@@ -120,6 +120,9 @@ public class NotificationServiceImpl {
 		} catch (JsonProcessingException e) {
 			e.printStackTrace();
 		}
+		if (Constants.PROFILE_SERVICE_NAME.equalsIgnoreCase(wfRequest.getServiceName()) && Constants.WITHDRAWN.equalsIgnoreCase(wfStatusEntity.getCurrentStatus())) {
+			return;
+		}
 		if (!ObjectUtils.isEmpty(wfStatus.getNotificationEnable()) && wfStatus.getNotificationEnable()) {
 			logger.info("Enter's in the notification block");
             Set<String> usersId = new HashSet<>();
