@@ -5,12 +5,7 @@ import java.util.Map;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
-import org.sunbird.workflow.models.Response;
-import org.sunbird.workflow.models.SBApiResponse;
-import org.sunbird.workflow.models.SearchCriteria;
-import org.sunbird.workflow.models.SearchCriteriaV2;
-import org.sunbird.workflow.models.WfRequest;
-import org.sunbird.workflow.models.WfStatus;
+import org.sunbird.workflow.models.*;
 
 public interface Workflowservice {
 
@@ -60,5 +55,8 @@ public interface Workflowservice {
 
     public Response getUserProfileApprovalRequest(String rootOrg, String org, SearchCriteria searchCriteria);
 
+    public Response workflowTransitionv2(String rootOrg, String org, WfRequest wfRequest);
 
+
+    public Response workflowTransitionV2(String rootOrg, String org, WfRequest wfRequest, String userId, String role);
 }

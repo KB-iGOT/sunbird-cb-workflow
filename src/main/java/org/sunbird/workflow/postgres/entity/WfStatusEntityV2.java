@@ -4,7 +4,7 @@ import javax.persistence.*;
 import java.util.Date;
 
 @Entity
-@Table(name = "wf_status_v2", schema = "wingspan")
+@Table(name = "wf_status_v2", schema = "sunbird")
 public class WfStatusEntityV2 {
 
     @Id

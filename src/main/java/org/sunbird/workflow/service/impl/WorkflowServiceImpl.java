@@ -6,7 +6,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -14,11 +13,6 @@ import java.util.stream.Stream;
 import org.apache.commons.collections.MapUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
@@ -155,7 +149,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 	}
 
 	public Response workflowTransition(String rootOrg, String org, WfRequest wfRequest) {
-		return workflowTransitionV1( rootOrg,  org,  wfRequest,null,null);
+		return workflowTransition( rootOrg,  org,  wfRequest,null,null);
 	}
 
 		private HashMap<String, String> changeStatus(String rootOrg, String org, WfRequest wfRequest,String userId,String role) {
@@ -1389,6 +1383,11 @@ public class WorkflowServiceImpl implements Workflowservice {
 		return response;
 	}
 
+	@Override
+	public Response workflowTransitionv2(String rootOrg, String org, WfRequest wfRequest) {
+		return workflowTransitionV2(rootOrg, org, wfRequest, null, null);
+	}
+
 
 	private void populateSheetWithPendingRequests(Map<String, Object> allPendingRequestMap, Map<String, Object> allUserDetails, String csvFilePath) throws IOException {
 		PrintWriter writer = new PrintWriter(new FileWriter(csvFilePath));
@@ -1615,7 +1614,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 		}
 	}
 
-	public Response workflowTransitionV1(String rootOrg, String org, WfRequest wfRequest, String userId, String role) {
+	public Response workflowTransitionV2(String rootOrg, String org, WfRequest wfRequest, String userId, String role) {
 		HashMap<String, String> changeStatusResponse;
 		List<String> wfIds = new ArrayList<>();
 		String changedStatus = null;
@@ -1623,28 +1622,18 @@ public class WorkflowServiceImpl implements Workflowservice {
 		HashMap<String, Object> data = new HashMap<>();
 
 		if (!CollectionUtils.isEmpty(wfRequest.getUpdateFieldValues())) {
-			String wfId = wfRequest.getWfId();
-			for (HashMap<String, Object> updatedField : wfRequest.getUpdateFieldValues()) {
-				wfRequest.setUpdateFieldValues(wfRequest.getUpdateFieldValues());
-				wfRequest.setWfId(wfId);
-				if (!StringUtils.isEmpty(wfRequest.getServiceName())) {
-					if (StringUtils.isEmpty(wfRequest.getWfId()) && wfRequest.getServiceName().equalsIgnoreCase(Constants.PROFILE_SERVICE_NAME)) {
-						if (handleProfileServiceWorkflowV1(wfRequest, response, data)) {
-							return response;
-						}
-					}
-				}
-
+			if (!StringUtils.isEmpty(wfRequest.getServiceName()) &&
+					(StringUtils.isEmpty(wfRequest.getWfId()) && Constants.PROFILE_SERVICE_NAME.equalsIgnoreCase(wfRequest.getServiceName()))) {
+				return initiateProfileWorkflowService(wfRequest, response, data);
+			}
 				changeStatusResponse = changeStatus(rootOrg, org, wfRequest, userId, role);
 				wfIds.add(changeStatusResponse.get(Constants.WF_ID_CONSTANT));
 				changedStatus = changeStatusResponse.get(Constants.STATUS);
-			}
+
 		} else {
 			if (!StringUtils.isEmpty(wfRequest.getServiceName())) {
-				if (StringUtils.isEmpty(wfRequest.getWfId()) && wfRequest.getServiceName().equalsIgnoreCase(Constants.PROFILE_SERVICE_NAME)) {
-					if (handleProfileServiceWorkflowV1(wfRequest, response, data)) {
-						return response;
-					}
+				if (StringUtils.isEmpty(wfRequest.getWfId()) && Constants.PROFILE_SERVICE_NAME.equalsIgnoreCase(wfRequest.getServiceName())) {
+					return initiateProfileWorkflowService(wfRequest, response, data);
 				}
 			}
 
@@ -1663,16 +1652,16 @@ public class WorkflowServiceImpl implements Workflowservice {
 	}
 
 
-	private boolean handleProfileServiceWorkflowV1(WfRequest wfRequest, Response response, Map<String, Object> data) {
+	private Response initiateProfileWorkflowService(WfRequest wfRequest, Response response, Map<String, Object> data) {
 		try {
-			Map<String, Object> wfRequestExistResponse = isWFRequestExistV1(wfRequest);
+			Map<String, Object> wfRequestExistResponse = isWFRequestExistV2(wfRequest);
 			boolean isWFRequestExist = (boolean) wfRequestExistResponse.get(Constants.IS_WF_REQUEST_EXIST);
 
 			if (isWFRequestExist) {
 				response.put(Constants.ERROR_MESSAGE, wfRequestExistResponse.get(Constants.ERROR_MESSAGE));
 				response.put(Constants.STATUS, HttpStatus.CONFLICT);
 				response.put(Constants.RESPONSE_CODE, HttpStatus.CONFLICT);
-				return true;
+				return response;
 			} else {
 				List<String> wfIds = new ArrayList<>();
 
@@ -1708,8 +1697,8 @@ public class WorkflowServiceImpl implements Workflowservice {
 				data.put(Constants.WF_IDS_CONSTANT, wfIds);
 				response.put(Constants.MESSAGE, Constants.STATUS_CHANGE_MESSAGE + Constants.SEND_FOR_APPROVAL);
 				response.put(Constants.DATA, data);
-				response.put(Constants.STATUS, HttpStatus.OK);
-				return true;
+				response.put(Constants.RESPONSE_CODE, HttpStatus.OK);
+				return response;
 			}
 		} catch (IOException e) {
 			String errorMessage = String.format("Error while validating WF request for user: %s. Exception message: %s", wfRequest.getUserId(), e.getMessage());
@@ -1717,12 +1706,12 @@ public class WorkflowServiceImpl implements Workflowservice {
 			response.put(Constants.STATUS, HttpStatus.INTERNAL_SERVER_ERROR);
 			response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
 			log.error(errorMessage, e);
-			return true;
+			return response;
 		}
 	}
 
 
-	private Map<String, Object> isWFRequestExistV1(WfRequest wfRequest) throws IOException {
+	private Map<String, Object> isWFRequestExistV2(WfRequest wfRequest) throws IOException {
 
 		if (wfRequest == null || wfRequest.getUpdateFieldValues() == null || wfRequest.getUpdateFieldValues().isEmpty()) {
 			throw new IllegalArgumentException("Invalid WfRequest or updateFieldValues");
@@ -1733,7 +1722,6 @@ public class WorkflowServiceImpl implements Workflowservice {
 		for (Map<String, Object> updateFieldValue : wfRequest.getUpdateFieldValues()) {
 			String fieldKey = (String) updateFieldValue.get("fieldKey");
 			Map<String, Object> toValue = (Map<String, Object>)updateFieldValue.get("toValue");
-			System.out.println("keys "+toValue.keySet());
 			for (Map.Entry<String, Object> fromEntry : toValue.entrySet()) {
 				String key = fromEntry.getKey();
 				String userId = wfRequest.getUserId();

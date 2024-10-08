@@ -15,6 +15,6 @@ import java.util.UUID;
 
 public interface WfStatusRepoV2 extends JpaRepository<WfStatusEntityV2, Long> {
 
-    @Query(value = "SELECT * FROM wingspan.wf_status_v2 WHERE user_id = ?1 AND request_type = ?2 AND status NOT IN (?3)", nativeQuery = true)
+    @Query(value = "SELECT * FROM sunbird.wf_status_v2 WHERE user_id = ?1 AND request_type = ?2 AND status NOT IN (?3)", nativeQuery = true)
     List<WfStatusEntityV2> countPendingRequests(String userId, String requestType, List<String> excludedStatuses);
 }

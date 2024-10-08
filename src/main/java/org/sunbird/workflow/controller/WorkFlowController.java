@@ -18,10 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.sunbird.workflow.config.Constants;
-import org.sunbird.workflow.models.Response;
-import org.sunbird.workflow.models.SBApiResponse;
-import org.sunbird.workflow.models.SearchCriteria;
-import org.sunbird.workflow.models.WfRequest;
+import org.sunbird.workflow.models.*;
 import org.sunbird.workflow.service.UserBulkUploadService;
 import org.sunbird.workflow.service.Workflowservice;
 
@@ -142,6 +139,13 @@ public class WorkFlowController {
 	public ResponseEntity<Response> getUserProfileApprovalRequest(@RequestHeader String rootOrg, @RequestHeader String org,
 														@RequestBody SearchCriteria searchCriteria) {
 		Response response = workflowService.getUserProfileApprovalRequest(rootOrg, org, searchCriteria);
+		return new ResponseEntity<>(response, HttpStatus.OK);
+	}
+
+	@PostMapping("/v2/transition")
+	public ResponseEntity<Response> wfTransitionv2(@RequestHeader String rootOrg, @RequestHeader String org,
+												 @RequestBody WfRequest wfRequest) {
+		Response response = workflowService.workflowTransitionv2(rootOrg, org, wfRequest);
 		return new ResponseEntity<>(response, HttpStatus.OK);
 	}
 }
