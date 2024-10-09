@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.commons.collections.MapUtils;
+import org.apache.kafka.common.protocol.types.Field;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -86,7 +87,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 	Logger log = LogManager.getLogger(WorkflowServiceImpl.class);
 
 	@Autowired
-	LRUCache<String, List<WfStatusCountDTO>> localCache ;
+	LRUCache<String, List<WfStatusCountDTO>> localCache;
 
 	@Autowired
 	StorageService storageService;
@@ -96,6 +97,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 
 	@Autowired
 	WfStatusRepoV2 wfStatusRepoV2;
+
 	/**
 	 * Change the status of workflow application
 	 *
@@ -105,7 +107,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 	 * @return
 	 */
 
-	public Response workflowTransition(String rootOrg, String org, WfRequest wfRequest,String userId,String role) {
+	public Response workflowTransition(String rootOrg, String org, WfRequest wfRequest, String userId, String role) {
 		HashMap<String, String> changeStatusResponse;
 		List<String> wfIds = new ArrayList<>();
 		String changedStatus = null;
@@ -1024,7 +1026,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 			propertyMap.put(Constants.ID, userId);
 			List<Map<String, Object>> userDetails = cassandraOperation.getRecordsByProperties(
 					Constants.KEYSPACE_SUNBIRD, Constants.USER_TABLE, propertyMap, Arrays.asList(Constants.ROOT_ORG_ID));
-			
+
 			if (userDetails.isEmpty()) {
 				setErrorData(response, String.format("Failed to upload file. Error: User not found for Id: %s", userId));
 				log.error("Record not found in :" + Constants.USER_TABLE + Constants.DB_TABLE_NAME);
@@ -1597,7 +1599,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 		return false;
 	}
 
-	private void addRequestTypeInProfileWF(WfRequest wfRequest){
+	private void addRequestTypeInProfileWF(WfRequest wfRequest) {
 		String requestKey = ((Map<String, Object>) wfRequest.getUpdateFieldValues().get(0).get(Constants.TO_VALUE)).keySet().iterator().next();
 		switch (requestKey) {
 			case "group":
@@ -1615,34 +1617,37 @@ public class WorkflowServiceImpl implements Workflowservice {
 	}
 
 	public Response workflowTransitionV2(String rootOrg, String org, WfRequest wfRequest, String userId, String role) {
-		HashMap<String, String> changeStatusResponse;
+		Map<String, Object> changeStatusResponse;
 		List<String> wfIds = new ArrayList<>();
 		String changedStatus = null;
 		Response response = new Response();
 		HashMap<String, Object> data = new HashMap<>();
 
 		if (!CollectionUtils.isEmpty(wfRequest.getUpdateFieldValues())) {
-			if (!StringUtils.isEmpty(wfRequest.getServiceName()) &&
-					(StringUtils.isEmpty(wfRequest.getWfId()) && Constants.PROFILE_SERVICE_NAME.equalsIgnoreCase(wfRequest.getServiceName()))) {
-				return initiateProfileWorkflowService(wfRequest, response, data);
-			}
-				changeStatusResponse = changeStatus(rootOrg, org, wfRequest, userId, role);
-				wfIds.add(changeStatusResponse.get(Constants.WF_ID_CONSTANT));
-				changedStatus = changeStatusResponse.get(Constants.STATUS);
-
+				if (!StringUtils.isEmpty(wfRequest.getServiceName())) {
+					if (StringUtils.isEmpty(wfRequest.getWfId()) && wfRequest.getServiceName().equalsIgnoreCase(Constants.PROFILE_SERVICE_NAME)) {
+						if (initiateProfileWorkflowService(response, data, wfRequest)) {
+							return response;
+						}
+					}
+				}
+				changeStatusResponse = changeStatusV2(rootOrg, org, wfRequest, userId, role);
+			    List<String> currentWfIds = (List<String>) changeStatusResponse.get(Constants.WF_IDS_CONSTANT);
+			    changedStatus = (String) changeStatusResponse.get(Constants.STATUS);
+			    wfIds.addAll(currentWfIds);
 		} else {
 			if (!StringUtils.isEmpty(wfRequest.getServiceName())) {
-				if (StringUtils.isEmpty(wfRequest.getWfId()) && Constants.PROFILE_SERVICE_NAME.equalsIgnoreCase(wfRequest.getServiceName())) {
-					return initiateProfileWorkflowService(wfRequest, response, data);
+				if (StringUtils.isEmpty(wfRequest.getWfId()) && wfRequest.getServiceName().equalsIgnoreCase(Constants.PROFILE_SERVICE_NAME)) {
+					if (initiateProfileWorkflowService(response, data, wfRequest)) {
+						return response;
+					}
 				}
 			}
-
-			changeStatusResponse = changeStatus(rootOrg, org, wfRequest, userId, role);
-			wfIds.add(changeStatusResponse.get(Constants.WF_ID_CONSTANT));
-			changedStatus = changeStatusResponse.get(Constants.STATUS);
+			changeStatusResponse = changeStatusV2(rootOrg, org, wfRequest, userId, role);
+			List<String> currentWfIds = (List<String>) changeStatusResponse.get(Constants.WF_IDS_CONSTANT);
+			changedStatus = (String) changeStatusResponse.get(Constants.STATUS);
+			wfIds.addAll(currentWfIds);
 		}
-
-		// Populate the response
 		data.put(Constants.STATUS, changedStatus);
 		data.put(Constants.WF_IDS_CONSTANT, wfIds);
 		response.put(Constants.MESSAGE, Constants.STATUS_CHANGE_MESSAGE + changedStatus);
@@ -1651,54 +1656,19 @@ public class WorkflowServiceImpl implements Workflowservice {
 		return response;
 	}
 
-
-	private Response initiateProfileWorkflowService(WfRequest wfRequest, Response response, Map<String, Object> data) {
+	private boolean initiateProfileWorkflowService(Response response, Map<String, Object> data, WfRequest wfRequest) {
 		try {
-			Map<String, Object> wfRequestExistResponse = isWFRequestExistV2(wfRequest);
+			Map<String, Object> wfRequestExistResponse = isWFRequestExistV2(wfRequest, wfRequest.getUserId());
 			boolean isWFRequestExist = (boolean) wfRequestExistResponse.get(Constants.IS_WF_REQUEST_EXIST);
 
 			if (isWFRequestExist) {
+				data.put(Constants.STATUS, Constants.SEND_FOR_APPROVAL);
+				data.put(Constants.WF_IDS_CONSTANT, Arrays.asList(wfRequestExistResponse.get(Constants.WF_ID_CONSTANT)));
 				response.put(Constants.ERROR_MESSAGE, wfRequestExistResponse.get(Constants.ERROR_MESSAGE));
 				response.put(Constants.STATUS, HttpStatus.CONFLICT);
-				response.put(Constants.RESPONSE_CODE, HttpStatus.CONFLICT);
-				return response;
-			} else {
-				List<String> wfIds = new ArrayList<>();
-
-				for (Map<String, Object> updateFieldValue : wfRequest.getUpdateFieldValues()) {
-					Map<String, Object> fromValueMap = (Map<String, Object>) updateFieldValue.get("fromValue");
-					Map<String, Object> toValueMap = (Map<String, Object>) updateFieldValue.get("toValue");
-
-					for (String key : fromValueMap.keySet()) {
-						String fromValue = fromValueMap.get(key).toString();
-						String toValue = toValueMap.get(key) != null ? toValueMap.get(key).toString() : null;
-
-						WfStatusEntityV2 wfStatusEntity = new WfStatusEntityV2();
-						wfStatusEntity.setWfId(UUID.randomUUID().toString());
-						wfStatusEntity.setUserId(wfRequest.getUserId());
-						wfStatusEntity.setOrganizationId(wfRequest.getRootOrgId());
-						wfStatusEntity.setRequestType(key);
-						wfStatusEntity.setFromValue(fromValue);
-						wfStatusEntity.setToValue(toValue);
-						wfStatusEntity.setStatus(Constants.SEND_FOR_APPROVAL);
-						wfStatusEntity.setCreatedBy(wfRequest.getActorUserId());
-						wfStatusEntity.setUpdatedBy(wfRequest.getActorUserId());
-						wfStatusEntity.setCreatedAt(new Date());
-						wfStatusEntity.setUpdatedAt(new Date());
-
-						WfStatusEntityV2 statusEntityV2 = wfStatusRepoV2.save(wfStatusEntity);
-						if (statusEntityV2 != null) {
-							wfIds.add(statusEntityV2.getWfId());
-						}
-					}
-				}
-				addRequestTypeInProfileWF(wfRequest);
-				data.put(Constants.STATUS, Constants.SEND_FOR_APPROVAL);
-				data.put(Constants.WF_IDS_CONSTANT, wfIds);
-				response.put(Constants.MESSAGE, Constants.STATUS_CHANGE_MESSAGE + Constants.SEND_FOR_APPROVAL);
 				response.put(Constants.DATA, data);
-				response.put(Constants.RESPONSE_CODE, HttpStatus.OK);
-				return response;
+				response.put(Constants.RESPONSE_CODE, HttpStatus.CONFLICT);
+				return true;
 			}
 		} catch (IOException e) {
 			String errorMessage = String.format("Error while validating WF request for user: %s. Exception message: %s", wfRequest.getUserId(), e.getMessage());
@@ -1706,28 +1676,23 @@ public class WorkflowServiceImpl implements Workflowservice {
 			response.put(Constants.STATUS, HttpStatus.INTERNAL_SERVER_ERROR);
 			response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
 			log.error(errorMessage, e);
-			return response;
+			return true;
 		}
+		return false;
 	}
 
+	private Map<String, Object> isWFRequestExistV2(WfRequest wfRequest , String userId) throws IOException {
 
-	private Map<String, Object> isWFRequestExistV2(WfRequest wfRequest) throws IOException {
-
-		if (wfRequest == null || wfRequest.getUpdateFieldValues() == null || wfRequest.getUpdateFieldValues().isEmpty()) {
+		if (wfRequest == null || wfRequest.getUpdateFieldValues().isEmpty()) {
 			throw new IllegalArgumentException("Invalid WfRequest or updateFieldValues");
 		}
 
 		Map<String, Object> response = new HashMap<>();
 		List<WfStatusEntityV2> wfStatusEntityV2List = null;
 		for (Map<String, Object> updateFieldValue : wfRequest.getUpdateFieldValues()) {
-			String fieldKey = (String) updateFieldValue.get("fieldKey");
-			Map<String, Object> toValue = (Map<String, Object>)updateFieldValue.get("toValue");
-			for (Map.Entry<String, Object> fromEntry : toValue.entrySet()) {
-				String key = fromEntry.getKey();
-				String userId = wfRequest.getUserId();
-
-				 wfStatusEntityV2List = wfStatusRepoV2.countPendingRequests(userId, key, Arrays.asList("initiated", "in-progress"));
-			}
+			addRequestTypeInProfileWFV2(updateFieldValue,wfRequest);
+			String key = wfRequest.getRequestType();
+				wfStatusEntityV2List = wfStatusRepoV2.countPendingRequests(userId, key, Arrays.asList("initiated", "in-progress"));
 			if (wfStatusEntityV2List.size() > 0) {
 				response.put(Constants.IS_WF_REQUEST_EXIST, true);
 				response.put(Constants.ERROR_MESSAGE, "A workflow request with the same details already exists.");
@@ -1741,5 +1706,122 @@ public class WorkflowServiceImpl implements Workflowservice {
 		return response;
 	}
 
+	private Map<String, Object> changeStatusV2(String rootOrg, String org, WfRequest wfRequest, String userId, String role) {
+		HashMap<String, Object> data = new HashMap<>();
+		List<String> wfids = new ArrayList<>();
+		String finalStatus = null;
+		for (HashMap<String, Object> updatedFieldValue : wfRequest.getUpdateFieldValues()) {
+			Map<String, Object> previousValuesMap = (Map<String, Object>) updatedFieldValue.get("fromValue");
+			Map<String, Object> updatedValuesMap = (Map<String, Object>) updatedFieldValue.get("toValue");
+			String previousValue = previousValuesMap.entrySet().stream()
+					.map(Map.Entry::getValue)
+					.findFirst()
+					.orElse("")
+					.toString();
 
+			String updatedValues = updatedValuesMap != null ? updatedValuesMap.entrySet().stream()
+					.map(Map.Entry::getValue)
+					.findFirst()
+					.map(Object::toString)
+					.orElse(null)
+					: null;
+
+			String wfId = wfRequest.getWfId();
+			if (wfId != null && wfRequest.getUpdateFieldValues().size() > 1) {
+				wfRequest.setWfId(null);
+				wfId = null;
+			}
+			String nextState = null;
+			addRequestTypeInProfileWFV2(updatedFieldValue,wfRequest);
+			validateWfRequest(wfRequest);
+			WfStatusEntityV2 applicationStatus = wfStatusRepoV2.findByOrganizationIdAndRequestTypeAndWfId(org,wfRequest.getRequestType(),wfRequest.getWfId());
+			String serviceName = wfRequest.getServiceName();
+			if (Constants.BLENDED_PROGRAM_SERVICE_NAME.equalsIgnoreCase(wfRequest.getServiceName()) && !StringUtils.isEmpty(applicationStatus.getServiceName())) {
+				serviceName = applicationStatus.getServiceName();
+			}
+			WorkFlowModel workFlowModel = getWorkFlowConfig(serviceName);
+			WfStatus wfStatus = getWfStatus(wfRequest.getState(), workFlowModel);
+			validateUserAndWfStatusV2(wfRequest, wfStatus, applicationStatus);
+			WfAction wfAction = getWfAction(wfRequest.getAction(), wfStatus);
+
+			// actor has proper role to take the workflow action
+
+			nextState = wfAction.getNextState();
+			if (ObjectUtils.isEmpty(applicationStatus)) {
+				applicationStatus = new WfStatusEntityV2();
+				wfId = UUID.randomUUID().toString();
+				applicationStatus.setWfId(wfId);
+				applicationStatus.setServiceName(serviceName);
+				applicationStatus.setUserId(wfRequest.getUserId());
+				applicationStatus.setOrganizationId(org);
+				applicationStatus.setCreatedAt(new Date());
+				applicationStatus.setCreatedBy(wfRequest.getActorUserId());
+				if (!StringUtils.isEmpty(wfRequest.getRequestType())) {
+					applicationStatus.setRequestType(wfRequest.getRequestType());
+				}
+				wfRequest.setWfId(wfId);
+			}
+
+			WfStatus wfStatusCheckForNextState = getWfStatus(nextState, workFlowModel);
+			applicationStatus.setStatus(nextState);
+			applicationStatus.setUpdatedAt(new Date());
+			applicationStatus.setUpdatedBy(wfRequest.getActorUserId());
+			applicationStatus.setFromValue(previousValue);
+			applicationStatus.setToValue(updatedValues);
+			String fieldKey = null;
+			wfStatusRepoV2.save(applicationStatus);
+				if (updatedFieldValue.containsKey(Constants.TO_VALUE)) {
+					Map<String, Object> toValue = (Map<String, Object>) updatedFieldValue.get(Constants.TO_VALUE);
+					fieldKey = toValue.entrySet().stream().findFirst().get().getKey();
+				}
+			if (!StringUtils.isEmpty(fieldKey) && Constants.NAME.equalsIgnoreCase(fieldKey)) {
+				Map<String, Object> propertyMap = new HashMap<>();
+				propertyMap.put(Constants.ID, wfRequest.getApplicationId());
+				List<Map<String, Object>> userDetails = cassandraOperation.getRecordsByProperties(
+						Constants.KEYSPACE_SUNBIRD, Constants.USER_TABLE, propertyMap, Arrays.asList(Constants.ROOT_ORG_ID));
+				String rootOrgId = null;
+				if (!CollectionUtils.isEmpty(userDetails)) {
+					rootOrgId = (String) userDetails.get(0).get(Constants.USER_ROOT_ORG_ID);
+				}
+				wfRequest.setPreviousRootOrgId(rootOrgId);
+			}
+			producer.push(configuration.getWorkFlowNotificationTopic(), wfRequest);
+			producer.push(configuration.getWorkflowApplicationTopic(), wfRequest);
+			wfids.add(wfId);
+			finalStatus = nextState;
+		}
+		data.put(Constants.WF_IDS_CONSTANT, wfids);
+		data.put(Constants.STATUS, finalStatus);
+		return data;
+	}
+
+	private void validateUserAndWfStatusV2(WfRequest wfRequest, WfStatus wfStatus, WfStatusEntityV2 applicationStatus) {
+
+		if (StringUtils.isEmpty(wfRequest.getWfId()) && !wfStatus.getStartState()) {
+			throw new ApplicationException(Constants.WORKFLOW_ID_ERROR_MESSAGE);
+		}
+		if ((!ObjectUtils.isEmpty(applicationStatus))
+				&& (!wfRequest.getState().equalsIgnoreCase(applicationStatus.getStatus()))) {
+			throw new BadRequestException("Application is in " + applicationStatus.getStatus()
+					+ " State but trying to be move in " + wfRequest.getState() + " state!");
+		}
+	}
+
+	private void addRequestTypeInProfileWFV2(Map<String,Object> updateFieldValues, WfRequest wfRequest) {
+		Map<String, Object> toValueMap = (Map<String, Object>) updateFieldValues.get("toValue");
+		String requestKey = toValueMap.entrySet().stream().findFirst().get().getKey();
+		switch (requestKey) {
+			case "group":
+				wfRequest.setRequestType("GROUP_CHANGE");
+				break;
+			case "designation":
+				wfRequest.setRequestType("DESIGNATION_CHANGE");
+				break;
+			case "name":
+				wfRequest.setRequestType("ORG_TRANSFER");
+				break;
+			default:
+				wfRequest.setRequestType(requestKey);
+		}
+	}
 }

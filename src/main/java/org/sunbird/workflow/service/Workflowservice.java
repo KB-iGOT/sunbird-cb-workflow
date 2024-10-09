@@ -56,7 +56,4 @@ public interface Workflowservice {
     public Response getUserProfileApprovalRequest(String rootOrg, String org, SearchCriteria searchCriteria);
 
     public Response workflowTransitionv2(String rootOrg, String org, WfRequest wfRequest);
-
-
-    public Response workflowTransitionV2(String rootOrg, String org, WfRequest wfRequest, String userId, String role);
 }

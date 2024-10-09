@@ -43,6 +43,9 @@ public class WfStatusEntityV2 {
     @Column(name = "updated_by", nullable = false, length = 64) 
     private String updatedBy;
 
+    @Column(name = "service_name")
+    private String serviceName;
+
     public String getWfId() {
         return wfId; 
     }
@@ -129,5 +132,13 @@ public class WfStatusEntityV2 {
 
     public void setUpdatedBy(String updatedBy) {
         this.updatedBy = updatedBy; 
+    }
+
+    public String getServiceName() {
+        return serviceName;
+    }
+
+    public void setServiceName(String serviceName) {
+        this.serviceName = serviceName;
     }
 }
