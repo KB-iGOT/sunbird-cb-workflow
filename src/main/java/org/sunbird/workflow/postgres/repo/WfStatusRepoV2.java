@@ -14,10 +14,12 @@ import java.util.UUID;
 @Repository
 @Transactional
 
-public interface WfStatusRepoV2 extends JpaRepository<WfStatusEntityV2, Long> {
+public interface WfStatusRepoV2 extends JpaRepository<WfStatusEntityV2, String> {
 
     @Query(value = "SELECT * FROM sunbird.wf_status_v2 WHERE user_id = ?1 AND request_type = ?2 AND status IN (?3)", nativeQuery = true)
     List<WfStatusEntityV2> countPendingRequests(String userId, String requestType, List<String> statuses);
 
     WfStatusEntityV2 findByOrganizationIdAndRequestTypeAndWfId(String organizationId, String requestType, String wfId);
+
+    WfStatusEntityV2 findByWfId(String wfId);
 }

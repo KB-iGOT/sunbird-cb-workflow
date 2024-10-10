@@ -1734,12 +1734,15 @@ public class WorkflowServiceImpl implements Workflowservice {
 			String nextState = null;
 
 			validateWfRequest(wfRequest);
-
-			WfStatusEntityV2 applicationStatus = wfStatusRepoV2.findByOrganizationIdAndRequestTypeAndWfId(org, wfRequest.getRequestType(), wfRequest.getWfId());
+			WfStatusEntityV2 applicationStatus = null;
+			if (wfId != null) {
+				applicationStatus = wfStatusRepoV2.findByWfId(wfId);
+			}
 			String serviceName = wfRequest.getServiceName();
-
-			if (Constants.BLENDED_PROGRAM_SERVICE_NAME.equalsIgnoreCase(serviceName) && !StringUtils.isEmpty(applicationStatus.getServiceName())) {
-				serviceName = applicationStatus.getServiceName();
+			if (applicationStatus != null) {
+				if (Constants.BLENDED_PROGRAM_SERVICE_NAME.equalsIgnoreCase(serviceName) && !StringUtils.isEmpty(applicationStatus.getServiceName())) {
+					serviceName = applicationStatus.getServiceName();
+				}
 			}
 
 			WorkFlowModel workFlowModel = getWorkFlowConfig(serviceName);
