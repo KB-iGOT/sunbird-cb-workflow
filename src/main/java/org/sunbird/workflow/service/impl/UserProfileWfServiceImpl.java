@@ -437,8 +437,11 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 			if(valueToUpdate.containsKey(Constants.TO_VALUE)) {
 				Map<String, Object> toValue = (Map<String, Object>) valueToUpdate.get(Constants.TO_VALUE);
 				String keyToUpdate = toValue.keySet().stream().findFirst().get();
-				if(Constants.FIRSTNAME.equalsIgnoreCase(keyToUpdate)) {
+				if (Constants.FIRSTNAME.equalsIgnoreCase(keyToUpdate)) {
 					requestWrapper.put(Constants.FIRST_NAME_CAMEL_CASE, toValue.get(keyToUpdate));
+				}
+				if (Constants.MOBILE.equalsIgnoreCase(keyToUpdate)) {
+					requestWrapper.put(Constants.PHONE, String.valueOf(toValue.get(keyToUpdate)));
 				}
 			}
 		}

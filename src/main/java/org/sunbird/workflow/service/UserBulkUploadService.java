@@ -190,7 +190,11 @@ public class UserBulkUploadService {
                     }
                     Map<String, Object> valuesToBeUpdate = new HashMap<>();
                     Map<String, Object> userDetails = null;
-                    boolean isEmailOrPhoneNumberValid = false;
+                    Map<String, Object> userDetailsForMobile = null;
+                    Map<String, Object> filters = null;
+                    boolean isEmailOrPhoneNumberExist = false;
+                    boolean isEmailValid = false;
+                    boolean isPhoneNumberValid = false;
                     Cell statusCell = nextRow.getCell(14);
                     if (statusCell == null) {
                         statusCell = nextRow.createCell(14);
@@ -199,52 +203,75 @@ public class UserBulkUploadService {
                     if (errorDetails == null) {
                         errorDetails = nextRow.createCell(15);
                     }
+                    String email = "";
                     if (nextRow.getCell(1) != null && nextRow.getCell(1).getCellType() != CellType.BLANK) {
-                        String email = nextRow.getCell(1).getStringCellValue().trim();
+                        email = nextRow.getCell(1).getStringCellValue().trim();
                         if(ValidationUtil.validateEmailPattern(email)){
                             userDetails = new HashMap<>();
-                            isEmailOrPhoneNumberValid = this.verifyUserRecordExists(Constants.EMAIL, email, userDetails);
+                            filters = new HashMap<>();
+                            filters.put(Constants.EMAIL, email);
+                            isEmailValid = this.verifyUserRecordExists(filters, userDetails);
                         } else{
                             errList.add("The Email provided in Invalid");
                         }
                     }
-                    if(!isEmailOrPhoneNumberValid){
-                        String phoneNumber = null;
-                        boolean isValidPhoneNumber = false;
-                        if (nextRow.getCell(2) != null && nextRow.getCell(2).getCellType() != CellType.BLANK) {
-                            if (nextRow.getCell(2).getCellType() == CellType.NUMERIC) {
-                                phoneNumber = NumberToTextConverter.toText(nextRow.getCell(2).getNumericCellValue());
-                            } else if (nextRow.getCell(2).getCellType() == CellType.STRING) {
-                                phoneNumber = nextRow.getCell(2).getStringCellValue().trim();
-                            } else {
-                                errList.add("Invalid Value of Mobile Number. Expecting number/string format");
-                            }
+                    String phoneNumber = null;
+                    boolean isValidPhoneNumber = false;
+                    if (nextRow.getCell(2) != null && nextRow.getCell(2).getCellType() != CellType.BLANK) {
+                        if (nextRow.getCell(2).getCellType() == CellType.NUMERIC) {
+                            phoneNumber = NumberToTextConverter.toText(nextRow.getCell(2).getNumericCellValue());
+                        } else if (nextRow.getCell(2).getCellType() == CellType.STRING) {
+                            phoneNumber = nextRow.getCell(2).getStringCellValue().trim();
                         } else {
-                            errList.add("Mobile Number is Missing");
+                            errList.add("Invalid Value of Mobile Number. Expecting number/string format");
                         }
-                        if(!StringUtils.isEmpty(phoneNumber)){
-                            isValidPhoneNumber = ValidationUtil.validateContactPattern(phoneNumber);
-                            if(isValidPhoneNumber){
-                                userDetails = new HashMap<>();
-                                isEmailOrPhoneNumberValid = this.verifyUserRecordExists(Constants.PHONE, phoneNumber, userDetails);
-                            } else{
-                                errList.add("The Mobile Number provided is Invalid");
-                            }
+                    } else {
+                        errList.add("Mobile Number is Missing");
+                    }
+                    if (!StringUtils.isEmpty(phoneNumber)) {
+                        isValidPhoneNumber = ValidationUtil.validateContactPattern(phoneNumber);
+                        if (isValidPhoneNumber) {
+                            userDetailsForMobile = new HashMap<>();
+                            filters = new HashMap<>();
+                            filters.put(Constants.PHONE, phoneNumber);
+                            isPhoneNumberValid = this.verifyUserRecordExists(filters, userDetailsForMobile);
+                        } else {
+                            errList.add("The Mobile Number provided is Invalid");
                         }
                     }
-                    if(!isEmailOrPhoneNumberValid){
+                    if (!StringUtils.isEmpty(phoneNumber) && isEmailValid) {
+                        filters = new HashMap<>();
+                        filters.put(Constants.EMAIL, email);
+                        filters.put(Constants.PHONE, phoneNumber);
+                        isEmailOrPhoneNumberExist = this.verifyUserRecordExists(filters, userDetails);
+                    }
+                    if (!CollectionUtils.isEmpty(errList)) {
+                        this.setErrorDetails(str, errList, statusCell, errorDetails);
+                        failedRecordsCount++;
+                        totalRecordsCount++;
+                        continue;
+                    }
+                    if(!isEmailValid){
                         errList.add("User record does not exist with given email and/or Mobile Number");
+                    } else if (!isEmailOrPhoneNumberExist && isPhoneNumberValid) {
+                        errList.add("Another user record exist with the mobile number");
                     } else {
                         errList.clear();
                         String userRootOrgId = (String) userDetails.get(Constants.ROOT_ORG_ID);
                         String mdoAdminRootOrgId = inputDataMap.get(Constants.ROOT_ORG_ID);
-                        if(!mdoAdminRootOrgId.equalsIgnoreCase(userRootOrgId)){
+                        if (!mdoAdminRootOrgId.equalsIgnoreCase(userRootOrgId)) {
                             errList.add("The User belongs to a different MDO Organisation");
                             this.setErrorDetails(str, errList, statusCell, errorDetails);
                             failedRecordsCount++;
                             totalRecordsCount++;
                             continue;
                         }
+                    }
+                    if(!CollectionUtils.isEmpty(errList)){
+                        this.setErrorDetails(str, errList, statusCell, errorDetails);
+                        failedRecordsCount++;
+                        totalRecordsCount++;
+                        continue;
                     }
                     if (nextRow.getCell(0) != null && nextRow.getCell(0).getCellType() != CellType.BLANK) {
                         if (nextRow.getCell(0).getCellType() == CellType.STRING) {
@@ -255,6 +282,9 @@ public class UserBulkUploadService {
                         } else {
                             errList.add("Invalid value for Full Name type. Expecting string format");
                         }
+                    }
+                    if (!isEmailOrPhoneNumberExist) {
+                        valuesToBeUpdate.put(Constants.MOBILE, phoneNumber);
                     }
                     if (nextRow.getCell(3) != null && nextRow.getCell(3).getCellType() != CellType.BLANK) {
                         String groupValue = null;
@@ -480,6 +510,7 @@ public class UserBulkUploadService {
                     personalDetailsKey.add(Constants.DOMICILE_MEDIUM);
                     personalDetailsKey.add(Constants.CATEGORY);
                     personalDetailsKey.add(Constants.GENDER);
+                    personalDetailsKey.add(Constants.MOBILE);
 
                     WfRequest wfRequest = this.getWFRequest(valuesToBeUpdate, userId);
                     List<HashMap<String, Object>> updatedValues = new ArrayList<>();
@@ -575,13 +606,10 @@ public class UserBulkUploadService {
     }
 
 
-    public boolean verifyUserRecordExists(String field, String fieldValue, Map<String, Object> userRecordDetails) {
+    public boolean verifyUserRecordExists(Map<String, Object> filters, Map<String, Object> userRecordDetails) {
 
         HashMap<String, String> headersValue = new HashMap<>();
         headersValue.put(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON);
-
-        Map<String, Object> filters = new HashMap<>();
-        filters.put(field, fieldValue);
 
         Map<String, Object> request = new HashMap<>();
         request.put("filters", filters);
@@ -743,28 +771,51 @@ public class UserBulkUploadService {
                         errList.add("Email or Phone is missing");
                     }
 
+                    Map<String, Object> userDetailsForMobile = null;
+                    Map<String, Object> filters = null;
+                    boolean isEmailOrPhoneNumberExist = false;
+                    boolean isEmailValid = false;
+                    boolean isPhoneNumberValid = false;
                     // Validate email
                     if (emailExists) {
                         if (ValidationUtil.validateEmailPattern(email)) {
                             userDetails = new HashMap<>();
-                            isEmailOrPhoneNumberValid = this.verifyUserRecordExists(Constants.EMAIL, email, userDetails);
+                            filters = new HashMap<>();
+                            filters.put(Constants.EMAIL, email);
+                            isEmailValid = this.verifyUserRecordExists(filters, userDetails);
                         } else {
                             errList.add("Invalid Email format");
                         }
                     }
 
                     // Validate phone
-                    if (!isEmailOrPhoneNumberValid) {
-                        if (ValidationUtil.validateContactPattern(phone)) {
-                            userDetails = new HashMap<>();
-                            isEmailOrPhoneNumberValid = this.verifyUserRecordExists(Constants.PHONE, phone, userDetails);
-                        } else {
-                            errList.add("Invalid Phone number format");
-                        }
-                    }
 
-                    if (!isEmailOrPhoneNumberValid) {
-                        errList.add("User record does not exist with given email and/or Mobile Number");
+                    if (ValidationUtil.validateContactPattern(phone)) {
+                        userDetails = new HashMap<>();
+                        userDetailsForMobile = new HashMap<>();
+                        filters = new HashMap<>();
+                        filters.put(Constants.PHONE, phone);
+                        isPhoneNumberValid = this.verifyUserRecordExists(filters, userDetailsForMobile);
+                    } else {
+                        errList.add("Invalid Phone number format");
+                    }
+                    if (!StringUtils.isEmpty(phone) && isEmailValid) {
+                        filters = new HashMap<>();
+                        filters.put(Constants.EMAIL, email);
+                        filters.put(Constants.PHONE, phone);
+                        isEmailOrPhoneNumberExist = this.verifyUserRecordExists(filters, userDetails);
+                    }
+                    if (!CollectionUtils.isEmpty(errList)) {
+                        csvValues.put("Error Details", String.join(",", errList));
+                        failedRecordsCount++;
+                        totalRecordsCount++;
+                        updatedRecords.add(csvValues);
+                        continue;
+                    }
+                    if (!isEmailValid) {
+                        errList.add("User record does not exist with given email");
+                    } else if (!isEmailOrPhoneNumberExist && isPhoneNumberValid) {
+                        errList.add("Another user record exist with the mobile number");
                     } else {
                         errList.clear();
                         String userRootOrgId = (String) userDetails.get(Constants.ROOT_ORG_ID);
@@ -780,6 +831,14 @@ public class UserBulkUploadService {
                         }
                     }
 
+                    if (!CollectionUtils.isEmpty(errList)) {
+                        csvValues.put("Error Details", String.join(",", errList));
+                        failedRecordsCount++;
+                        totalRecordsCount++;
+                        updatedRecords.add(csvValues);
+                        continue;
+                    }
+
                     // Validate and update fields
                     if (!record.get(0).isEmpty()) {
                         String fullName = record.get(0).trim();
@@ -789,111 +848,114 @@ public class UserBulkUploadService {
                             errList.add("Invalid Full Name format");
                         }
                     }
-                        // Group
-                        if (!record.get(3).isEmpty()) {
-                            String group = record.get(3).trim();
-                            valuesToBeUpdate.put(Constants.GROUP, group);
-                            if (!this.validateGroupValue(group)) {
-                                errList.add("Invalid value of Group Type, please choose a valid value from the default list");
-                            }
+                    // Group
+                    if (!record.get(3).isEmpty()) {
+                        String group = record.get(3).trim();
+                        valuesToBeUpdate.put(Constants.GROUP, group);
+                        if (!this.validateGroupValue(group)) {
+                            errList.add("Invalid value of Group Type, please choose a valid value from the default list");
                         }
+                    }
 
-                        // Designation
-                        if (!record.get(4).isEmpty()) {
-                            String designation = record.get(4).trim();
-                            valuesToBeUpdate.put(Constants.DESIGNATION, designation);
-                            if (!ValidationUtil.validateRegexPatternWithNoSpecialCharacter(designation)) {
-                                errList.add("Invalid Designation: Designation should be added from default list and cannot contain special character");
-                            }
-                            if (this.validateFieldValue("position", designation)) {
-                                errList.add("Invalid Value of Designation, please choose a valid value from the default list");
-                            }
+                    if (!isEmailOrPhoneNumberExist) {
+                        valuesToBeUpdate.put(Constants.MOBILE, phone);
+                    }
+                    // Designation
+                    if (!record.get(4).isEmpty()) {
+                        String designation = record.get(4).trim();
+                        valuesToBeUpdate.put(Constants.DESIGNATION, designation);
+                        if (!ValidationUtil.validateRegexPatternWithNoSpecialCharacter(designation)) {
+                            errList.add("Invalid Designation: Designation should be added from default list and cannot contain special character");
+                        }
+                        if (this.validateFieldValue("position", designation)) {
+                            errList.add("Invalid Value of Designation, please choose a valid value from the default list");
+                        }
+                    } else {
+                        errList.add("Invalid value for Designation type. Expecting string format");
+                    }
+
+                    // Gender
+                    if (!record.get(5).isEmpty()) {
+                        String gender = record.get(5).trim();
+                        if (validateGender(gender)) {
+                            valuesToBeUpdate.put(Constants.GENDER, gender);
                         } else {
-                            errList.add("Invalid value for Designation type. Expecting string format");
+                            errList.add("Invalid Gender : Gender can be only among one of these " + configuration.getBulkUploadGenderValue());
                         }
+                    }
 
-                        // Gender
-                        if (!record.get(5).isEmpty()) {
-                            String gender = record.get(5).trim();
-                            if (validateGender(gender)) {
-                                valuesToBeUpdate.put(Constants.GENDER, gender);
-                            } else {
-                                errList.add("Invalid Gender : Gender can be only among one of these " + configuration.getBulkUploadGenderValue());
-                            }
-                        }
-
-                        // Category
-                        if (!record.get(6).isEmpty()) {
-                            String category = record.get(6).trim();
-                            if (validateCategory(category)) {
-                                valuesToBeUpdate.put(Constants.CATEGORY, category);
-                            } else {
-                                errList.add("Invalid Category : Category can be only among one of these " + configuration.getBulkUploadCategoryValue());
-                            }
-                        }
-
-                        // Date of Birth
-                        if (!record.get(7).isEmpty()) {
-                            String dob = record.get(7).trim();
-                            if (ValidationUtil.validateDate(dob)) {
-                                valuesToBeUpdate.put(Constants.DOB, dob);
-                            } else {
-                                errList.add("Invalid format for Date of Birth type. Expecting in format dd-mm-yyyy");
-                            }
+                    // Category
+                    if (!record.get(6).isEmpty()) {
+                        String category = record.get(6).trim();
+                        if (validateCategory(category)) {
+                            valuesToBeUpdate.put(Constants.CATEGORY, category);
                         } else {
-                            errList.add("Invalid value for Date of Birth type. Expecting string format");
+                            errList.add("Invalid Category : Category can be only among one of these " + configuration.getBulkUploadCategoryValue());
                         }
+                    }
 
-                        // Mother Tongue
-                        if (!record.get(8).isEmpty()) {
-                            String motherTongue = record.get(8).trim();
-                            if (!ValidationUtil.validateRegexPatternWithNoSpecialCharacter(motherTongue) || this.validateFieldValue("languages", motherTongue)) {
-                                errList.add("Invalid Mother Tongue: Mother Tongue should be added from default list and/or cannot contain special character(s)");
-                            }
-                            valuesToBeUpdate.put(Constants.DOMICILE_MEDIUM, motherTongue);
+                    // Date of Birth
+                    if (!record.get(7).isEmpty()) {
+                        String dob = record.get(7).trim();
+                        if (ValidationUtil.validateDate(dob)) {
+                            valuesToBeUpdate.put(Constants.DOB, dob);
                         } else {
-                            errList.add("Invalid value for Mother Tongue type. Expecting string format");
+                            errList.add("Invalid format for Date of Birth type. Expecting in format dd-mm-yyyy");
                         }
+                    } else {
+                        errList.add("Invalid value for Date of Birth type. Expecting string format");
+                    }
 
-                        // Employee ID
-                        if (!record.get(9).isEmpty()) {
-                            String employeeId = record.get(9).trim();
-                            valuesToBeUpdate.put(Constants.EMPLOYEE_CODE, employeeId);
-                            if (!ValidationUtil.validateEmployeeId((String) valuesToBeUpdate.get(Constants.EMPLOYEE_CODE))) {
-                                errList.add("Invalid Employee ID : Employee ID can contain alphanumeric characters or numeric character and have a max length of 30");
-                            }
+                    // Mother Tongue
+                    if (!record.get(8).isEmpty()) {
+                        String motherTongue = record.get(8).trim();
+                        if (!ValidationUtil.validateRegexPatternWithNoSpecialCharacter(motherTongue) || this.validateFieldValue("languages", motherTongue)) {
+                            errList.add("Invalid Mother Tongue: Mother Tongue should be added from default list and/or cannot contain special character(s)");
                         }
+                        valuesToBeUpdate.put(Constants.DOMICILE_MEDIUM, motherTongue);
+                    } else {
+                        errList.add("Invalid value for Mother Tongue type. Expecting string format");
+                    }
 
-
-                        // Office Pin Code
-                        if (!record.get(10).isEmpty()) {
-                            String officePinCode = record.get(10).trim();
-                            if (!ValidationUtil.validatePinCode(officePinCode)) {
-                                errList.add("Invalid Pin Code: " + officePinCode +
-                                        " Pin Code should be numeric and is of 6 digits.");
-                            }
-                            valuesToBeUpdate.put(Constants.PIN_CODE, officePinCode);
+                    // Employee ID
+                    if (!record.get(9).isEmpty()) {
+                        String employeeId = record.get(9).trim();
+                        valuesToBeUpdate.put(Constants.EMPLOYEE_CODE, employeeId);
+                        if (!ValidationUtil.validateEmployeeId((String) valuesToBeUpdate.get(Constants.EMPLOYEE_CODE))) {
+                            errList.add("Invalid Employee ID : Employee ID can contain alphanumeric characters or numeric character and have a max length of 30");
                         }
+                    }
 
-                        // External System ID
-                        if (!record.get(11).isEmpty()) {
-                            String externalSystemId = record.get(11).trim();
-                            if (!ValidationUtil.validateExternalSystemId(externalSystemId)) {
-                                errList.add("Invalid External System ID: " + externalSystemId +
-                                        " External System Id can contain alphanumeric characters and have a max length of 30");
-                            }
-                            valuesToBeUpdate.put(Constants.EXTERNAL_SYSTEM_ID, externalSystemId);
-                        }
 
-                        // External System
-                        if (!record.get(12).isEmpty()) {
-                            String externalSystem = record.get(12).trim();
-                            if (!ValidationUtil.validateExternalSystem(externalSystem)) {
-                                errList.add("Invalid External System Name: " + externalSystem +
-                                        " External System Name can contain only alphabets and can have a max length of 255");
-                            }
-                            valuesToBeUpdate.put(Constants.EXTERNAL_SYSTEM, externalSystem);
+                    // Office Pin Code
+                    if (!record.get(10).isEmpty()) {
+                        String officePinCode = record.get(10).trim();
+                        if (!ValidationUtil.validatePinCode(officePinCode)) {
+                            errList.add("Invalid Pin Code: " + officePinCode +
+                                    " Pin Code should be numeric and is of 6 digits.");
                         }
+                        valuesToBeUpdate.put(Constants.PIN_CODE, officePinCode);
+                    }
+
+                    // External System ID
+                    if (!record.get(11).isEmpty()) {
+                        String externalSystemId = record.get(11).trim();
+                        if (!ValidationUtil.validateExternalSystemId(externalSystemId)) {
+                            errList.add("Invalid External System ID: " + externalSystemId +
+                                    " External System Id can contain alphanumeric characters and have a max length of 30");
+                        }
+                        valuesToBeUpdate.put(Constants.EXTERNAL_SYSTEM_ID, externalSystemId);
+                    }
+
+                    // External System
+                    if (!record.get(12).isEmpty()) {
+                        String externalSystem = record.get(12).trim();
+                        if (!ValidationUtil.validateExternalSystem(externalSystem)) {
+                            errList.add("Invalid External System Name: " + externalSystem +
+                                    " External System Name can contain only alphabets and can have a max length of 255");
+                        }
+                        valuesToBeUpdate.put(Constants.EXTERNAL_SYSTEM, externalSystem);
+                    }
 
                         // Tags
                         if (!record.get(13).isEmpty()) {
@@ -910,121 +972,122 @@ public class UserBulkUploadService {
                         }
 
 
-                        if(!CollectionUtils.isEmpty(errList)) {
-                            String statusValue = errList.isEmpty() ? Constants.SUCCESSFUL_UPERCASE : Constants.FAILED_UPPERCASE;
-                            csvValues.put("Status", statusValue);
-                            csvValues.put("Error Details", errList.isEmpty() ? "" : String.join(", ", errList));
-                            failedRecordsCount++;
-                            totalRecordsCount++;
-                            updatedRecords.add(csvValues);
-                            continue;
-                        }
+                    if (!CollectionUtils.isEmpty(errList)) {
+                        String statusValue = errList.isEmpty() ? Constants.SUCCESSFUL_UPERCASE : Constants.FAILED_UPPERCASE;
+                        csvValues.put("Status", statusValue);
+                        csvValues.put("Error Details", errList.isEmpty() ? "" : String.join(", ", errList));
+                        failedRecordsCount++;
+                        totalRecordsCount++;
+                        updatedRecords.add(csvValues);
+                        continue;
+                    }
 
 
-                        String userId = null;
-                        if (!CollectionUtils.isEmpty(userDetails)) {
-                            userId = (String) userDetails.get(Constants.USER_ID);
-                        }
-                        logger.info("userId "+userId);
-                        List<WfStatusEntity> userPendingRequest = wfStatusRepo.findByUserIdAndCurrentStatus(userId, true);
-                        boolean userRecordUpdate = true;
-                        if (!CollectionUtils.isEmpty(userPendingRequest)) {
-                            for (WfStatusEntity wfStatusEntity : userPendingRequest) {
-                                String updateValuesString = wfStatusEntity.getUpdateFieldValues();
-                                List<Map<String, Object>> updatedValues = mapper.readValue(updateValuesString, List.class);
-                                Map<String, String> toValue = (Map<String, String>) updatedValues.get(0).get(Constants.TO_VALUE);
-                                for (Map.Entry<String, String> entry : toValue.entrySet()) {
-                                    if (valuesToBeUpdate.containsKey(entry.getKey())) {
-                                        WfRequest wfRequest = this.getWFRequest(wfStatusEntity, null);
-                                        if (entry.getValue().equalsIgnoreCase((String) valuesToBeUpdate.get(entry.getKey()))) {
-                                            wfStatusEntity.setCurrentStatus(Constants.APPROVED);
+                    String userId = null;
+                    if (!CollectionUtils.isEmpty(userDetails)) {
+                        userId = (String) userDetails.get(Constants.USER_ID);
+                    }
+                    logger.info("userId " + userId);
+                    List<WfStatusEntity> userPendingRequest = wfStatusRepo.findByUserIdAndCurrentStatus(userId, true);
+                    boolean userRecordUpdate = true;
+                    if (!CollectionUtils.isEmpty(userPendingRequest)) {
+                        for (WfStatusEntity wfStatusEntity : userPendingRequest) {
+                            String updateValuesString = wfStatusEntity.getUpdateFieldValues();
+                            List<Map<String, Object>> updatedValues = mapper.readValue(updateValuesString, List.class);
+                            Map<String, String> toValue = (Map<String, String>) updatedValues.get(0).get(Constants.TO_VALUE);
+                            for (Map.Entry<String, String> entry : toValue.entrySet()) {
+                                if (valuesToBeUpdate.containsKey(entry.getKey())) {
+                                    WfRequest wfRequest = this.getWFRequest(wfStatusEntity, null);
+                                    if (entry.getValue().equalsIgnoreCase((String) valuesToBeUpdate.get(entry.getKey()))) {
+                                        wfStatusEntity.setCurrentStatus(Constants.APPROVED);
+                                    } else {
+                                        wfStatusEntity.setCurrentStatus(Constants.REJECTED);
+                                    }
+                                    wfStatusEntity.setInWorkflow(false);
+                                    wfStatusRepo.save(wfStatusEntity);
+                                    if (Constants.APPROVED.equalsIgnoreCase(wfStatusEntity.getCurrentStatus())) {
+                                        userProfileWfService.updateUserProfile(wfRequest);
+                                        WfStatusEntity wfStatusEntityFailed = wfStatusRepo.findByWfId(wfRequest.getWfId());
+                                        if (Constants.REJECTED.equalsIgnoreCase(wfStatusEntityFailed.getCurrentStatus())) {
+                                            userRecordUpdate = false;
+                                            csvValues.put("Status", Constants.FAILED_UPPERCASE);
+                                            csvValues.put("Error Details", Constants.UPDATE_FAILED);
                                         } else {
-                                            wfStatusEntity.setCurrentStatus(Constants.REJECTED);
+                                            csvValues.put("Status", Constants.SUCCESSFUL_UPERCASE);
                                         }
-                                        wfStatusEntity.setInWorkflow(false);
-                                        wfStatusRepo.save(wfStatusEntity);
-                                        if (Constants.APPROVED.equalsIgnoreCase(wfStatusEntity.getCurrentStatus())) {
-                                            userProfileWfService.updateUserProfile(wfRequest);
-                                            WfStatusEntity wfStatusEntityFailed = wfStatusRepo.findByWfId(wfRequest.getWfId());
-                                            if (Constants.REJECTED.equalsIgnoreCase(wfStatusEntityFailed.getCurrentStatus())) {
-                                                userRecordUpdate = false;
-                                                csvValues.put("Status", Constants.FAILED_UPPERCASE);
-                                                csvValues.put("Error Details", Constants.UPDATE_FAILED);
-                                            } else {
-                                                csvValues.put("Status", Constants.SUCCESSFUL_UPERCASE);
-                                            }
-                                            valuesToBeUpdate.remove(entry.getKey());
-                                        }
+                                        valuesToBeUpdate.remove(entry.getKey());
                                     }
                                 }
                             }
                         }
-                        if (valuesToBeUpdate.isEmpty()) {
-                            if (userRecordUpdate)
-                                noOfSuccessfulRecords++;
-                            else
-                                failedRecordsCount++;
-                            totalRecordsCount++;
-                            updatedRecords.add(csvValues);
-                            continue;
-                        }
-
-                        Set<String> employmentDetailsKey = new HashSet<>();
-                        employmentDetailsKey.add(Constants.EMPLOYEE_CODE);
-                        employmentDetailsKey.add(Constants.PIN_CODE);
-
-                        Set<String> professionalDetailsKey = new HashSet<>();
-                        professionalDetailsKey.add(Constants.GROUP);
-                        professionalDetailsKey.add(Constants.DESIGNATION);
-
-                        Set<String> personalDetailsKey = new HashSet<>();
-                        personalDetailsKey.add(Constants.FIRSTNAME);
-                        personalDetailsKey.add(Constants.DOB);
-                        personalDetailsKey.add(Constants.DOMICILE_MEDIUM);
-                        personalDetailsKey.add(Constants.CATEGORY);
-                        personalDetailsKey.add(Constants.GENDER);
-
-                        WfRequest wfRequest = this.getWFRequest(valuesToBeUpdate, userId);
-                        List<HashMap<String, Object>> updatedValues = new ArrayList<>();
-                        for (Map.Entry<String, Object> entry : valuesToBeUpdate.entrySet()) {
-                            String fieldKey;
-                            HashMap<String, Object> updatedValueMap = new HashMap<>();
-                            updatedValueMap.put(entry.getKey(), entry.getValue());
-                            HashMap<String, Object> updateValues = new HashMap<>();
-                            updateValues.put(Constants.FROM_VALUE, new HashMap<>());
-                            updateValues.put(Constants.TO_VALUE, updatedValueMap);
-                            if (employmentDetailsKey.contains(entry.getKey())) {
-                                fieldKey = Constants.EMPLOYMENT_DETAILS;
-                            } else if (professionalDetailsKey.contains(entry.getKey())) {
-                                fieldKey = Constants.PROFESSIONAL_DETAILS;
-                            } else if (personalDetailsKey.contains(entry.getKey())) {
-                                fieldKey = Constants.PERSONAL_DETAILS;
-                            } else {
-                                fieldKey = Constants.ADDITIONAL_PROPERTIES;
-                            }
-                            updateValues.put(Constants.FIELD_KEY, fieldKey);
-                            updatedValues.add(updateValues);
-                            if (null != wfRequest) {
-                                wfRequest.setUpdateFieldValues(updatedValues);
-                            }
-                        }
-                        userProfileWfService.updateUserProfileForBulkUpload(wfRequest);
-                        WfStatusEntity wfStatusEntityFailed = wfStatusRepo.findByWfId(wfRequest.getWfId());
-                        if (null != wfStatusEntityFailed && Constants.REJECTED.equalsIgnoreCase(wfStatusEntityFailed.getCurrentStatus())) {
-                            userRecordUpdate = false;
-                        }
-                        if (userRecordUpdate) {
+                    }
+                    if (valuesToBeUpdate.isEmpty()) {
+                        if (userRecordUpdate)
                             noOfSuccessfulRecords++;
-                            csvValues.put("Status", Constants.SUCCESSFUL_UPERCASE);
-                            csvValues.put("Error Details", "NA");
-                        } else {
+                        else
                             failedRecordsCount++;
-                            csvValues.put("Status", Constants.UPDATE_FAILED);
-                            csvValues.put("Error Details", Constants.UPDATE_FAILED);
-                        }
                         totalRecordsCount++;
-                        duration = System.currentTimeMillis() - startTime;
-                        logger.info("UserBulkUploadService:: Record Completed. Time taken: {} milli-seconds", duration);
+                        updatedRecords.add(csvValues);
+                        continue;
+                    }
+
+                    Set<String> employmentDetailsKey = new HashSet<>();
+                    employmentDetailsKey.add(Constants.EMPLOYEE_CODE);
+                    employmentDetailsKey.add(Constants.PIN_CODE);
+
+                    Set<String> professionalDetailsKey = new HashSet<>();
+                    professionalDetailsKey.add(Constants.GROUP);
+                    professionalDetailsKey.add(Constants.DESIGNATION);
+
+                    Set<String> personalDetailsKey = new HashSet<>();
+                    personalDetailsKey.add(Constants.FIRSTNAME);
+                    personalDetailsKey.add(Constants.DOB);
+                    personalDetailsKey.add(Constants.DOMICILE_MEDIUM);
+                    personalDetailsKey.add(Constants.CATEGORY);
+                    personalDetailsKey.add(Constants.GENDER);
+                    personalDetailsKey.add(Constants.MOBILE);
+
+                    WfRequest wfRequest = this.getWFRequest(valuesToBeUpdate, userId);
+                    List<HashMap<String, Object>> updatedValues = new ArrayList<>();
+                    for (Map.Entry<String, Object> entry : valuesToBeUpdate.entrySet()) {
+                        String fieldKey;
+                        HashMap<String, Object> updatedValueMap = new HashMap<>();
+                        updatedValueMap.put(entry.getKey(), entry.getValue());
+                        HashMap<String, Object> updateValues = new HashMap<>();
+                        updateValues.put(Constants.FROM_VALUE, new HashMap<>());
+                        updateValues.put(Constants.TO_VALUE, updatedValueMap);
+                        if (employmentDetailsKey.contains(entry.getKey())) {
+                            fieldKey = Constants.EMPLOYMENT_DETAILS;
+                        } else if (professionalDetailsKey.contains(entry.getKey())) {
+                            fieldKey = Constants.PROFESSIONAL_DETAILS;
+                        } else if (personalDetailsKey.contains(entry.getKey())) {
+                            fieldKey = Constants.PERSONAL_DETAILS;
+                        } else {
+                            fieldKey = Constants.ADDITIONAL_PROPERTIES;
+                        }
+                        updateValues.put(Constants.FIELD_KEY, fieldKey);
+                        updatedValues.add(updateValues);
+                        if (null != wfRequest) {
+                            wfRequest.setUpdateFieldValues(updatedValues);
+                        }
+                    }
+                    userProfileWfService.updateUserProfileForBulkUpload(wfRequest);
+                    WfStatusEntity wfStatusEntityFailed = wfStatusRepo.findByWfId(wfRequest.getWfId());
+                    if (null != wfStatusEntityFailed && Constants.REJECTED.equalsIgnoreCase(wfStatusEntityFailed.getCurrentStatus())) {
+                        userRecordUpdate = false;
+                    }
+                    if (userRecordUpdate) {
+                        noOfSuccessfulRecords++;
+                        csvValues.put("Status", Constants.SUCCESSFUL_UPERCASE);
+                        csvValues.put("Error Details", "NA");
+                    } else {
+                        failedRecordsCount++;
+                        csvValues.put("Status", Constants.UPDATE_FAILED);
+                        csvValues.put("Error Details", Constants.UPDATE_FAILED);
+                    }
+                    totalRecordsCount++;
+                    duration = System.currentTimeMillis() - startTime;
+                    logger.info("UserBulkUploadService:: Record Completed. Time taken: {} milli-seconds", duration);
                     updatedRecords.add(csvValues);
                 }
                     // Write back updated records to the same CSV file
@@ -1033,42 +1096,42 @@ public class UserBulkUploadService {
                     csvPrinter = new CSVPrinter(bufferedWriter,CSVFormat.newFormat(csvDelimiter).withHeader(headers.toArray(new String[0])).withRecordSeparator(System.lineSeparator()));
 
 
-                    for (Map<String, Object> record : updatedRecords) {
-                        List<String> recordValues = new ArrayList<>();
-                        for (String header : headers) {
-                            recordValues.add((String) record.get(header));
-                        }
-                        csvPrinter.printRecord(recordValues);
+                for (Map<String, Object> record : updatedRecords) {
+                    List<String> recordValues = new ArrayList<>();
+                    for (String header : headers) {
+                        recordValues.add((String) record.get(header));
                     }
+                    csvPrinter.printRecord(recordValues);
+                }
 
-                    if (totalRecordsCount == 0) {
-                        List<String> singleRow = new ArrayList<>(Collections.nCopies(headers.size(), ""));
-                        singleRow.set(headers.indexOf("Status"), Constants.FAILED_UPPERCASE);
-                        singleRow.set(headers.indexOf("Error Details"), Constants.EMPTY_FILE_FAILED);
-                        csvPrinter.printRecord(singleRow);
-                        status = Constants.FAILED_UPPERCASE;
-                    }
-                    csvPrinter.flush();
-
-                    status = uploadTheUpdatedCSVFile(file);
-
-
-                    status = (failedRecordsCount == 0 && totalRecordsCount == noOfSuccessfulRecords && totalRecordsCount >= 1)
-                            ? Constants.SUCCESSFUL_UPERCASE
-                            : Constants.FAILED_UPPERCASE;
-
-                    updateUserBulkUploadStatus(inputDataMap.get(Constants.ROOT_ORG_ID), inputDataMap.get(Constants.IDENTIFIER),
-                            status, totalRecordsCount, noOfSuccessfulRecords, failedRecordsCount);
-
-                } else{
-                    logger.error("File does not exist or is empty.");
+                if (totalRecordsCount == 0) {
+                    List<String> singleRow = new ArrayList<>(Collections.nCopies(headers.size(), ""));
+                    singleRow.set(headers.indexOf("Status"), Constants.FAILED_UPPERCASE);
+                    singleRow.set(headers.indexOf("Error Details"), Constants.EMPTY_FILE_FAILED);
+                    csvPrinter.printRecord(singleRow);
                     status = Constants.FAILED_UPPERCASE;
                 }
-            } catch (Exception e) {
+                csvPrinter.flush();
+
+                status = uploadTheUpdatedCSVFile(file);
+
+
+                status = (failedRecordsCount == 0 && totalRecordsCount == noOfSuccessfulRecords && totalRecordsCount >= 1)
+                        ? Constants.SUCCESSFUL_UPERCASE
+                        : Constants.FAILED_UPPERCASE;
+
+                updateUserBulkUploadStatus(inputDataMap.get(Constants.ROOT_ORG_ID), inputDataMap.get(Constants.IDENTIFIER),
+                        status, totalRecordsCount, noOfSuccessfulRecords, failedRecordsCount);
+
+            } else {
+                logger.error("File does not exist or is empty.");
+                status = Constants.FAILED_UPPERCASE;
+            }
+        } catch (Exception e) {
             logger.error(String.format("Error in Process Bulk Upload %s", e.getMessage()), e);
             this.updateUserBulkUploadStatus(inputDataMap.get(Constants.ROOT_ORG_ID), inputDataMap.get(Constants.IDENTIFIER),
                     Constants.FAILED_UPPERCASE, 0, 0, 0);
-            } finally {
+        } finally {
             if (csvParser != null)
                 csvParser.close();
             if (csvPrinter != null)
@@ -1079,7 +1142,7 @@ public class UserBulkUploadService {
                 fileWriter.close();
             if (file != null)
                 file.delete();
-            }
+        }
         }
 
     private String uploadTheUpdatedCSVFile(File file)
