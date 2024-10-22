@@ -772,6 +772,7 @@ public class UserBulkUploadService {
                     }
 
                     Map<String, Object> userDetailsForMobile = null;
+                    Map<String, Object> userDetailsForMobileAndEmail = null;
                     Map<String, Object> filters = null;
                     boolean isEmailOrPhoneNumberExist = false;
                     boolean isEmailValid = false;
@@ -803,10 +804,10 @@ public class UserBulkUploadService {
                         filters = new HashMap<>();
                         filters.put(Constants.EMAIL, email);
                         filters.put(Constants.PHONE, phone);
-                        isEmailOrPhoneNumberExist = this.verifyUserRecordExists(filters, userDetails);
+                        isEmailOrPhoneNumberExist = this.verifyUserRecordExists(filters, userDetailsForMobileAndEmail);
                     }
                     if (!CollectionUtils.isEmpty(errList)) {
-                        csvValues.put("Error Details", String.join(",", errList));
+                        csvValues.put("Error Details", String.join(tagsDelimiter, errList));
                         failedRecordsCount++;
                         totalRecordsCount++;
                         updatedRecords.add(csvValues);
@@ -823,7 +824,7 @@ public class UserBulkUploadService {
                         if (!mdoAdminRootOrgId.equalsIgnoreCase(userRootOrgId)) {
                             logger.info("The User belongs to a different MDO Organisation");
                             errList.add("The User belongs to a different MDO Organisation");
-                            csvValues.put("Error Details", String.join(",", errList));
+                            csvValues.put("Error Details", String.join(tagsDelimiter, errList));
                             failedRecordsCount++;
                             totalRecordsCount++;
                             updatedRecords.add(csvValues);
@@ -832,7 +833,7 @@ public class UserBulkUploadService {
                     }
 
                     if (!CollectionUtils.isEmpty(errList)) {
-                        csvValues.put("Error Details", String.join(",", errList));
+                        csvValues.put("Error Details", String.join(tagsDelimiter, errList));
                         failedRecordsCount++;
                         totalRecordsCount++;
                         updatedRecords.add(csvValues);
@@ -880,7 +881,7 @@ public class UserBulkUploadService {
                         if (validateGender(gender)) {
                             valuesToBeUpdate.put(Constants.GENDER, gender);
                         } else {
-                            errList.add("Invalid Gender : Gender can be only among one of these " + configuration.getBulkUploadGenderValue());
+                            errList.add("Invalid Gender : Gender can be only among one of these " + String.join("|", configuration.getBulkUploadGenderValue()));
                         }
                     }
 
@@ -890,7 +891,7 @@ public class UserBulkUploadService {
                         if (validateCategory(category)) {
                             valuesToBeUpdate.put(Constants.CATEGORY, category);
                         } else {
-                            errList.add("Invalid Category : Category can be only among one of these " + configuration.getBulkUploadCategoryValue());
+                            errList.add("Invalid Category : Category can be only among one of these " + String.join("|", configuration.getBulkUploadCategoryValue()));
                         }
                     }
 
@@ -962,7 +963,7 @@ public class UserBulkUploadService {
                             }
                             if (!ValidationUtil.validateTag(tagList)) {
                                 errList.add("Invalid Tag: " + tagStrList +
-                                        " Tags are separated by '|' and can contain only alphabets with spaces. e.g., Bihar Circle|Patna Division");
+                                        " Tags are separated by ';' and can contain only alphabets with spaces. e.g., Bihar Circle;Patna Division");
                             }
                             valuesToBeUpdate.put(Constants.TAG, tagList);
                         }
@@ -971,7 +972,7 @@ public class UserBulkUploadService {
                     if (!CollectionUtils.isEmpty(errList)) {
                         String statusValue = errList.isEmpty() ? Constants.SUCCESSFUL_UPERCASE : Constants.FAILED_UPPERCASE;
                         csvValues.put("Status", statusValue);
-                        csvValues.put("Error Details", errList.isEmpty() ? "" : String.join(", ", errList));
+                        csvValues.put("Error Details", errList.isEmpty() ? "" : String.join(tagsDelimiter, errList));
                         failedRecordsCount++;
                         totalRecordsCount++;
                         updatedRecords.add(csvValues);
