@@ -792,7 +792,6 @@ public class UserBulkUploadService {
                     // Validate phone
 
                     if (ValidationUtil.validateContactPattern(phone)) {
-                        userDetails = new HashMap<>();
                         userDetailsForMobile = new HashMap<>();
                         filters = new HashMap<>();
                         filters.put(Constants.PHONE, phone);
@@ -801,6 +800,7 @@ public class UserBulkUploadService {
                         errList.add("Invalid Phone number format");
                     }
                     if (!StringUtils.isEmpty(phone) && isEmailValid) {
+                        userDetailsForMobileAndEmail = new HashMap<>();
                         filters = new HashMap<>();
                         filters.put(Constants.EMAIL, email);
                         filters.put(Constants.PHONE, phone);
