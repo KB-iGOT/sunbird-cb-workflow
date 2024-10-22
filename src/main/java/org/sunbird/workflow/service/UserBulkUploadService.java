@@ -902,8 +902,6 @@ public class UserBulkUploadService {
                         } else {
                             errList.add("Invalid format for Date of Birth type. Expecting in format dd-mm-yyyy");
                         }
-                    } else {
-                        errList.add("Invalid value for Date of Birth type. Expecting string format");
                     }
 
                     // Mother Tongue
@@ -913,8 +911,6 @@ public class UserBulkUploadService {
                             errList.add("Invalid Mother Tongue: Mother Tongue should be added from default list and/or cannot contain special character(s)");
                         }
                         valuesToBeUpdate.put(Constants.DOMICILE_MEDIUM, motherTongue);
-                    } else {
-                        errList.add("Invalid value for Mother Tongue type. Expecting string format");
                     }
 
                     // Employee ID
