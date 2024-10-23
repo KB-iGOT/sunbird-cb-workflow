@@ -786,6 +786,13 @@ public class WorkflowServiceImpl implements Workflowservice {
 		}
 		if (criteria.getServiceName().equalsIgnoreCase(Constants.BLENDED_PROGRAM_SERVICE_NAME)) {
 			infos = wfStatusEntities.stream().collect(Collectors.groupingBy(WfStatusEntity::getUserId));
+			if (criteria.getUserId() != null) {
+				List<WfStatusEntity> matchedInfo = infos.get(criteria.getUserId());
+				infos.clear();
+				if (matchedInfo != null) {
+					infos.put(criteria.getUserId(), matchedInfo);
+				}
+			}
 		} else {
 			infos = wfStatusEntities.stream().collect(Collectors.groupingBy(WfStatusEntity::getApplicationId));
 		}
