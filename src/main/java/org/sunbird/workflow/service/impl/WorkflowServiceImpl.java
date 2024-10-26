@@ -787,7 +787,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 		}
 		if (criteria.getServiceName().equalsIgnoreCase(Constants.BLENDED_PROGRAM_SERVICE_NAME)) {
 			infos = wfStatusEntities.stream().collect(Collectors.groupingBy(WfStatusEntity::getUserId));
-			if (StringUtil.isBlank(criteria.getUserId())) {
+			if (StringUtil.isNotBlank(criteria.getUserId())) {
 				List<WfStatusEntity> matchedInfo = infos.get(criteria.getUserId());
 				infos.clear();
 				if (matchedInfo != null) {
