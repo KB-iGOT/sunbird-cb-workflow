@@ -763,8 +763,8 @@ public class UserBulkUploadService {
                     boolean isEmailOrPhoneNumberValid = false;
 
                     // Validate email and phone presence
-                    String email = record.size() > 1 ? record.get(1) : null;
-                    String phone = record.size() > 2 ? record.get(2) : null;
+                    String email = record.size() > 1 && record.get(1) != null ? record.get(1).toLowerCase().trim() : null;
+                    String phone = record.size() > 2 && record.get(2) != null ? record.get(2).trim() : null;
                     boolean emailExists = email != null && !email.isEmpty();
                     boolean phoneExists = phone != null && !phone.isEmpty();
                     if (!emailExists && !phoneExists) {
@@ -790,14 +790,15 @@ public class UserBulkUploadService {
                     }
 
                     // Validate phone
-
-                    if (ValidationUtil.validateContactPattern(phone)) {
-                        userDetailsForMobile = new HashMap<>();
-                        filters = new HashMap<>();
-                        filters.put(Constants.PHONE, phone);
-                        isPhoneNumberValid = this.verifyUserRecordExists(filters, userDetailsForMobile);
-                    } else {
-                        errList.add("Invalid Phone number format");
+                    if (phoneExists) {
+                        if (ValidationUtil.validateContactPattern(phone)) {
+                            userDetailsForMobile = new HashMap<>();
+                            filters = new HashMap<>();
+                            filters.put(Constants.PHONE, phone);
+                            isPhoneNumberValid = this.verifyUserRecordExists(filters, userDetailsForMobile);
+                        } else {
+                            errList.add("Invalid Phone number format");
+                        }
                     }
                     if (!StringUtils.isEmpty(phone) && isEmailValid) {
                         userDetailsForMobileAndEmail = new HashMap<>();
@@ -871,8 +872,6 @@ public class UserBulkUploadService {
                         if (this.validateFieldValue("position", designation)) {
                             errList.add("Invalid Value of Designation, please choose a valid value from the default list");
                         }
-                    } else {
-                        errList.add("Invalid value for Designation type. Expecting string format");
                     }
 
                     // Gender
