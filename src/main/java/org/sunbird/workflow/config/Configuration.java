@@ -236,6 +236,12 @@ public class Configuration {
     @Value("${course.admin.blended.program.enrol}")
     private String adminBlendedProgramEnrolEndPoint;
 
+    @Value("${kafka.topics.workflow.notification.v2}")
+    private String workFlowNotificationTopicV2;
+
+    @Value("${kafka.topics.workflow.request.v2}")
+    private String workflowApplicationTopicV2;
+
     public String getAdminBlendedProgramEnrolEndPoint() {
         return adminBlendedProgramEnrolEndPoint;
     }
@@ -849,5 +855,21 @@ public class Configuration {
 
     public String getTagsDelimiter() {
         return tagsDelimiter;
+    }
+
+    public String getWorkFlowNotificationTopicV2() {
+        return workFlowNotificationTopicV2;
+    }
+
+    public void setWorkFlowNotificationTopicV2(String workFlowNotificationTopicV2) {
+        this.workFlowNotificationTopicV2 = workFlowNotificationTopicV2;
+    }
+
+    public String getWorkflowApplicationTopicV2() {
+        return workflowApplicationTopicV2;
+    }
+
+    public void setWorkflowApplicationTopicV2(String workflowApplicationTopicV2) {
+        this.workflowApplicationTopicV2 = workflowApplicationTopicV2;
     }
 }

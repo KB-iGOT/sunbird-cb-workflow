@@ -1,14 +1,7 @@
 package org.sunbird.workflow.service.impl;
 
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TimeZone;
+import java.util.*;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -405,28 +398,14 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 	}
 
 	private void failedCase(WfRequest wfRequest) {
+		WfStatusEntity wfStatusEntity = wfStatusRepo.findByApplicationIdAndWfId(wfRequest.getApplicationId(),
+				wfRequest.getWfId());
 		wfRequest.setState(Constants.FAILED);
 		wfRequest.setAction(Constants.FAILED);
-		WfStatusEntity applicationStatus = new WfStatusEntity();
-		String wfId = wfRequest.getWfId();
-		applicationStatus.setWfId(wfId);
-		applicationStatus.setServiceName(wfRequest.getServiceName());
-		applicationStatus.setUserId(wfRequest.getUserId());
-		applicationStatus.setApplicationId(wfRequest.getApplicationId());
-		applicationStatus.setRootOrg(Constants.ROOT_ORG);
-		applicationStatus.setOrg(Constants.ORG);
-		applicationStatus.setCreatedOn(new Date());
-		applicationStatus.setLastUpdatedOn(new Date());
-		applicationStatus.setCurrentStatus(Constants.REJECTED);
-		applicationStatus.setActorUUID(wfRequest.getActorUserId());
-		try {
-			applicationStatus.setUpdateFieldValues(mapper.writeValueAsString(wfRequest.getUpdateFieldValues()));
-		} catch (JsonProcessingException e) {
-			logger.error("Exception occurred : ", e);
-		}
-		applicationStatus.setInWorkflow(false);
-		applicationStatus.setDeptName(wfRequest.getDeptName());
-		wfStatusRepo.save(applicationStatus);
+		wfStatusEntity.setLastUpdatedOn(new Date());
+		wfStatusEntity.setCurrentStatus(Constants.FAILED);
+		wfStatusEntity.setInWorkflow(false);
+		wfStatusRepo.save(wfStatusEntity);
 	}
 
 	private Map<String, Object> getUpdateRequest(WfRequest wfRequest, Map<String, Object> updateRequest) {
@@ -560,4 +539,130 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 		return null;
 	}
 
+	public void updateUserProfileV2(List<WfRequest> wfRequests, String userId) {
+		try {
+			Map<String, Object> readData = (Map<String, Object>) userProfileRead(userId);
+			if (readData != null && !Constants.OK.equals(readData.get(Constants.RESPONSE_CODE))) {
+				Map<String, Object> params = (Map<String, Object>) readData.getOrDefault(Constants.PARAMS, Collections.emptyMap());
+				String detailedError = (String) params.getOrDefault(Constants.ERROR_MESSAGE, "No additional details provided.");
+				String errorMessage = "User not found: " + detailedError;
+				logger.error(errorMessage);
+				wfRequests.forEach(wfRequest -> failedCase(wfRequest, errorMessage));
+				return;
+			}
+			Map<String, Object> existingUserResults = (Map<String, Object>) readData.get(Constants.RESULT);
+			Map<String, Object> existingUserResponse = (Map<String, Object>) existingUserResults.get(Constants.RESPONSE);
+			Map<String, Object> profileDetails = (Map<String, Object>) existingUserResponse.get(Constants.PROFILE_DETAILS);
+			boolean isUpdateRequired = false;
+			for (WfRequest wfRequest : wfRequests) {
+				WfStatusEntity wfStatusEntity = wfStatusRepo.findByApplicationIdAndWfId(wfRequest.getApplicationId(),
+						wfRequest.getWfId());
+				if ((Constants.PROFILE_SERVICE_NAME.equals(wfRequest.getServiceName()) && Constants.APPROVED_STATE.equals(wfStatusEntity.getCurrentStatus()))
+						|| (Constants.USER_PROFILE_FLAG_SERVICE.equals(wfRequest.getServiceName()) && Constants.PROCESSED_STATE.equals(wfStatusEntity.getCurrentStatus()))) {
+
+					List<HashMap<String, Object>> updatedFieldValues = wfRequest.getUpdateFieldValues();
+					HashMap<String, Object> updatedFieldValueElement = updatedFieldValues.get(0);
+					HashMap<String, Object> toValueList = (HashMap<String, Object>) updatedFieldValueElement.get(Constants.TO_VALUE);
+					for (String key : toValueList.keySet()) {
+						if (Constants.NAME.equals(key) && StringUtils.isNotEmpty((String) toValueList.get(Constants.NAME))) {
+							String updatedDeptName = (String) toValueList.get(Constants.NAME);
+							wfRequest.setDeptName(updatedDeptName);
+							Map<String, Object> response = (Map<String, Object>) migrateUser(wfRequest);
+							if (null != response && !Constants.OK.equals(response.get(Constants.RESPONSE_CODE))) {
+								String migrateError = (String) ((Map<String, Object>) response.getOrDefault(Constants.PARAMS, Collections.emptyMap()))
+										.getOrDefault(Constants.ERROR_MESSAGE, "Unknown error");
+								String errorMessage = "Migrate user failed: " + migrateError;
+								logger.error(errorMessage);
+								failedCase(wfRequest, errorMessage);
+							} else {
+								handlePendingRequestUpdate(wfRequest, updatedDeptName);
+							}
+						} else {
+							Map<String, Object> updateRequest = updateRequestWithWF(wfRequest.getUserId(), wfRequest.getUpdateFieldValues(), profileDetails);
+							isUpdateRequired = true;
+							if (updateRequest == null) {
+								logger.error("User profile data type error for request: {}", wfRequest.getWfId());
+								failedCase(wfRequest, "User profile data type error.");
+							}
+						}
+					}
+				}
+			}
+			if (isUpdateRequired) {
+				updateUserProfileData(userId, profileDetails, wfRequests);
+			}
+		} catch (Exception e) {
+			logger.error("Exception occurred : ", e);
+		}
+	}
+
+	private void updateUserProfileData(String userId, Map<String, Object> profileDetails, List<WfRequest> wfRequests) {
+		try {
+			Map<String, Object> profileUpdateRequest = new HashMap<>();
+			profileUpdateRequest.put(Constants.USER_ID, userId);
+			profileUpdateRequest.put(Constants.PROFILE_DETAILS, profileDetails);
+
+			Map<String, Object> profileUpdateRequestBody = new HashMap<>();
+			profileUpdateRequestBody.put(Constants.REQUEST, profileUpdateRequest);
+
+			Map<String, Object> updateUserApiResp = requestServiceImpl
+					.fetchResultUsingPatch(configuration.getLmsServiceHost() + configuration.getUserProfileUpdateEndPoint(), profileUpdateRequestBody, getHeaders());
+			if (updateUserApiResp == null || !Constants.OK.equals(updateUserApiResp.get(Constants.RESPONSE_CODE))) {
+				Map<String, Object> params = (Map<String, Object>) updateUserApiResp.getOrDefault(Constants.PARAMS, Collections.emptyMap());
+				String updateError = (String) params.getOrDefault(Constants.ERROR_MESSAGE, "Unknown error");
+				String errorMessage = "User update failed: " + updateError;
+				logger.error("User update failed: {}", updateError);
+				failedCaseProfileUpdate(wfRequests, errorMessage);
+			}
+		} catch (Exception e) {
+			logger.error("Error updating user profile for userId: {}", userId, e);
+		}
+	}
+
+	private void handlePendingRequestUpdate(WfRequest wfRequest, String updatedDeptName) {
+		try {
+			Map<String, Object> request = new HashMap<>();
+			Map<String, Object> requestBody = new HashMap<>();
+			requestBody.put(Constants.USER_ID, wfRequest.getApplicationId());
+			requestBody.put(Constants.DEPARTMENT_NAME, updatedDeptName);
+			request.put(Constants.REQUEST, requestBody);
+
+			workflowService.updatePendingRequestsToNewMDO(request);
+		} catch (Exception e) {
+			logger.error("Error updating pending requests for wfRequest: {}", wfRequest.getApplicationId(), e);
+		}
+	}
+
+	private void failedCase(WfRequest wfRequest, String errorMsg) {
+		WfStatusEntity wfStatusEntity = wfStatusRepo.findByApplicationIdAndWfId(wfRequest.getApplicationId(),
+				wfRequest.getWfId());
+		wfRequest.setState(Constants.FAILED);
+		wfRequest.setAction(Constants.FAILED);
+		wfStatusEntity.setLastUpdatedOn(new Date());
+		wfStatusEntity.setCurrentStatus(Constants.FAILED);
+		wfStatusEntity.setInWorkflow(false);
+		wfStatusEntity.setComment(errorMsg);
+		wfStatusRepo.save(wfStatusEntity);
+	}
+
+	private void failedCaseProfileUpdate(List<WfRequest> wfRequests, String updateError) {
+
+		for (WfRequest wfRequest : wfRequests) {
+			List<HashMap<String, Object>> updatedFieldValues = wfRequest.getUpdateFieldValues();
+			HashMap<String, Object> updatedFieldValueElement = updatedFieldValues.get(0);
+			HashMap<String, Object> toValue = (HashMap<String, Object>) updatedFieldValueElement.get(Constants.TO_VALUE);
+			Set<String> keySet = toValue.keySet();
+			if (!keySet.contains(Constants.NAME)) {
+				WfStatusEntity wfStatusEntity = wfStatusRepo.findByApplicationIdAndWfId(wfRequest.getApplicationId(),
+						wfRequest.getWfId());
+				wfRequest.setState(Constants.FAILED);
+				wfRequest.setAction(Constants.FAILED);
+				wfStatusEntity.setLastUpdatedOn(new Date());
+				wfStatusEntity.setCurrentStatus(Constants.FAILED);
+				wfStatusEntity.setInWorkflow(false);
+				wfStatusEntity.setComment(updateError);
+				wfStatusRepo.save(wfStatusEntity);
+			}
+		}
+	}
 }
