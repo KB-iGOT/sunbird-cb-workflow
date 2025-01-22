@@ -231,7 +231,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                             ? Date.from((Instant) courseBatch.get(Constants.ENROLMENT_END_DATE))
                             : null;
                     Date batchStartDate = courseBatch.containsKey(Constants.START_DATE)
-                            ? (Date) courseBatch.get(Constants.START_DATE)
+                            ? Date.from((Instant) courseBatch.get(Constants.START_DATE))
                             : null;
                     String batchName = batchAttributes != null
                             && courseBatch.containsKey(Constants.NAME)
