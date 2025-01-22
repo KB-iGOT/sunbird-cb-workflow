@@ -34,7 +34,7 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
     public CqlSession getSession(String keyspaceName) {
         // Check if session for keyspace already exists
         CqlSession currentSession = cassandraSessionMap.get(keyspaceName);
-        if (currentSession != null) {
+        if (currentSession != null && !currentSession.isClosed()) {
             return currentSession;
         } else {
             // Create new session scoped to keyspace using the USE command
@@ -94,7 +94,7 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
                             Integer.parseInt(cache.getProperty(Constants.HEARTBEAT_INTERVAL)))
                     .withInt(DefaultDriverOption.CONNECTION_INIT_QUERY_TIMEOUT, 10000)
                     .withInt(DefaultDriverOption.REQUEST_TIMEOUT, 10000)
-                    .withString(DefaultDriverOption.PROTOCOL_VERSION, ProtocolVersion.V4.toString())
+                    .withString(DefaultDriverOption.PROTOCOL_VERSION, ProtocolVersion.V6.toString())
                     .withClass(DefaultDriverOption.RETRY_POLICY_CLASS, DefaultRetryPolicy.class)
                     .withClass(DefaultDriverOption.TIMESTAMP_GENERATOR_CLASS, AtomicTimestampGenerator.class)
                     .build();
@@ -114,7 +114,7 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
                         .withConfigLoader(loader)
                         .build();
             }
-
+			logger.info("Connected to the keyspaces: " + keySpaceName);
             // Get metadata and log cluster information
             final Metadata metadata = sessionWithKeyspaces.getMetadata();
             logger.info(String.format("Connected to cluster: %s", metadata.getClusterName()));
