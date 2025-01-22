@@ -94,7 +94,7 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
                             Integer.parseInt(cache.getProperty(Constants.HEARTBEAT_INTERVAL)))
                     .withInt(DefaultDriverOption.CONNECTION_INIT_QUERY_TIMEOUT, 10000)
                     .withInt(DefaultDriverOption.REQUEST_TIMEOUT, 10000)
-                    .withString(DefaultDriverOption.PROTOCOL_VERSION, ProtocolVersion.V6.toString())
+                    .withString(DefaultDriverOption.PROTOCOL_VERSION, ProtocolVersion.V5.toString())
                     .withClass(DefaultDriverOption.RETRY_POLICY_CLASS, DefaultRetryPolicy.class)
                     .withClass(DefaultDriverOption.TIMESTAMP_GENERATOR_CLASS, AtomicTimestampGenerator.class)
                     .build();
