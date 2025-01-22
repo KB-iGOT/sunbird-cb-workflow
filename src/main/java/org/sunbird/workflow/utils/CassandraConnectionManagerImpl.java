@@ -36,8 +36,10 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
 			return currentSession;
 		} else {
 			// Create new session scoped to keyspace using the USE command
-			session.execute("USE " + keyspaceName);
-			cassandraSessionMap.put(keyspaceName, session);
+			session = CqlSession.builder()
+					.withKeyspace(keyspaceName) // Specify the keyspace when creating the session
+					.build();
+			cassandraSessionMap.put(keyspaceName, session); // Store session in the map
 			return session;
 		}
 	}
@@ -65,8 +67,11 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
 					.map(host -> new InetSocketAddress(host.trim(), 9042)) // Assuming default port 9042
 					.collect(Collectors.toList());
 
+			List<String> contactPointsString = hosts.stream()
+					.map(host -> host.trim() + ":9042") // Ensure proper host:port format
+					.collect(Collectors.toList());
 			DriverConfigLoader loader = DriverConfigLoader.programmaticBuilder()
-					.withStringList(DefaultDriverOption.CONTACT_POINTS, hosts)
+					.withStringList(DefaultDriverOption.CONTACT_POINTS, contactPointsString)
 					.withString(DefaultDriverOption.REQUEST_CONSISTENCY, getConsistencyLevel().name())
 					.withString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER, "datacenter1")
 					// Local host connection pooling

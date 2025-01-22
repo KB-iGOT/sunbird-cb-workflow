@@ -929,7 +929,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 			for (Object[] result : resultSet) {
 				WfStatusCountDTO dto = new WfStatusCountDTO();
 				dto.setCurrentStatus((String) result[0]);
-				dto.setStatusCount(((BigInteger) result[1]).longValue());
+				dto.setStatusCount(((Long) result[1]));
 				statusCountDTOs.add(dto);
 			}
 			localCache.put(applicationId,statusCountDTOs);

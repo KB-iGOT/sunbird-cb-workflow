@@ -2,6 +2,7 @@ package org.sunbird.workflow.service.impl;
 
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -227,7 +228,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                                     : "0";
                     int currentBatchSize = Integer.parseInt(currentBatchSizeString);
                     Date enrollmentEndDate = courseBatch.containsKey(Constants.ENROLMENT_END_DATE)
-                            ? (Date) courseBatch.get(Constants.ENROLMENT_END_DATE)
+                            ? Date.from((Instant) courseBatch.get(Constants.ENROLMENT_END_DATE))
                             : null;
                     Date batchStartDate = courseBatch.containsKey(Constants.START_DATE)
                             ? (Date) courseBatch.get(Constants.START_DATE)
