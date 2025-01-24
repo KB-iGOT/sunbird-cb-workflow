@@ -37,7 +37,9 @@ public class CassandraOperationImpl implements CassandraOperation {
     public List<Map<String, Object>> getRecordsByProperties(String keyspaceName, String tableName,
                                                             Map<String, Object> propertyMap, List<String> fields) {
         List<Map<String, Object>> response = new ArrayList<>();
-        try (CqlSession session = connectionManager.getSession(keyspaceName)) {
+        CqlSession session = null;
+        try {
+            session = connectionManager.getSession(keyspaceName);
             Select selectQuery = processQuery(keyspaceName, tableName, propertyMap, fields);
             ResultSet results = session.execute(selectQuery.build());
             response = CassandraUtil.createResponse(results);
@@ -50,7 +52,9 @@ public class CassandraOperationImpl implements CassandraOperation {
     @Override
     public int getCountByProperties(String keyspaceName, String tableName, Map<String, Object> propertyMap) {
         int count = 0;
-        try (CqlSession session = connectionManager.getSession(keyspaceName)) {
+        CqlSession session = null;
+        try {
+            session = connectionManager.getSession(keyspaceName);
             Select selectQuery = selectFrom(keyspaceName, tableName).countAll().where();
             propertyMap.forEach((key, value) -> selectQuery.whereColumn(key).isEqualTo(bindMarker()));
             PreparedStatement preparedStatement = session.prepare(selectQuery.build());
@@ -94,7 +98,9 @@ public class CassandraOperationImpl implements CassandraOperation {
 
     public Response insertRecord(String keyspaceName, String tableName, Map<String, Object> request) {
         Response response = new Response();
-        try (CqlSession session = connectionManager.getSession(keyspaceName)) {
+        CqlSession session = null;
+        try {
+            session = connectionManager.getSession(keyspaceName);
             String query = CassandraUtil.getPreparedStatement(keyspaceName, tableName, request);
             PreparedStatement statement = session.prepare(query);
             BoundStatement boundStatement = statement.bind(request.values().toArray());
@@ -111,7 +117,9 @@ public class CassandraOperationImpl implements CassandraOperation {
     public Map<String, Object> updateRecord(String keyspaceName, String tableName, Map<String, Object> updateAttributes,
                                             Map<String, Object> compositeKey) {
         Map<String, Object> response = new HashMap<>();
-        try (CqlSession session = connectionManager.getSession(keyspaceName)) {
+        CqlSession session = null;
+        try {
+            session = connectionManager.getSession(keyspaceName);
             UpdateStart updateStart = QueryBuilder.update(keyspaceName, tableName);
             UpdateWithAssignments updateWithAssignments = updateStart.set(updateAttributes.entrySet().stream()
                     .map(entry -> Assignment.setColumn(entry.getKey(), QueryBuilder.literal(entry.getValue())))

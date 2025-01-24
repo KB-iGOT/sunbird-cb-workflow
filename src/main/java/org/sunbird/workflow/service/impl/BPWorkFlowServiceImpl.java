@@ -101,7 +101,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         }
         wfRequest.setServiceName(Constants.BLENDED_PROGRAM_SERVICE_NAME);
         wfRequest.setBatchName((String) courseBatchDetails.get(Constants.BATCH_NAME));
-        wfRequest.setBatchStartDate((Date) courseBatchDetails.get(Constants.START_DATE));
+        wfRequest.setBatchStartDate(Date.from((Instant)courseBatchDetails.get(Constants.START_DATE)));
         Response response = saveEnrollUserIntoWfStatus(rootOrg, org, wfRequest);
         producer.push(configuration.getWorkflowApplicationTopic(), wfRequest);
         return response;
@@ -114,7 +114,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         Map<String, Object> batchDetailsMap = new HashMap<>();
         String validationError = validateBatchUserRequestAccess(wfRequest, batchDetailsMap);
         wfRequest.setBatchName((String) batchDetailsMap.get(Constants.BATCH_NAME));
-        wfRequest.setBatchStartDate((Date) batchDetailsMap.get(Constants.START_DATE));
+        wfRequest.setBatchStartDate(Date.from((Instant) batchDetailsMap.get(Constants.START_DATE)));
         if (Constants.BATCH_START_DATE_ERROR.equals(validationError)) {
             response.put(Constants.ERROR_MESSAGE, configuration.getBatchInProgressMessage());
             response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
@@ -359,7 +359,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
 
 
     private boolean validateBatchStartDate(Map<String, Object> courseBatchDetails) {
-        Date batchStartDate = (Date) courseBatchDetails.get(Constants.START_DATE);
+        Date batchStartDate = (Date.from((Instant) courseBatchDetails.get(Constants.START_DATE)));
         return batchStartDate.after(new Date());
     }
 
@@ -386,7 +386,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
             for (Map<String, Object> courseBatchDetail : courseBatchDetailsList) {
                 // Process batch details
                 Date endDate = courseBatchDetail.containsKey(Constants.END_DATE)
-                        ? (Date) courseBatchDetail.get(Constants.END_DATE)
+                        ? Date.from((Instant) courseBatchDetail.get(Constants.END_DATE))
                         : null;
                 Date todayDate = new Date();
                 if (todayDate.after(endDate)) {
@@ -519,7 +519,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                 wfRequest.setAction(Constants.INITIATE);
                 wfRequest.setNominatedByMdo(true);
                 wfRequest.setBatchName((String) courseBatchDetails.get(Constants.BATCH_NAME));
-                wfRequest.setBatchStartDate((Date) courseBatchDetails.get(Constants.START_DATE));
+                wfRequest.setBatchStartDate(Date.from((Instant) courseBatchDetails.get(Constants.START_DATE)));
                 response = saveAdminEnrollUserIntoWfStatus(rootOrg, org, wfRequest);
                // producer.push(configuration.getWorkFlowNotificationTopic(), wfRequest);
                 producer.push(configuration.getWorkflowApplicationTopic(), wfRequest);
@@ -591,7 +591,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         } else if (approvedLearners.size() == 1)
             wfRequest.setWfId(approvedLearners.get(0).getWfId());
         wfRequest.setBatchName((String) courseBatchDetails.get(Constants.BATCH_NAME));
-        wfRequest.setBatchStartDate((Date) courseBatchDetails.get(Constants.START_DATE));
+        wfRequest.setBatchStartDate(Date.from((Instant) courseBatchDetails.get(Constants.START_DATE)));
         response = workflowService.workflowTransition(rootOrg, org, wfRequest, userId,role);
         response.put(Constants.STATUS, HttpStatus.OK);
 
@@ -644,13 +644,13 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         List<Map<String, Object>> enrolledCourseBatchList = getCourseBatchDetails(userEnrollmentBatchDetailsList);
         courseBatchWfRequestList.stream().flatMap(courseBatchWfRequest -> courseBatchWfRequest.entrySet().stream()).forEach(entry -> {
             if (entry.getKey().equals(Constants.START_DATE)) {
-                Date startDate = (Date) entry.getValue();
+                Date startDate = Date.from((Instant) entry.getValue());
                 if (startDate != null) {
                     wfBatchStartDate[0] = startDate;
                 }
             }
             if (entry.getKey().equals(Constants.END_DATE)) {
-                Date endDate = (Date) entry.getValue();
+                Date endDate = Date.from((Instant) entry.getValue());
                 if (endDate != null) {
                     wfBatchEndDate[0] = endDate;
                 }
@@ -672,8 +672,8 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         final boolean[] startDateFlag = {false};
         final boolean[] endDateFlag = {false};
         enrolledCourseBatchList.forEach(enrolledCourseBatch -> enrolledCourseBatch.forEach((key, value) -> {
-            Date startDateValue = (Date) enrolledCourseBatch.get(Constants.START_DATE);
-            Date endDateValue = (Date) enrolledCourseBatch.get(Constants.END_DATE);
+            Date startDateValue = Date.from((Instant) enrolledCourseBatch.get(Constants.START_DATE));
+            Date endDateValue = Date.from((Instant) enrolledCourseBatch.get(Constants.END_DATE));
             if (startDateValue != null && isWithinRange(startDateValue, startDate[0], endDate[0])) {
                 logger.info("The user is not allowed to enroll for the course since there is a conflict" + startDateValue + startDate[0] + endDate[0]);
                 startDateFlag[0] = true;

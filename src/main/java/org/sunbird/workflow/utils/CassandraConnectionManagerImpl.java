@@ -37,7 +37,6 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
         if (currentSession != null && !currentSession.isClosed()) {
             return currentSession;
         } else {
-            // Create new session scoped to keyspace using the USE command
             CqlSession newSession = createCassandraConnectionWithKeySpaces(keyspaceName);
             cassandraSessionMap.put(keyspaceName, newSession);
             return newSession;
@@ -114,7 +113,7 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
                         .withConfigLoader(loader)
                         .build();
             }
-			logger.info("Connected to the keyspaces: " + keySpaceName);
+            logger.info("Connected to the keyspaces: " + keySpaceName);
             // Get metadata and log cluster information
             final Metadata metadata = sessionWithKeyspaces.getMetadata();
             logger.info(String.format("Connected to cluster: %s", metadata.getClusterName()));
