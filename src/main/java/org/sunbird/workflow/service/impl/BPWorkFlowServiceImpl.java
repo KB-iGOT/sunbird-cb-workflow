@@ -101,7 +101,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         }
         wfRequest.setServiceName(Constants.BLENDED_PROGRAM_SERVICE_NAME);
         wfRequest.setBatchName((String) courseBatchDetails.get(Constants.BATCH_NAME));
-        wfRequest.setBatchStartDate(Date.from((Instant)courseBatchDetails.get(Constants.START_DATE)));
+        wfRequest.setBatchStartDate((Date)courseBatchDetails.get(Constants.START_DATE));
         Response response = saveEnrollUserIntoWfStatus(rootOrg, org, wfRequest);
         producer.push(configuration.getWorkflowApplicationTopic(), wfRequest);
         return response;

@@ -2,10 +2,10 @@ package org.sunbird.workflow.utils;
 
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.*;
-import com.datastax.oss.driver.api.querybuilder.BindMarker;
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
 import com.datastax.oss.driver.api.querybuilder.relation.Relation;
 import com.datastax.oss.driver.api.querybuilder.select.Select;
+import com.datastax.oss.driver.api.querybuilder.term.Term;
 import com.datastax.oss.driver.api.querybuilder.update.Assignment;
 import com.datastax.oss.driver.api.querybuilder.update.Update;
 import com.datastax.oss.driver.api.querybuilder.update.UpdateStart;
@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.stream.Collectors;
 
 import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.bindMarker;
 import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.selectFrom;
@@ -83,8 +84,11 @@ public class CassandraOperationImpl implements CassandraOperation {
             for (Entry<String, Object> entry : propertyMap.entrySet()) {
                 if (entry.getValue() instanceof List) {
                     List<?> list = (List<?>) entry.getValue();
-                    if (list != null) {
-                        selectQuery = selectQuery.whereColumn(entry.getKey()).in((BindMarker) list);
+                    if (CollectionUtils.isNotEmpty(list)) {
+                        List<Term> terms = list.stream()
+                                .map(QueryBuilder::literal)
+                                .collect(Collectors.toList());
+                        selectQuery = selectQuery.whereColumn(entry.getKey()).in(terms);
                     }
                 } else {
                     selectQuery = selectQuery.whereColumn(entry.getKey()).isEqualTo(QueryBuilder.literal(entry.getValue()));
