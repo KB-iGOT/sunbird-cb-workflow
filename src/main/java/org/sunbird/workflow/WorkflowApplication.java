@@ -2,6 +2,8 @@ package org.sunbird.workflow;
 
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
@@ -23,7 +25,11 @@ public class WorkflowApplication {
 
 	@Bean
 	public ObjectMapper objectMapper() {
-		return new ObjectMapper().configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
+		ObjectMapper objectMapper = new ObjectMapper()
+				.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
+		objectMapper.registerModule(new JavaTimeModule());
+		objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);  // Disable timestamps for date-time fields
+		return objectMapper;
 	}
 
 	@Bean
