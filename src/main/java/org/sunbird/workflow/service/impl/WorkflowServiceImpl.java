@@ -1382,17 +1382,16 @@ public class WorkflowServiceImpl implements Workflowservice {
 				StringBuilder builder = new StringBuilder(configuration.getLmsServiceHost());
 				builder.append(configuration.getLmsUserSearchEndPoint());
 				Map<String, Object> userSearchResult = (Map<String, Object>) requestServiceImpl.fetchResultUsingPost(builder, requestObject, Map.class, (HashMap<String, String>) headersValue);
-				List<String> userRecordIds = new ArrayList<>();
+
 				if (userSearchResult != null && Constants.OK.equalsIgnoreCase((String) userSearchResult.get(Constants.RESPONSE_CODE))) {
 					Map<String, Object> result = (Map<String, Object>) userSearchResult.get(Constants.RESULT);
 					Map<String, Object> lmsResponse = (Map<String, Object>) result.get(Constants.RESPONSE);
 					List<Map<String, Object>> contents = (List<Map<String, Object>>) lmsResponse.get(Constants.CONTENT);
 
 					if (!CollectionUtils.isEmpty(contents)) {
-						userRecordIds = contents.stream().map(content -> (String) content.get(Constants.USER_ID)).collect(Collectors.toList());
+						applicationIds = contents.stream().map(content -> (String) content.get(Constants.USER_ID)).collect(Collectors.toList());
 					}
 				}
-				applicationIds = userRecordIds;
 			} else if (CollectionUtils.isEmpty(applicationIds)) {
 				Page<String> applicationIdsPage = wfStatusRepo.getListOfDistinctUserIdsUsingRequestType(
 						criteria.getServiceName(), criteria.getApplicationStatus(), criteria.getDeptName(), criteria.getRequestType(), pageable);
