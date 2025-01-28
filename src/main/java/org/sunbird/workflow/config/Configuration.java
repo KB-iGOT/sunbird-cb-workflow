@@ -243,7 +243,7 @@ public class Configuration {
     private String workflowApplicationTopicV2;
 
     @Value("${lms.service.user.search.limit}")
-    private int lmsUserSearchLimit;
+    private Integer lmsUserSearchLimit;
 
     public String getAdminBlendedProgramEnrolEndPoint() {
         return adminBlendedProgramEnrolEndPoint;
