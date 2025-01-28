@@ -242,6 +242,9 @@ public class Configuration {
     @Value("${kafka.topics.workflow.request.v2}")
     private String workflowApplicationTopicV2;
 
+    @Value("${lms.service.user.search.limit}")
+    private int lmsUserSearchLimit;
+
     public String getAdminBlendedProgramEnrolEndPoint() {
         return adminBlendedProgramEnrolEndPoint;
     }
@@ -872,4 +875,8 @@ public class Configuration {
     public void setWorkflowApplicationTopicV2(String workflowApplicationTopicV2) {
         this.workflowApplicationTopicV2 = workflowApplicationTopicV2;
     }
+
+    public Integer getLmsUserSearchLimit() { return lmsUserSearchLimit; }
+
+    public void setLmsUserSearchLimit(Integer lmsUserSearchLimit) { this.lmsUserSearchLimit = lmsUserSearchLimit; }
 }

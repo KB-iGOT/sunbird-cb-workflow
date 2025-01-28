@@ -357,5 +357,9 @@ public class Constants {
 	public static final String WITHDRAWN = "WITHDRAWN";
 	public static final String WORKFLOW_REQUESTS = "workflowRequests";
 	public static final String SERVICE_NAME = "serviceName";
+	public static final String QUERY = "query";
+	public static final String LIMIT = "limit";
+	public static final String OFFSET = "offset";
+	public static final String X_AUTH_USER_ORG_ID = "x-authenticated-user-orgid";
 
 }

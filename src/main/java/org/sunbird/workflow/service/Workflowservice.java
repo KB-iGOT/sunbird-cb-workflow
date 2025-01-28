@@ -58,7 +58,7 @@ public interface Workflowservice {
 
     public ResponseEntity<?> downloadPendingRequestFile(String userAuthToken);
 
-    public Response getUserProfileApprovalRequest(String rootOrg, String org, SearchCriteria searchCriteria);
+    public Response getUserProfileApprovalRequest(String rootOrg, String org, SearchCriteria searchCriteria, String rootOrgId);
 
 
 }

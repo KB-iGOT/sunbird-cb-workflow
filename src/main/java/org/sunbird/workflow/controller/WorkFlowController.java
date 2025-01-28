@@ -139,9 +139,12 @@ public class WorkFlowController {
 	}
 
 	@PostMapping(path = "/profile/approvalRequest/search", produces = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<Response> getUserProfileApprovalRequest(@RequestHeader String rootOrg, @RequestHeader String org,
-														@RequestBody SearchCriteria searchCriteria) {
-		Response response = workflowService.getUserProfileApprovalRequest(rootOrg, org, searchCriteria);
+	public ResponseEntity<Response> getUserProfileApprovalRequest(
+			@RequestHeader(name = "rootOrg", defaultValue = Constants.ROOT_ORG) String rootOrg,
+			@RequestHeader(name = "org", defaultValue = Constants.ORG) String org,
+			@RequestHeader(name = Constants.X_AUTH_USER_ORG_ID, required = false) String rootOrgId,
+			@RequestBody SearchCriteria searchCriteria) {
+		Response response = workflowService.getUserProfileApprovalRequest(rootOrg, org, searchCriteria,rootOrgId);
 		return new ResponseEntity<>(response, HttpStatus.OK);
 	}
 }

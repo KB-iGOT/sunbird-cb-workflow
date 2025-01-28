@@ -25,6 +25,8 @@ public class SearchCriteria {
 
 	private List<String> requestType;
 
+	private String query;
+
 	public String getServiceName() {
 		return serviceName;
 	}
@@ -100,4 +102,8 @@ public class SearchCriteria {
 	public void setRequestType(List<String> requestType) {
 		this.requestType = requestType;
 	}
+
+	public String getQuery() { return query; }
+
+	public void setQuery(String query) { this.query = query; }
 }
