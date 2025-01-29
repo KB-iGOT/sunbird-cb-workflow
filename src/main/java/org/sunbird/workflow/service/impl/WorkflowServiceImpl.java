@@ -1405,14 +1405,13 @@ public class WorkflowServiceImpl implements Workflowservice {
 					Map<String, Object> result = (Map<String, Object>) userSearchResult.get(Constants.RESULT);
 					Map<String, Object> lmsResponse = (Map<String, Object>) result.get(Constants.RESPONSE);
 					List<Map<String, Object>> contents = (List<Map<String, Object>>) lmsResponse.get(Constants.CONTENT);
-					if (CollectionUtils.isEmpty(contents)) {
+					if (!CollectionUtils.isEmpty(contents)) {
+						applicationIds = contents.stream().map(content -> (String) content.get(Constants.USER_ID)).collect(Collectors.toList());
+					} else {
 						response.put(Constants.MESSAGE, Constants.NO_USER_FOUND);
 						response.put(Constants.STATUS, HttpStatus.OK);
 						response.put(Constants.COUNT, 0);
 						return response;
-					}
-					if (!CollectionUtils.isEmpty(contents)) {
-						applicationIds = contents.stream().map(content -> (String) content.get(Constants.USER_ID)).collect(Collectors.toList());
 					}
 				}
 			}
