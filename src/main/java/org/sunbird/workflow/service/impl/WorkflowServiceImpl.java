@@ -1363,8 +1363,14 @@ public class WorkflowServiceImpl implements Workflowservice {
 			Pageable pageable = getPageReqForApplicationSearch(criteria);
 			List<String> applicationIds = criteria.getApplicationIds();
 			long totalRequestCount = 0;
+			if (CollectionUtils.isEmpty(applicationIds) && StringUtil.isBlank(criteria.getQuery())) {
+				Page<String> applicationIdsPage = wfStatusRepo.getListOfDistinctUserIdsUsingRequestType(
+						criteria.getServiceName(), criteria.getApplicationStatus(), criteria.getDeptName(), criteria.getRequestType(), pageable);
+				applicationIds = applicationIdsPage.getContent();
+				totalRequestCount = applicationIdsPage.getTotalElements();
+			}
 			if (StringUtil.isNotBlank(criteria.getQuery()) && criteria.getServiceName().equals(Constants.PROFILE_SERVICE_NAME)) {
-				if (StringUtil.isBlank(rootOrgId) && (criteria.getRequestType().equals("GROUP_CHANGE") || criteria.getRequestType().equals("DESIGNATION_CHANGE"))) {
+				if (StringUtil.isBlank(rootOrgId) && (criteria.getRequestType().equals(Constants.GROUP_CHANGE) || criteria.getRequestType().equals(Constants.DESIGNATION_CHANGE))) {
 					response.setResponseCode(HttpStatus.BAD_REQUEST);
 					response.put(Constants.MESSAGE, Constants.ROOT_ORG_ERROR_MESSAGE);
 					response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
@@ -1373,8 +1379,12 @@ public class WorkflowServiceImpl implements Workflowservice {
 				Map<String, String> headersValue = new HashMap<>();
 				headersValue.put(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON);
 				Map<String, Object> filters = new HashMap<>();
-				if ((criteria.getRequestType().contains("GROUP_CHANGE") || criteria.getRequestType().contains("DESIGNATION_CHANGE"))) {
+				if ((criteria.getRequestType().contains(Constants.GROUP_CHANGE) || criteria.getRequestType().contains(Constants.DESIGNATION_CHANGE))) {
 					filters.put(Constants.ROOT_ORG_ID, rootOrgId);
+				}
+				if (criteria.getRequestType().contains(Constants.ORG_TRANSFER_REQUEST)) {
+					List<String> userIds = wfStatusRepo.getListOfDistinctUserIdsUsingRequestTypeWithoutPagination(criteria.getServiceName(), criteria.getApplicationStatus(), criteria.getDeptName(), criteria.getRequestType());
+					filters.put(Constants.USER_ID, userIds);
 				}
 				filters.put(Constants.STATUS, 1);
 				Map<String, Object> request = new HashMap<>();
@@ -1395,16 +1405,16 @@ public class WorkflowServiceImpl implements Workflowservice {
 					Map<String, Object> result = (Map<String, Object>) userSearchResult.get(Constants.RESULT);
 					Map<String, Object> lmsResponse = (Map<String, Object>) result.get(Constants.RESPONSE);
 					List<Map<String, Object>> contents = (List<Map<String, Object>>) lmsResponse.get(Constants.CONTENT);
-
+					if (CollectionUtils.isEmpty(contents)) {
+						response.put(Constants.MESSAGE, Constants.NO_USER_FOUND);
+						response.put(Constants.STATUS, HttpStatus.OK);
+						response.put(Constants.COUNT, 0);
+						return response;
+					}
 					if (!CollectionUtils.isEmpty(contents)) {
 						applicationIds = contents.stream().map(content -> (String) content.get(Constants.USER_ID)).collect(Collectors.toList());
 					}
 				}
-			}else if (CollectionUtils.isEmpty(applicationIds)) {
-				Page<String> applicationIdsPage = wfStatusRepo.getListOfDistinctUserIdsUsingRequestType(
-						criteria.getServiceName(), criteria.getApplicationStatus(), criteria.getDeptName(), criteria.getRequestType(), pageable);
-				applicationIds = applicationIdsPage.getContent();
-				totalRequestCount = applicationIdsPage.getTotalElements();
 			}
 
 			List<WfStatusEntity> wfStatusEntities = null;

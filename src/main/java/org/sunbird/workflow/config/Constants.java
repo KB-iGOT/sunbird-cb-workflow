@@ -364,4 +364,7 @@ public class Constants {
 	public static final String ORG_CONSTANT = "org";
 	public static final String ROOT_ORG_ERROR_MESSAGE = "Invalid RootOrgId";
 	public static final String ORG_TRANSFER_REQUEST ="ORG_TRANSFER";
+	public static final String NO_USER_FOUND = "No user found";
+	public static final String GROUP_CHANGE ="GROUP_CHANGE";
+	public static final String DESIGNATION_CHANGE ="DESIGNATION_CHANGE";
 }
