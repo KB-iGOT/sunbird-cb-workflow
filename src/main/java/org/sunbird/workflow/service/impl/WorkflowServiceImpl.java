@@ -1363,7 +1363,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 			Pageable pageable = getPageReqForApplicationSearch(criteria);
 			List<String> applicationIds = criteria.getApplicationIds();
 			long totalRequestCount = 0;
-			if(StringUtil.isNotBlank(criteria.getQuery()) && criteria.getServiceName().equals(Constants.PROFILE_SERVICE_NAME)) {
+			if (StringUtil.isNotBlank(criteria.getQuery()) && criteria.getServiceName().equals(Constants.PROFILE_SERVICE_NAME)) {
 				if (StringUtil.isBlank(rootOrgId) && (criteria.getRequestType().equals("GROUP_CHANGE") || criteria.getRequestType().equals("DESIGNATION_CHANGE"))) {
 					response.setResponseCode(HttpStatus.BAD_REQUEST);
 					response.put(Constants.MESSAGE, Constants.ROOT_ORG_ERROR_MESSAGE);
@@ -1373,7 +1373,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 				Map<String, String> headersValue = new HashMap<>();
 				headersValue.put(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON);
 				Map<String, Object> filters = new HashMap<>();
-				if ((criteria.getRequestType().contains("GROUP_CHANGE") || criteria.getRequestType().contains("DESIGNATION_CHANGE"))){
+				if ((criteria.getRequestType().contains("GROUP_CHANGE") || criteria.getRequestType().contains("DESIGNATION_CHANGE"))) {
 					filters.put(Constants.ROOT_ORG_ID, rootOrgId);
 				}
 				filters.put(Constants.STATUS, 1);
