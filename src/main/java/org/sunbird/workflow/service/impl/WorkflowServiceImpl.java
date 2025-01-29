@@ -1364,10 +1364,18 @@ public class WorkflowServiceImpl implements Workflowservice {
 			List<String> applicationIds = criteria.getApplicationIds();
 			long totalRequestCount = 0;
 			if(StringUtil.isNotBlank(criteria.getQuery()) && criteria.getServiceName().equals(Constants.PROFILE_SERVICE_NAME)) {
+				if (StringUtil.isBlank(rootOrgId) && (criteria.getRequestType().equals("GROUP_CHANGE") || criteria.getRequestType().equals("DESIGNATION_CHANGE"))) {
+					response.setResponseCode(HttpStatus.BAD_REQUEST);
+					response.put(Constants.MESSAGE, Constants.ROOT_ORG_ERROR_MESSAGE);
+					response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+					return response;
+				}
 				Map<String, String> headersValue = new HashMap<>();
 				headersValue.put(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON);
 				Map<String, Object> filters = new HashMap<>();
-				filters.put(Constants.ROOT_ORG_ID, rootOrgId);
+				if ((criteria.getRequestType().contains("GROUP_CHANGE") || criteria.getRequestType().contains("DESIGNATION_CHANGE"))){
+					filters.put(Constants.ROOT_ORG_ID, rootOrgId);
+				}
 				filters.put(Constants.STATUS, 1);
 				Map<String, Object> request = new HashMap<>();
 				request.put(Constants.FILTERS, filters);
@@ -1392,7 +1400,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 						applicationIds = contents.stream().map(content -> (String) content.get(Constants.USER_ID)).collect(Collectors.toList());
 					}
 				}
-			} else if (CollectionUtils.isEmpty(applicationIds)) {
+			}else if (CollectionUtils.isEmpty(applicationIds)) {
 				Page<String> applicationIdsPage = wfStatusRepo.getListOfDistinctUserIdsUsingRequestType(
 						criteria.getServiceName(), criteria.getApplicationStatus(), criteria.getDeptName(), criteria.getRequestType(), pageable);
 				applicationIds = applicationIdsPage.getContent();

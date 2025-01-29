@@ -362,5 +362,6 @@ public class Constants {
 	public static final String OFFSET = "offset";
 	public static final String X_AUTH_USER_ORG_ID = "x-authenticated-user-orgid";
 	public static final String ORG_CONSTANT = "org";
-
+	public static final String ROOT_ORG_ERROR_MESSAGE = "Invalid RootOrgId";
+	public static final String ORG_TRANSFER_REQUEST ="ORG_TRANSFER";
 }
