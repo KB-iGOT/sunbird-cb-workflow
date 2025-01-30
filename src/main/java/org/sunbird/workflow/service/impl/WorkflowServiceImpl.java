@@ -1363,7 +1363,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 			Pageable pageable = getPageReqForApplicationSearch(criteria);
 			List<String> applicationIds = criteria.getApplicationIds();
 			long totalRequestCount = 0;
-			if (CollectionUtils.isEmpty(applicationIds) && StringUtil.isBlank(criteria.getQuery())) {
+			if (CollectionUtils.isEmpty(applicationIds)) {
 				Page<String> applicationIdsPage = wfStatusRepo.getListOfDistinctUserIdsUsingRequestType(
 						criteria.getServiceName(), criteria.getApplicationStatus(), criteria.getDeptName(), criteria.getRequestType(), pageable);
 				applicationIds = applicationIdsPage.getContent();
@@ -1379,11 +1379,12 @@ public class WorkflowServiceImpl implements Workflowservice {
 				Map<String, String> headersValue = new HashMap<>();
 				headersValue.put(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON);
 				Map<String, Object> filters = new HashMap<>();
+				List<String> userIds = wfStatusRepo.getListOfDistinctUserIdsUsingRequestTypeWithoutPagination(criteria.getServiceName(), criteria.getApplicationStatus(), criteria.getDeptName(), criteria.getRequestType());
 				if ((criteria.getRequestType().contains(Constants.GROUP_CHANGE) || criteria.getRequestType().contains(Constants.DESIGNATION_CHANGE))) {
 					filters.put(Constants.ROOT_ORG_ID, rootOrgId);
+					filters.put(Constants.USER_ID, userIds);
 				}
 				if (criteria.getRequestType().contains(Constants.ORG_TRANSFER_REQUEST)) {
-					List<String> userIds = wfStatusRepo.getListOfDistinctUserIdsUsingRequestTypeWithoutPagination(criteria.getServiceName(), criteria.getApplicationStatus(), criteria.getDeptName(), criteria.getRequestType());
 					filters.put(Constants.USER_ID, userIds);
 				}
 				filters.put(Constants.STATUS, 1);
