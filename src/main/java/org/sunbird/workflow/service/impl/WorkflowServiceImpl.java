@@ -1370,7 +1370,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 				totalRequestCount = applicationIdsPage.getTotalElements();
 			}
 			if (StringUtil.isNotBlank(criteria.getQuery()) && criteria.getServiceName().equals(Constants.PROFILE_SERVICE_NAME)) {
-				if (StringUtil.isBlank(rootOrgId) && (criteria.getRequestType().contains(Constants.GROUP_CHANGE) || criteria.getRequestType().contains(Constants.DESIGNATION_CHANGE))) {
+				if (StringUtil.isBlank(rootOrgId) && criteria.getRequestType() != null && (criteria.getRequestType().contains(Constants.GROUP_CHANGE) || criteria.getRequestType().contains(Constants.DESIGNATION_CHANGE))) {
 					response.setResponseCode(HttpStatus.BAD_REQUEST);
 					response.put(Constants.MESSAGE, Constants.ROOT_ORG_ERROR_MESSAGE);
 					response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
