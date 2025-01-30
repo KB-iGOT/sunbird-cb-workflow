@@ -1257,7 +1257,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 			uploadedFileDetails.put(Constants.FILE_NAME, uploadResponse.getResult().get(Constants.NAME));
 			uploadedFileDetails.put(Constants.FILE_PATH, uploadResponse.getResult().get(Constants.URL));
 			uploadedFileDetails.put(Constants.CREATED_BY, userId);
-			uploadedFileDetails.put(Constants.DATE_CREATED_ON, Instant.now());
+			uploadedFileDetails.put(Constants.DATE_CREATED_ON, Instant.now().toEpochMilli());
 			uploadedFileDetails.put(Constants.STATUS, Constants.INITIATED_CAPITAL);
 			uploadedFileDetails.put(Constants.COMMENT, "");
 
