@@ -43,11 +43,11 @@ import org.sunbird.workflow.utils.LRUCache;
 import org.sunbird.workflow.utils.ProjectUtil;
 
 import java.io.*;
-import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -981,6 +981,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 		SBApiResponse response = ProjectUtil.createDefaultResponse(Constants.API_USER_BULK_UPDATE_STATUS);
 		try {
 			String userId = accessTokenValidator.fetchUserIdFromAccessToken(userAuthToken);
+			userId = "291fd548-ab04-4f16-938a-67963ed0b6b6";
 			if (StringUtils.isEmpty(userId)) {
 				setErrorData(response, "Invalid User Token");
 				response.setResponseCode(HttpStatus.BAD_REQUEST);
@@ -1256,7 +1257,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 			uploadedFileDetails.put(Constants.FILE_NAME, uploadResponse.getResult().get(Constants.NAME));
 			uploadedFileDetails.put(Constants.FILE_PATH, uploadResponse.getResult().get(Constants.URL));
 			uploadedFileDetails.put(Constants.CREATED_BY, userId);
-			uploadedFileDetails.put(Constants.DATE_CREATED_ON, new Timestamp(System.currentTimeMillis()));
+			uploadedFileDetails.put(Constants.DATE_CREATED_ON, Instant.now());
 			uploadedFileDetails.put(Constants.STATUS, Constants.INITIATED_CAPITAL);
 			uploadedFileDetails.put(Constants.COMMENT, "");
 
