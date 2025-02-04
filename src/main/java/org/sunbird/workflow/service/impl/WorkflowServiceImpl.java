@@ -1363,58 +1363,36 @@ public class WorkflowServiceImpl implements Workflowservice {
 			Pageable pageable = getPageReqForApplicationSearch(criteria);
 			List<String> applicationIds = criteria.getApplicationIds();
 			long totalRequestCount = 0;
+
 			if (CollectionUtils.isEmpty(applicationIds)) {
 				Page<String> applicationIdsPage = wfStatusRepo.getListOfDistinctUserIdsUsingRequestType(
 						criteria.getServiceName(), criteria.getApplicationStatus(), criteria.getDeptName(), criteria.getRequestType(), pageable);
 				applicationIds = applicationIdsPage.getContent();
 				totalRequestCount = applicationIdsPage.getTotalElements();
 			}
+
 			if (StringUtil.isNotBlank(criteria.getQuery()) && criteria.getServiceName().equals(Constants.PROFILE_SERVICE_NAME)) {
-				if (StringUtil.isBlank(rootOrgId) && criteria.getRequestType() != null && (criteria.getRequestType().contains(Constants.GROUP_CHANGE) || criteria.getRequestType().contains(Constants.DESIGNATION_CHANGE))) {
+				if (StringUtil.isBlank(rootOrgId) && criteria.getRequestType() != null &&
+						(criteria.getRequestType().contains(Constants.GROUP_CHANGE) || criteria.getRequestType().contains(Constants.DESIGNATION_CHANGE))) {
 					response.setResponseCode(HttpStatus.BAD_REQUEST);
 					response.put(Constants.MESSAGE, Constants.ROOT_ORG_ERROR_MESSAGE);
 					response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
 					return response;
 				}
-				Map<String, String> headersValue = new HashMap<>();
-				headersValue.put(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON);
-				Map<String, Object> filters = new HashMap<>();
-				List<String> userIds = wfStatusRepo.getListOfDistinctUserIdsUsingRequestTypeWithoutPagination(criteria.getServiceName(), criteria.getApplicationStatus(), criteria.getDeptName(), criteria.getRequestType());
-				if ((criteria.getRequestType().contains(Constants.GROUP_CHANGE) || criteria.getRequestType().contains(Constants.DESIGNATION_CHANGE))) {
-					filters.put(Constants.ROOT_ORG_ID, rootOrgId);
-					filters.put(Constants.USER_ID, userIds);
-				}
-				if (criteria.getRequestType().contains(Constants.ORG_TRANSFER_REQUEST)) {
-					filters.put(Constants.USER_ID, userIds);
-				}
-				filters.put(Constants.STATUS, 1);
-				Map<String, Object> request = new HashMap<>();
-				request.put(Constants.FILTERS, filters);
-				request.put(Constants.QUERY, criteria.getQuery());
-				request.put(Constants.LIMIT, configuration.getLmsUserSearchLimit());
-				request.put(Constants.OFFSET, criteria.getOffset());
-				request.put(Constants.FIELDS, Arrays.asList(Constants.USER_ID));
+				applicationIds= new ArrayList<>();
 
-				Map<String, Object> requestObject = new HashMap<>();
-				requestObject.put(Constants.REQUEST, request);
+				List<String> userIds = wfStatusRepo.getListOfDistinctUserIdsUsingRequestTypeWithoutPagination(
+						criteria.getServiceName(), criteria.getApplicationStatus(), criteria.getDeptName(), criteria.getRequestType());
 
-				StringBuilder builder = new StringBuilder(configuration.getLmsServiceHost());
-				builder.append(configuration.getLmsUserSearchEndPoint());
-				Map<String, Object> userSearchResult = (Map<String, Object>) requestServiceImpl.fetchResultUsingPost(builder, requestObject, Map.class, (HashMap<String, String>) headersValue);
+				List<String> finalUserIds = fetchPaginatedUsers(userIds, criteria, rootOrgId);
 
-				if (userSearchResult != null && Constants.OK.equalsIgnoreCase((String) userSearchResult.get(Constants.RESPONSE_CODE))) {
-					Map<String, Object> result = (Map<String, Object>) userSearchResult.get(Constants.RESULT);
-					Map<String, Object> lmsResponse = (Map<String, Object>) result.get(Constants.RESPONSE);
-					List<Map<String, Object>> contents = (List<Map<String, Object>>) lmsResponse.get(Constants.CONTENT);
-					if (!CollectionUtils.isEmpty(contents)) {
-						applicationIds = contents.stream().map(content -> (String) content.get(Constants.USER_ID)).collect(Collectors.toList());
-					} else {
-						response.put(Constants.MESSAGE, Constants.NO_USER_FOUND);
-						response.put(Constants.STATUS, HttpStatus.OK);
-						response.put(Constants.COUNT, 0);
-						return response;
-					}
+				if (CollectionUtils.isEmpty(finalUserIds)) {
+					response.put(Constants.MESSAGE, Constants.NO_USER_FOUND);
+					response.put(Constants.STATUS, HttpStatus.OK);
+					response.put(Constants.COUNT, 0);
+					return response;
 				}
+				applicationIds = finalUserIds;
 			}
 
 			List<WfStatusEntity> wfStatusEntities = null;
@@ -1428,18 +1406,11 @@ public class WorkflowServiceImpl implements Workflowservice {
 					userProfileWfService.enrichUserData(wfStatusEntities.stream().collect(Collectors.groupingBy(WfStatusEntity::getApplicationId)), rootOrg);
 
 			if (criteria.getSortBy() != null && !criteria.getSortBy().isEmpty()) {
-				log.info("sortBy invoked {}", userProfiles);
 				userProfiles = sortDataByCriteria(userProfiles, criteria);
 			}
 
-			int page = criteria.getOffset() != null ? criteria.getOffset() : 0;
-			int pageSize = criteria.getLimit() != null ? criteria.getLimit() : configuration.getDefaultLimit();
-			int start = Math.min(page * pageSize, userProfiles.size());
-			int end = Math.min((page * pageSize) + pageSize, userProfiles.size());
-			List<Map<String, Object>> paginatedUserProfiles = userProfiles.subList(start, end);
-
 			response.put(Constants.MESSAGE, Constants.SUCCESSFUL);
-			response.put(Constants.DATA, paginatedUserProfiles);
+			response.put(Constants.DATA, userProfiles);
 			response.put(Constants.STATUS, HttpStatus.OK);
 			response.put(Constants.COUNT, totalRequestCount);
 			this.identifyAndMarkOrgTransferRequest(response);
@@ -1451,6 +1422,79 @@ public class WorkflowServiceImpl implements Workflowservice {
 		}
 
 		return response;
+	}
+
+	/**
+	 * Fetches paginated user IDs from LMS in batches of the specified size from configuration, stopping when enough data is available.
+	 */
+	private List<String> fetchPaginatedUsers(List<String> userIds, SearchCriteria criteria, String rootOrgId) {
+		int batchSize = configuration.getLmsUserSearchLimit();
+		int index = 0;
+		List<String> finalUserIds = new ArrayList<>();
+
+		int requestedOffset = criteria.getOffset();
+		int requestedLimit = criteria.getLimit();
+		int requiredRecords = (requestedOffset + 1) * requestedLimit;
+
+		while (index < userIds.size()) {
+			int endIndex = Math.min(index + batchSize, userIds.size());
+			List<String> batchUserIds = userIds.subList(index, endIndex);
+
+			List<String> fetchedUserIds = fetchUsersFromLMS(batchUserIds, criteria, rootOrgId);
+			finalUserIds.addAll(fetchedUserIds);
+
+			// Stop fetching if we've collected enough users to serve the requested page
+			if (finalUserIds.size() >= requiredRecords) {
+				break;
+			}
+			index = endIndex;
+		}
+
+		// Calculate the start and end index for the requested page
+		int start = Math.min(requestedOffset * requestedLimit, finalUserIds.size());
+		int end = Math.min(start + requestedLimit, finalUserIds.size());
+
+		return finalUserIds.subList(start, end);
+	}
+
+	private List<String> fetchUsersFromLMS(List<String> userIds, SearchCriteria criteria, String rootOrgId) {
+		Map<String, String> headersValue = new HashMap<>();
+		headersValue.put(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON);
+
+		List<String> allFetchedUserIds = new ArrayList<>();
+
+		Map<String, Object> filters = new HashMap<>();
+		if ((criteria.getRequestType().contains(Constants.GROUP_CHANGE) || criteria.getRequestType().contains(Constants.DESIGNATION_CHANGE))) {
+			filters.put(Constants.ROOT_ORG_ID, rootOrgId);
+			filters.put(Constants.USER_ID, userIds);
+		}
+		if (criteria.getRequestType().contains(Constants.ORG_TRANSFER_REQUEST)) {
+			filters.put(Constants.USER_ID, userIds);
+		}
+		filters.put(Constants.STATUS, 1);
+		Map<String, Object> request = new HashMap<>();
+		request.put(Constants.FILTERS, filters);
+		request.put(Constants.QUERY, criteria.getQuery());
+		request.put(Constants.LIMIT, configuration.getLmsUserSearchLimit());
+		request.put(Constants.OFFSET, 0);
+		request.put(Constants.FIELDS, Arrays.asList(Constants.USER_ID));
+
+		Map<String, Object> requestObject = new HashMap<>();
+		requestObject.put(Constants.REQUEST, request);
+
+		StringBuilder builder = new StringBuilder(configuration.getLmsServiceHost());
+		builder.append(configuration.getLmsUserSearchEndPoint());
+		Map<String, Object> userSearchResult = (Map<String, Object>) requestServiceImpl.fetchResultUsingPost(builder, requestObject, Map.class, (HashMap<String, String>) headersValue);
+
+		if (userSearchResult != null && Constants.OK.equalsIgnoreCase((String) userSearchResult.get(Constants.RESPONSE_CODE))) {
+			Map<String, Object> result = (Map<String, Object>) userSearchResult.get(Constants.RESULT);
+			Map<String, Object> lmsResponse = (Map<String, Object>) result.get(Constants.RESPONSE);
+			List<Map<String, Object>> contents = (List<Map<String, Object>>) lmsResponse.get(Constants.CONTENT);
+			if (!CollectionUtils.isEmpty(contents)) {
+				allFetchedUserIds = contents.stream().map(content -> (String) content.get(Constants.USER_ID)).collect(Collectors.toList());
+			}
+		}
+		return allFetchedUserIds;
 	}
 
 
