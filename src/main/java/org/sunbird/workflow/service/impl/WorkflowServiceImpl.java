@@ -1432,8 +1432,14 @@ public class WorkflowServiceImpl implements Workflowservice {
 				userProfiles = sortDataByCriteria(userProfiles, criteria);
 			}
 
+			int page = criteria.getOffset() != null ? criteria.getOffset() : 0;
+			int pageSize = criteria.getLimit() != null ? criteria.getLimit() : configuration.getDefaultLimit();
+			int start = Math.min(page * pageSize, userProfiles.size());
+			int end = Math.min((page * pageSize) + pageSize, userProfiles.size());
+			List<Map<String, Object>> paginatedUserProfiles = userProfiles.subList(start, end);
+
 			response.put(Constants.MESSAGE, Constants.SUCCESSFUL);
-			response.put(Constants.DATA, userProfiles);
+			response.put(Constants.DATA, paginatedUserProfiles);
 			response.put(Constants.STATUS, HttpStatus.OK);
 			response.put(Constants.COUNT, totalRequestCount);
 			this.identifyAndMarkOrgTransferRequest(response);
