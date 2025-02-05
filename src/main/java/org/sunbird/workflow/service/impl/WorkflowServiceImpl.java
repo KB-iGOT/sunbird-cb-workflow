@@ -1406,6 +1406,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 					userProfileWfService.enrichUserData(wfStatusEntities.stream().collect(Collectors.groupingBy(WfStatusEntity::getApplicationId)), rootOrg);
 
 			if (criteria.getSortBy() != null && !criteria.getSortBy().isEmpty()) {
+				log.info("sortBy invoked {}", userProfiles);
 				userProfiles = sortDataByCriteria(userProfiles, criteria);
 			}
 
