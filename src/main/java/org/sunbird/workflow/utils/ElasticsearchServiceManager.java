@@ -102,9 +102,9 @@ public class ElasticsearchServiceManager {
         return true;
     }
 
-    public List<String> searchUsers(String queryString, String rootOrgId, int from, int size) {
-        List<String> result = new ArrayList<String>();
-
+    public long searchUsers(String queryString, String rootOrgId, int from, int size, List<String> userInfo) {
+        userInfo = new ArrayList<String>();
+        long totalHits = 0;
         try {
             // Construct the search request
             SearchRequest searchRequest = new SearchRequest(sbUserIndex);
@@ -159,12 +159,13 @@ public class ElasticsearchServiceManager {
 
             for (SearchHit hit : searchResponse.getHits().getHits()) {
                 Map<String, Object> sourceMap = (Map<String, Object>) hit.getSourceAsMap();
-                result.add((String) sourceMap.get(Constants.ID));
+                userInfo.add((String) sourceMap.get(Constants.ID));
             }
+            totalHits = searchResponse.getHits().getTotalHits();
         } catch (IOException e) {
             logger.error("Failed to query ES to find records for given query.", e);
         }
-        return result;
+        return totalHits;
     }
 
     public boolean updateWfRequest(String userId, String uuid, boolean append) {
