@@ -243,10 +243,10 @@ public class ElasticsearchServiceManager {
             // Script logic for add or remove
             String scriptSource;
             if (append) {
-                // Set `wfTransferRequest` as an object with deptName and wfId
-                scriptSource = "ctx._source.wfTransferRequest = params;";
+                scriptSource = "ctx._source.wfTransferRequest = new HashMap(); " +
+                        "ctx._source.wfTransferRequest.deptName = params.deptName; " +
+                        "ctx._source.wfTransferRequest.wfId = params.wfId;";
             } else {
-                // Remove `wfTransferRequest` field from the document
                 scriptSource = "ctx._source.remove('wfTransferRequest');";
             }
 
