@@ -244,7 +244,7 @@ public class ElasticsearchServiceManager {
             String scriptSource;
             if (append) {
                 scriptSource = "ctx._source.wfTransferRequest = new HashMap(); " +
-                        "ctx._source.wfTransferRequest.deptName = params.deptName; " +
+                        "ctx._source.wfTransferRequest.departmentName = params.departmentName; " +
                         "ctx._source.wfTransferRequest.wfId = params.wfId;";
             } else {
                 scriptSource = "ctx._source.remove('wfTransferRequest');";
