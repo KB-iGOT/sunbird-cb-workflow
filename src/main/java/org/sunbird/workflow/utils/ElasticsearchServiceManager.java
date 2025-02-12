@@ -102,7 +102,8 @@ public class ElasticsearchServiceManager {
         return true;
     }
 
-    public long searchUsers(String queryString, String rootOrgId, int from, int size, List<String> userInfo) {
+    public long searchUsers(String queryString, String rootOrgId, int from, int size, List<String> userInfo,
+            String deptName, List<String> requestTypes) {
         userInfo = new ArrayList<String>();
         long totalHits = 0;
         try {
@@ -141,8 +142,11 @@ public class ElasticsearchServiceManager {
                 boolQuery.must(simpleQuery);
             }
 
-            boolQuery.must(QueryBuilders.existsQuery(Constants.WF_REQUESTS_KEY));
-
+            if (requestTypes.contains(Constants.ORG_TRANSFER_REQUEST)) {
+                boolQuery.must(QueryBuilders.termQuery(Constants.WF_TRANSFER_REQUEST_DEPTNAME_KEY, deptName));
+            } else {
+                boolQuery.must(QueryBuilders.existsQuery(Constants.WF_REQUESTS_KEY));
+            }
             if (StringUtils.isNotBlank(rootOrgId)) {
                 boolQuery.filter(QueryBuilders.termQuery(Constants.ROOT_ORG_ID_RAW_KEY, rootOrgId));
             }
@@ -227,5 +231,66 @@ public class ElasticsearchServiceManager {
             return false;
         }
         return true;
+    }
+
+    public boolean updateWfTransferRequest(String userId, String deptName, String wfId, boolean append) {
+        try {
+            // Prepare parameters for the script
+            Map<String, Object> params = new HashMap<>();
+            params.put(Constants.DEPARTMENT_NAME, deptName);
+            params.put(Constants.WF_ID_CONSTANT, wfId);
+
+            // Script logic for add or remove
+            String scriptSource;
+            if (append) {
+                // Set `wfTransferRequest` as an object with deptName and wfId
+                scriptSource = "ctx._source.wfTransferRequest = params;";
+            } else {
+                // Remove `wfTransferRequest` field from the document
+                scriptSource = "ctx._source.remove('wfTransferRequest');";
+            }
+
+            // Create script object
+            Script script = new Script(ScriptType.INLINE, "painless", scriptSource, params);
+
+            // Upsert logic: If document doesn’t exist, initialize it with `wfTransferRequest`
+            Map<String, Object> upsertContent = new HashMap<>();
+            if (append) {
+                Map<String, Object> wfTransferRequest = new HashMap<>();
+                wfTransferRequest.put(Constants.DEPARTMENT_NAME, deptName);
+                wfTransferRequest.put(Constants.WF_ID_CONSTANT, wfId);
+                upsertContent.put(Constants.WF_TRANSFER_REQUEST_STRING, wfTransferRequest);
+            }
+
+            // Create UpdateRequest
+            UpdateRequest updateRequest = new UpdateRequest(sbUserIndex, _DOC, userId)
+                    .script(script)
+                    .upsert(upsertContent) // Creates the document if missing
+                    .retryOnConflict(5); // Handle concurrent updates
+
+            // Execute the update
+            UpdateResponse updateResponse = client.update(updateRequest, RequestOptions.DEFAULT);
+
+            // Log success
+            switch (updateResponse.getResult()) {
+                case CREATED:
+                    logger.info("WfTransferRequest created successfully for userId: {}", userId);
+                    break;
+                case UPDATED:
+                    logger.info("WfTransferRequest updated successfully for userId: {}", userId);
+                    break;
+                case NOOP:
+                    logger.info("WfTransferRequest update was a noop; no changes were made for userId: {}", userId);
+                    break;
+                default:
+                    logger.warn("WfTransferRequest update:: Unexpected result: {}, for userId: {}",
+                            updateResponse.getResult(), userId);
+            }
+
+            return true;
+        } catch (Exception e) {
+            logger.error("Failed to update wfTransferRequest for userId: {}", userId, e);
+            return false;
+        }
     }
 }

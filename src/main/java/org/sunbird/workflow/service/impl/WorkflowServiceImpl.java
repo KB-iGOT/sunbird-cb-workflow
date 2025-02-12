@@ -1399,7 +1399,8 @@ public class WorkflowServiceImpl implements Workflowservice {
 					updatedRootOrgId = rootOrgId;
 				}
 				totalSearchCount = eServiceManager.searchUsers(criteria.getQuery(), updatedRootOrgId,
-						(int) pageable.getOffset(), pageable.getPageSize(), applicationIds);
+						(int) pageable.getOffset(), pageable.getPageSize(), applicationIds, criteria.getDeptName(),
+						criteria.getRequestType());
 				log.info("ES returns {} number of userId for search using query: {} and rootOrgId: {}",
 						applicationIds.size(), criteria.getQuery(), updatedRootOrgId);
 			} else if (CollectionUtils.isEmpty(applicationIds)) {

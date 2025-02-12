@@ -371,6 +371,8 @@ public class Constants {
 	public static final String ROOT_ORG_ID_RAW_KEY = "rootOrgId.raw";
 	public static final String PROFILE_PRIMARY_EMAIL_FIELD = "profileDetails.personalDetails.primaryEmail.raw";
 	public static final String PROFILE_PHONE_NUMBER_FILED = "profileDetails.personalDetails.mobile.raw";
+	public static final String WF_TRANSFER_REQUEST_STRING = "wfTransferRequest";
+	public static final String WF_TRANSFER_REQUEST_DEPTNAME_KEY = "wfTransferRequest.departmentName";
 
 	public static final List<String> USER_DEFAULT_SEARCH_FIELDS = Collections
 			.unmodifiableList(Arrays.asList(PROFILE_DETAILS_PERSONAL_DETAILS_PRIMARY_EMAIL,

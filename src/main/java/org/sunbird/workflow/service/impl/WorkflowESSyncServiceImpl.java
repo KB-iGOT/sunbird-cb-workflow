@@ -27,18 +27,28 @@ public class WorkflowESSyncServiceImpl implements WorkflowESSyncService {
         if (Constants.PROFILE_SERVICE_NAME.equalsIgnoreCase(wfRequest.getServiceName())) {
             switch (wfStatusEntity.getCurrentStatus()) {
                 case Constants.SEND_FOR_APPROVAL:
-                    esServiceManager.updateWfRequest(wfRequest.getApplicationId(), wfRequest.getWfId(), true);
+                    if (Constants.ORG_TRANSFER_REQUEST.equalsIgnoreCase(wfStatusEntity.getRequestType())) {
+                        esServiceManager.updateWfTransferRequest(wfRequest.getApplicationId(),
+                                wfStatusEntity.getDeptName(), wfRequest.getWfId(), true);
+                    } else {
+                        esServiceManager.updateWfRequest(wfRequest.getApplicationId(), wfRequest.getWfId(), true);
+                    }
                     break;
                 case Constants.WITHDRAWN:
                 case Constants.APPROVED:
                 case Constants.REJECTED:
-                    esServiceManager.updateWfRequest(wfRequest.getApplicationId(), wfRequest.getWfId(), false);
+                    if (Constants.ORG_TRANSFER_REQUEST.equalsIgnoreCase(wfStatusEntity.getRequestType())) {
+                        esServiceManager.updateWfTransferRequest(wfRequest.getApplicationId(),
+                                wfStatusEntity.getDeptName(), wfRequest.getWfId(), false);
+                    } else {
+                        esServiceManager.updateWfRequest(wfRequest.getApplicationId(), wfRequest.getWfId(), false);
+                    }
                     break;
                 default:
                     logger.error("Unknown current status for ES Sync request.");
             }
         } else {
-            logger.error("Failed to process ESSync request.");
+            logger.warn("Ignoring to process ESSync request due to unknown service.");
         }
     }
 }
