@@ -1392,6 +1392,9 @@ public class WorkflowServiceImpl implements Workflowservice {
 					response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
 					return response;
 				}
+				if(CollectionUtils.isEmpty(applicationIds)) {
+					applicationIds = new ArrayList<String>();
+				}
 				String updatedRootOrgId = "";
 				// if request type is group or designation then use rootOrgId, otherwise set to empty.
 				if ((criteria.getRequestType().contains(Constants.GROUP_CHANGE)

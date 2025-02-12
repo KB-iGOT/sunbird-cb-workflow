@@ -104,7 +104,6 @@ public class ElasticsearchServiceManager {
 
     public long searchUsers(String queryString, String rootOrgId, int from, int size, List<String> userInfo,
             String deptName, List<String> requestTypes) {
-        userInfo = new ArrayList<String>();
         long totalHits = 0;
         try {
             // Construct the search request
