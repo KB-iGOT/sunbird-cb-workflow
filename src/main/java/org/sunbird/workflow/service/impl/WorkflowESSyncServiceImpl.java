@@ -29,7 +29,7 @@ public class WorkflowESSyncServiceImpl implements WorkflowESSyncService {
                 case Constants.SEND_FOR_APPROVAL:
                     if (Constants.ORG_TRANSFER_REQUEST.equalsIgnoreCase(wfStatusEntity.getRequestType())) {
                         esServiceManager.updateWfTransferRequest(wfRequest.getApplicationId(),
-                                wfStatusEntity.getDeptName(), wfRequest.getWfId(), true);
+                            wfRequest.getDeptName(), wfRequest.getWfId(), true);
                     } else {
                         esServiceManager.updateWfRequest(wfRequest.getApplicationId(), wfRequest.getWfId(), true);
                     }
@@ -39,7 +39,7 @@ public class WorkflowESSyncServiceImpl implements WorkflowESSyncService {
                 case Constants.REJECTED:
                     if (Constants.ORG_TRANSFER_REQUEST.equalsIgnoreCase(wfStatusEntity.getRequestType())) {
                         esServiceManager.updateWfTransferRequest(wfRequest.getApplicationId(),
-                                wfStatusEntity.getDeptName(), wfRequest.getWfId(), false);
+                            wfRequest.getDeptName(), wfRequest.getWfId(), false);
                     } else {
                         esServiceManager.updateWfRequest(wfRequest.getApplicationId(), wfRequest.getWfId(), false);
                     }
