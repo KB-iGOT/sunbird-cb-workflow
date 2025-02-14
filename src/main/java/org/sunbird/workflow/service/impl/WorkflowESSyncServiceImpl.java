@@ -30,8 +30,10 @@ public class WorkflowESSyncServiceImpl implements WorkflowESSyncService {
                     if (Constants.ORG_TRANSFER_REQUEST.equalsIgnoreCase(wfStatusEntity.getRequestType())) {
                         esServiceManager.updateWfTransferRequest(wfRequest.getApplicationId(),
                             wfRequest.getDeptName(), wfRequest.getWfId(), true);
-                    } else {
-                        esServiceManager.updateWfRequest(wfRequest.getApplicationId(), wfRequest.getWfId(), true);
+                    } else if (Constants.GROUP_CHANGE.equalsIgnoreCase(wfStatusEntity.getRequestType())
+                            || Constants.DESIGNATION_CHANGE.equalsIgnoreCase(wfStatusEntity.getRequestType())) {
+                        esServiceManager.updateWfProfileRequest(wfRequest.getApplicationId(), wfRequest.getWfId(),
+                                wfRequest.getDeptName(), true);
                     }
                     break;
                 case Constants.WITHDRAWN:
@@ -40,8 +42,10 @@ public class WorkflowESSyncServiceImpl implements WorkflowESSyncService {
                     if (Constants.ORG_TRANSFER_REQUEST.equalsIgnoreCase(wfStatusEntity.getRequestType())) {
                         esServiceManager.updateWfTransferRequest(wfRequest.getApplicationId(),
                             wfRequest.getDeptName(), wfRequest.getWfId(), false);
-                    } else {
-                        esServiceManager.updateWfRequest(wfRequest.getApplicationId(), wfRequest.getWfId(), false);
+                    } else if (Constants.GROUP_CHANGE.equalsIgnoreCase(wfStatusEntity.getRequestType())
+                            || Constants.DESIGNATION_CHANGE.equalsIgnoreCase(wfStatusEntity.getRequestType())) {
+                        esServiceManager.updateWfProfileRequest(wfRequest.getApplicationId(), wfRequest.getWfId(),
+                                wfRequest.getDeptName(), false);
                     }
                     break;
                 default:
