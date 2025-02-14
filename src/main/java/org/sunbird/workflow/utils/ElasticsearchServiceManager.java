@@ -306,17 +306,23 @@ public class ElasticsearchServiceManager {
                         "  ctx._source.wfProfileRequests = new ArrayList(); " +
                         "} " +
                         "boolean exists = false; " +
-                        "for (item in ctx._source.wfProfileRequests) { " +
-                        "  if (item.wfId == params.uuid && item.departmentName == params.departmentName) { " +
-                        "    exists = true; break; " +
+                        "for (entry in ctx._source.wfProfileRequests) { " +
+                        "  if (entry.wfId == params.uuid && entry.departmentName == params.departmentName) { " +
+                        "    exists = true; " +
+                        "    break; " +
                         "  } " +
                         "} " +
                         "if (!exists) { " +
-                        "  ctx._source.wfProfileRequests.add(params); " +
+                        "  ctx._source.wfProfileRequests.add(['wfId': params.uuid, 'departmentName': params.departmentName]); " +
                         "}";
             } else {
                 scriptSource = "if (ctx._source.wfProfileRequests != null) { " +
-                        "  ctx._source.wfProfileRequests.removeIf(item -> item.wfId == params.uuid && item.departmentName == params.departmentName); " +
+                        "  ctx._source.wfProfileRequests.removeIf(entry -> " +
+                        "    entry.wfId == params.uuid && entry.departmentName == params.departmentName" +
+                        "  ); " +
+                        "  if (ctx._source.wfProfileRequests.isEmpty()) { " +  // Remove field if empty
+                        "    ctx._source.remove('wfProfileRequests'); " +
+                        "  } " +
                         "}";
             }
     
