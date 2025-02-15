@@ -1395,17 +1395,13 @@ public class WorkflowServiceImpl implements Workflowservice {
 				if(CollectionUtils.isEmpty(applicationIds)) {
 					applicationIds = new ArrayList<String>();
 				}
-				String updatedRootOrgId = "";
-				// if request type is group or designation then use rootOrgId, otherwise set to empty.
-				if ((criteria.getRequestType().contains(Constants.GROUP_CHANGE)
-						|| criteria.getRequestType().contains(Constants.DESIGNATION_CHANGE))) {
-					updatedRootOrgId = rootOrgId;
-				}
-				totalSearchCount = eServiceManager.searchUsers(criteria.getQuery(), updatedRootOrgId,
-						(int) pageable.getOffset(), pageable.getPageSize(), applicationIds, criteria.getDeptName(),
+				totalSearchCount = eServiceManager.searchUsers(criteria.getQuery(), (int) pageable.getOffset(),
+						pageable.getPageSize(), applicationIds, criteria.getDeptName(),
 						criteria.getRequestType());
-				log.info("ES returns {} number of userId for search using query: {} and rootOrgId: {}",
-						applicationIds.size(), criteria.getQuery(), updatedRootOrgId);
+				log.info(
+						"ES returns {} number of userId for search using query: {}, departmentName: {} and requestTypes: {}",
+						applicationIds.size(), criteria.getQuery(), criteria.getDeptName(),
+						criteria.getRequestType().toString());
 			} else if (CollectionUtils.isEmpty(applicationIds)) {
 				Page<String> applicationIdsPage = null;
 				if (criteria.getRequestType().contains(Constants.ORG_TRANSFER_REQUEST)) {

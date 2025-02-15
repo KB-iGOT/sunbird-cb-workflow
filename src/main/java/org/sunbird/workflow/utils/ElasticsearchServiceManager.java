@@ -102,7 +102,7 @@ public class ElasticsearchServiceManager {
         return true;
     }
 
-    public long searchUsers(String queryString, String rootOrgId, int from, int size, List<String> userInfo,
+    public long searchUsers(String queryString, int from, int size, List<String> userInfo,
             String deptName, List<String> requestTypes) {
         long totalHits = 0;
         try {
