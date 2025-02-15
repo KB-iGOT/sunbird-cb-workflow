@@ -317,13 +317,17 @@ public class ElasticsearchServiceManager {
                         "}";
             } else {
                 scriptSource = "if (ctx._source.wfProfileRequests != null) { " +
-                        "  ctx._source.wfProfileRequests.removeIf(entry -> " +
-                        "    entry.wfId == params.uuid && entry.departmentName == params.departmentName" +
-                        "  ); " +
-                        "  if (ctx._source.wfProfileRequests.isEmpty()) { " +  // Remove field if empty
-                        "    ctx._source.remove('wfProfileRequests'); " +
-                        "  } " +
-                        "}";
+                    "  List newList = new ArrayList(); " +
+                    "  for (entry in ctx._source.wfProfileRequests) { " +
+                    "    if (!(entry.wfId == params.uuid && entry.departmentName == params.departmentName)) { " +
+                    "      newList.add(entry); " +
+                    "    } " +
+                    "  } " +
+                    "  ctx._source.wfProfileRequests = newList; " +
+                    "  if (ctx._source.wfProfileRequests.isEmpty()) { " +  // Remove field if empty
+                    "    ctx._source.remove('wfProfileRequests'); " +
+                    "  } " +
+                    "}";
             }
     
             // Create the script
