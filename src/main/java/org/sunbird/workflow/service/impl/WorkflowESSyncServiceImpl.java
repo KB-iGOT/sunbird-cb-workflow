@@ -11,8 +11,6 @@ import org.sunbird.workflow.postgres.repo.WfStatusRepo;
 import org.sunbird.workflow.service.WorkflowESSyncService;
 import org.sunbird.workflow.utils.ElasticsearchServiceManager;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 @Service
 public class WorkflowESSyncServiceImpl implements WorkflowESSyncService {
     Logger logger = LogManager.getLogger(WorkflowESSyncServiceImpl.class);
@@ -23,18 +21,9 @@ public class WorkflowESSyncServiceImpl implements WorkflowESSyncService {
     @Autowired
     private ElasticsearchServiceManager esServiceManager;
 
-    @Autowired
-    private ObjectMapper objectMapper;
-
     @Override
     public void syncWithElasticService(WfRequest wfRequest) {
         WfStatusEntity wfStatusEntity = wfStatusRepo.findByWfId(wfRequest.getWfId());
-        try {
-            logger.info("Trying to sync WF details to ElasticService. WF Status Entity: %s, WF Request : %s",
-                    objectMapper.writeValueAsString(wfStatusEntity), objectMapper.writeValueAsString(wfRequest));
-        } catch (Exception e) {
-            logger.error("WorkflowESSyncServiceImpl::syncWithElasticService. Failed due to exception: ", e);
-        }
         if (Constants.PROFILE_SERVICE_NAME.equalsIgnoreCase(wfRequest.getServiceName())) {
             switch (wfStatusEntity.getCurrentStatus()) {
                 case Constants.SEND_FOR_APPROVAL:
