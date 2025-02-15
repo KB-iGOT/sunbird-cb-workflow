@@ -144,7 +144,12 @@ public class ElasticsearchServiceManager {
             if (requestTypes.contains(Constants.ORG_TRANSFER_REQUEST)) {
                 boolQuery.must(QueryBuilders.termQuery(Constants.WF_TRANSFER_REQUEST_DEPTNAME_KEY, deptName));
             } else {
-                boolQuery.must(QueryBuilders.termQuery(Constants.WF_PROFILE_REQUEST_DEPTNAME_KEY, deptName));
+                BoolQueryBuilder wfProfileQuery = QueryBuilders.boolQuery()
+                        .should(QueryBuilders.termQuery(Constants.WF_PROFILE_DESIGNATION_REQUEST_DEPTNAME_KEY, deptName))
+                        .should(QueryBuilders.termQuery(Constants.WF_PROFILE_GROUP_REQEST_DEPTNAME_KEY, deptName))
+                        .minimumShouldMatch(1); // Ensures at least one of these conditions is met
+
+                boolQuery.must(wfProfileQuery);
             }
 
             sourceBuilder.query(boolQuery);
@@ -229,7 +234,7 @@ public class ElasticsearchServiceManager {
         return true;
     }
 
-    public boolean updateWfTransferRequest(String userId, String deptName, String wfId, boolean append) {
+    public boolean updateWfRequestObject(String wfId, String userId, String deptName, String attributeName, boolean append) {
         try {
             // Prepare parameters for the script
             Map<String, Object> params = new HashMap<>();
@@ -239,25 +244,25 @@ public class ElasticsearchServiceManager {
             // Script logic for add or remove
             String scriptSource;
             if (append) {
-                scriptSource = "ctx._source.wfTransferRequest = new HashMap(); " +
-                        "ctx._source.wfTransferRequest.departmentName = params.departmentName; " +
-                        "ctx._source.wfTransferRequest.wfId = params.wfId;";
+                scriptSource = "ctx._source." + attributeName + "= new HashMap(); " +
+                        "ctx._source." + attributeName + ".departmentName = params.departmentName; " +
+                        "ctx._source." + attributeName + ".wfId = params.wfId;";
             } else {
-                scriptSource = "ctx._source.wfTransferRequest = new HashMap();";
+                scriptSource = "ctx._source."+ attributeName + " = new HashMap();";
             }
 
             // Create script object
             Script script = new Script(ScriptType.INLINE, "painless", scriptSource, params);
 
-            // Upsert logic: If document doesn’t exist, initialize it with `wfTransferRequest`
+            // Upsert logic: If document doesn’t exist, initialize it with `attributeName`
             Map<String, Object> upsertContent = new HashMap<>();
             if (append) {
-                Map<String, Object> wfTransferRequest = new HashMap<>();
-                wfTransferRequest.put(Constants.DEPARTMENT_NAME, deptName);
-                wfTransferRequest.put(Constants.WF_ID_CONSTANT, wfId);
-                upsertContent.put(Constants.WF_TRANSFER_REQUEST_STRING, wfTransferRequest);
+                Map<String, Object> wfRequestObject = new HashMap<>();
+                wfRequestObject.put(Constants.DEPARTMENT_NAME, deptName);
+                wfRequestObject.put(Constants.WF_ID_CONSTANT, wfId);
+                upsertContent.put(attributeName, wfRequestObject);
             } else {
-                upsertContent.put("wfTransferRequest", new HashMap<>()); // Set as empty map
+                upsertContent.put(attributeName, new HashMap<>()); // Set as empty map
             }
 
             // Create UpdateRequest
@@ -272,102 +277,23 @@ public class ElasticsearchServiceManager {
             // Log success
             switch (updateResponse.getResult()) {
                 case CREATED:
-                    logger.info("WfTransferRequest created successfully for userId: {}", userId);
+                    logger.info("{} created successfully for userId: {}", attributeName, userId);
                     break;
                 case UPDATED:
-                    logger.info("WfTransferRequest updated successfully for userId: {}", userId);
+                    logger.info("{} updated successfully for userId: {}", attributeName, userId);
                     break;
                 case NOOP:
-                    logger.info("WfTransferRequest update was a noop; no changes were made for userId: {}", userId);
+                    logger.info("{} update was a noop; no changes were made for userId: {}", attributeName, userId);
                     break;
                 default:
-                    logger.warn("WfTransferRequest update:: Unexpected result: {}, for userId: {}",
-                            updateResponse.getResult(), userId);
+                    logger.warn("{} update:: Unexpected result: {}, for userId: {}",
+                            attributeName, updateResponse.getResult(), userId);
             }
 
             return true;
         } catch (Exception e) {
-            logger.error("Failed to update wfTransferRequest for userId: {}", userId, e);
+            logger.error("Failed to update {} for userId: {}", attributeName, userId, e);
             return false;
         }
     }
-
-    public boolean updateWfProfileRequest(String userId, String uuid, String departmentName, boolean append) {
-        try {
-            // Prepare parameters for the script
-            Map<String, Object> params = new HashMap<>();
-            params.put("uuid", uuid);
-            params.put("departmentName", departmentName);
-    
-            // Script logic for adding or removing the entry
-            String scriptSource;
-            if (append) {
-                scriptSource = "if (ctx._source.wfProfileRequests == null) { " +
-                        "  ctx._source.wfProfileRequests = new ArrayList(); " +
-                        "} " +
-                        "boolean exists = false; " +
-                        "for (entry in ctx._source.wfProfileRequests) { " +
-                        "  if (entry.wfId == params.uuid && entry.departmentName == params.departmentName) { " +
-                        "    exists = true; " +
-                        "    break; " +
-                        "  } " +
-                        "} " +
-                        "if (!exists) { " +
-                        "  ctx._source.wfProfileRequests.add(['wfId': params.uuid, 'departmentName': params.departmentName]); " +
-                        "}";
-            } else {
-                scriptSource = "if (ctx._source.wfProfileRequests != null) { " +
-                    "  List newList = new ArrayList(); " +
-                    "  for (entry in ctx._source.wfProfileRequests) { " +
-                    "    if (!(entry.wfId == params.uuid && entry.departmentName == params.departmentName)) { " +
-                    "      newList.add(entry); " +
-                    "    } " +
-                    "  } " +
-                    "  ctx._source.wfProfileRequests = newList; " +
-                    "  if (ctx._source.wfProfileRequests.isEmpty()) { " +  // Remove field if empty
-                    "    ctx._source.remove('wfProfileRequests'); " +
-                    "  } " +
-                    "}";
-            }
-    
-            // Create the script
-            Script script = new Script(ScriptType.INLINE, "painless", scriptSource, params);
-    
-            // Define upsert content only if append = true
-            UpdateRequest updateRequest = new UpdateRequest(sbUserIndex, _DOC, userId)
-                    .script(script)
-                    .retryOnConflict(5);
-    
-            if (append) {
-                // Create upsert content for insert operations
-                Map<String, Object> upsertContent = new HashMap<>();
-                List<Map<String, Object>> initialList = new ArrayList<>();
-                Map<String, Object> entry = new HashMap<>();
-                entry.put("wfId", uuid);
-                entry.put("departmentName", departmentName);
-                initialList.add(entry);
-                upsertContent.put("wfProfileRequests", initialList);
-    
-                updateRequest.upsert(new IndexRequest(sbUserIndex).id(userId).source(upsertContent));
-            }
-    
-            // Execute the update
-            UpdateResponse updateResponse = client.update(updateRequest, RequestOptions.DEFAULT);
-            DocWriteResponse.Result result = updateResponse.getResult();
-    
-            if (result == DocWriteResponse.Result.CREATED) {
-                logger.info("wfProfileRequests created successfully for userId: {}", userId);
-            } else if (result == DocWriteResponse.Result.UPDATED) {
-                logger.info("wfProfileRequests updated successfully for userId: {}", userId);
-            } else if (result == DocWriteResponse.Result.NOOP) {
-                logger.info("wfProfileRequests update was a noop; no changes were made for userId: {}", userId);
-            } else {
-                logger.warn("wfProfileRequests update:: Unexpected result: {}, for userId: {}", result, userId);
-            }
-        } catch (Exception e) {
-            logger.error("Failed to update wfProfileRequests for userId: {}", userId, e);
-            return false;
-        }
-        return true;
-    }    
 }

@@ -373,7 +373,10 @@ public class Constants {
 	public static final String PROFILE_PHONE_NUMBER_FILED = "profileDetails.personalDetails.mobile.raw";
 	public static final String WF_TRANSFER_REQUEST_STRING = "wfTransferRequest";
 	public static final String WF_TRANSFER_REQUEST_DEPTNAME_KEY = "wfTransferRequest.departmentName";
-	public static final String WF_PROFILE_REQUEST_DEPTNAME_KEY = "wfProfileRequests.departmentName";
+	public static final String WF_PROFILE_GROUP_REQUEST_STRING = "wfProfileGroupRequest";
+	public static final String WF_PROFILE_DESIGNATION_REQUEST_STRING = "wfProfileDesignationRequest";
+	public static final String WF_PROFILE_GROUP_REQEST_DEPTNAME_KEY = "wfProfileGroupRequest.departmentName";
+	public static final String WF_PROFILE_DESIGNATION_REQUEST_DEPTNAME_KEY = "wfProfileDesignationRequest.departmentName";
 
 	public static final List<String> USER_DEFAULT_SEARCH_FIELDS = Collections
 			.unmodifiableList(Arrays.asList(PROFILE_DETAILS_PERSONAL_DETAILS_PRIMARY_EMAIL,
