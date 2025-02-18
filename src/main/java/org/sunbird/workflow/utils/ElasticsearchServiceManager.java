@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.collections4.MapUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.elasticsearch.action.DocWriteResponse;
@@ -99,7 +100,7 @@ public class ElasticsearchServiceManager {
         return true;
     }
 
-    public long searchUsers(String queryString, int from, int size, List<String> userInfo,
+    public long searchUsers(String queryString, int from, int size, Map<String, Object> userInfo,
             String deptName, List<String> requestTypes) {
         long totalHits = 0;
         try {
@@ -142,7 +143,8 @@ public class ElasticsearchServiceManager {
                 boolQuery.must(QueryBuilders.termQuery(Constants.WF_TRANSFER_REQUEST_DEPTNAME_KEY, deptName));
             } else {
                 BoolQueryBuilder wfProfileQuery = QueryBuilders.boolQuery()
-                        .should(QueryBuilders.termQuery(Constants.WF_PROFILE_DESIGNATION_REQUEST_DEPTNAME_KEY, deptName))
+                        .should(QueryBuilders.termQuery(Constants.WF_PROFILE_DESIGNATION_REQUEST_DEPTNAME_KEY,
+                                deptName))
                         .should(QueryBuilders.termQuery(Constants.WF_PROFILE_GROUP_REQEST_DEPTNAME_KEY, deptName))
                         .minimumShouldMatch(1); // Ensures at least one of these conditions is met
 
@@ -152,7 +154,8 @@ public class ElasticsearchServiceManager {
             sourceBuilder.query(boolQuery);
 
             sourceBuilder.fetchSource(
-                    new String[] { Constants.ID },
+                    new String[] { Constants.ID, Constants.PROFILE_DETAILS, Constants.ROOT_ORG_ID,
+                            Constants.FIRST_NAME_CAMEL_CASE },
                     new String[] {});
 
             searchRequest.source(sourceBuilder);
@@ -161,7 +164,25 @@ public class ElasticsearchServiceManager {
 
             for (SearchHit hit : searchResponse.getHits().getHits()) {
                 Map<String, Object> sourceMap = (Map<String, Object>) hit.getSourceAsMap();
-                userInfo.add((String) sourceMap.get(Constants.ID));
+                Map<String, Object> record = new HashMap<>();
+                record.put(Constants.ID, sourceMap.get(Constants.ID));
+                record.put(Constants.UUID, sourceMap.get(Constants.ID));
+                record.put(Constants.ROOT_ORG_ID, sourceMap.get(Constants.ROOT_ORG_ID));
+                record.put(Constants.SEARCH_SCORE, hit.getScore());
+                HashMap<String, Object> profileDetails = (HashMap<String, Object>) sourceMap
+                        .get(Constants.PROFILE_DETAILS);
+                if (MapUtils.isNotEmpty(profileDetails)) {
+                    HashMap<String, Object> personalDetails = (HashMap<String, Object>) profileDetails
+                            .get(Constants.PERSONAL_DETAILS);
+                    record.put(Constants.FIRST_NAME, personalDetails.get(Constants.FIRSTNAME));
+                    record.put(Constants.EMAIL, personalDetails.get(Constants.PRIMARY_EMAIL));
+                    Map<String, Object> additionalProperties = (Map<String, Object>) profileDetails
+                            .get(Constants.ADDITIONAL_PROPERTIES);
+                    if (MapUtils.isNotEmpty(additionalProperties)) {
+                        record.put(Constants.TAG, additionalProperties.get(Constants.TAG));
+                    }
+                }
+                userInfo.put((String) record.get(Constants.ID), record);
             }
             totalHits = searchResponse.getHits().getTotalHits();
         } catch (IOException e) {
@@ -231,7 +252,8 @@ public class ElasticsearchServiceManager {
         return true;
     }
 
-    public boolean updateWfRequestObject(String wfId, String userId, String deptName, String attributeName, boolean append) {
+    public boolean updateWfRequestObject(String wfId, String userId, String deptName, String attributeName,
+            boolean append) {
         try {
             // Prepare parameters for the script
             Map<String, Object> params = new HashMap<>();
@@ -245,7 +267,7 @@ public class ElasticsearchServiceManager {
                         "ctx._source." + attributeName + ".departmentName = params.departmentName; " +
                         "ctx._source." + attributeName + ".wfId = params.wfId;";
             } else {
-                scriptSource = "ctx._source."+ attributeName + " = new HashMap();";
+                scriptSource = "ctx._source." + attributeName + " = new HashMap();";
             }
 
             // Create script object

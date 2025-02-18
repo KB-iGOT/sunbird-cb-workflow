@@ -377,6 +377,9 @@ public class Constants {
 	public static final String WF_PROFILE_DESIGNATION_REQUEST_STRING = "wfProfileDesignationRequest";
 	public static final String WF_PROFILE_GROUP_REQEST_DEPTNAME_KEY = "wfProfileGroupRequest.departmentName";
 	public static final String WF_PROFILE_DESIGNATION_REQUEST_DEPTNAME_KEY = "wfProfileDesignationRequest.departmentName";
+	public static final String SEARCH_SCORE = "searchScore";
+	public static final String WF_INFO = "wfInfo";
+	public static final String USER_INFO = "userInfo";
 
 	public static final List<String> USER_DEFAULT_SEARCH_FIELDS = Collections
 			.unmodifiableList(Arrays.asList(PROFILE_DETAILS_PERSONAL_DETAILS_PRIMARY_EMAIL,
