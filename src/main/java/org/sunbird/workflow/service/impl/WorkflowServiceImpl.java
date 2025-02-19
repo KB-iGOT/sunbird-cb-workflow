@@ -1401,6 +1401,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 				totalSearchCount = eServiceManager.searchUsers(criteria.getQuery(), (int) pageable.getOffset(),
 						pageable.getPageSize(), userInfoMap, criteria.getDeptName(),
 						criteria.getRequestType());
+				applicationIds = new ArrayList<String>(userInfoMap.keySet());
 				log.info(
 						"ES returns {} number of userId for search using query: {}, departmentName: {} and requestTypes: {}",
 						userInfoMap.size(), criteria.getQuery(), criteria.getDeptName(),
@@ -1437,12 +1438,11 @@ public class WorkflowServiceImpl implements Workflowservice {
 				// add the wf details and return the data.
 				Map<String, List<WfStatusEntity>> wfInfos = wfStatusEntities.stream()
 						.collect(Collectors.groupingBy(WfStatusEntity::getApplicationId));
-				Iterator<String> userIds = userInfoMap.keySet().iterator();
-				while (userIds.hasNext()) {
-					String userId = userIds.next();
+
+				for (Map.Entry<String, List<WfStatusEntity>> wfStatusEntity : wfInfos.entrySet()) {
 					HashMap<String, Object> responseMap = new HashMap<>();
-					responseMap.put(Constants.WF_INFO, wfInfos.get(userId));
-					responseMap.put(Constants.USER_INFO, userInfoMap.get(userId));
+					responseMap.put(Constants.WF_INFO, wfStatusEntity.getValue());
+					responseMap.put(Constants.USER_INFO, userInfoMap.get(wfStatusEntity.getKey()));
 					esUserProfiles.add(responseMap);
 				}
 				userProfiles = esUserProfiles.stream()
