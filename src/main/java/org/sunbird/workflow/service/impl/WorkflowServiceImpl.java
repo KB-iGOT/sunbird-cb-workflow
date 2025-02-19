@@ -1403,7 +1403,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 						criteria.getRequestType());
 				log.info(
 						"ES returns {} number of userId for search using query: {}, departmentName: {} and requestTypes: {}",
-						userProfiles.size(), criteria.getQuery(), criteria.getDeptName(),
+						userInfoMap.size(), criteria.getQuery(), criteria.getDeptName(),
 						criteria.getRequestType().toString());
 			} else if (CollectionUtils.isEmpty(applicationIds)) {
 				Page<String> applicationIdsPage = null;
@@ -1445,7 +1445,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 					responseMap.put(Constants.USER_INFO, userInfoMap.get(userId));
 					esUserProfiles.add(responseMap);
 				}
-				userProfiles = userProfiles.stream()
+				userProfiles = esUserProfiles.stream()
 					.sorted((profile1, profile2) -> {
 						Map<String, Object> userInfo1 = (Map<String, Object>) profile1.get(Constants.USER_INFO);
 						Map<String, Object> userInfo2 = (Map<String, Object>) profile2.get(Constants.USER_INFO);
