@@ -3,6 +3,7 @@ package org.sunbird.workflow.service;
 import java.io.*;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -127,7 +128,7 @@ public class UserBulkUploadService {
             if (failedRecordsCount >= 0) {
                 fieldsToBeUpdated.put(Constants.FAILED_RECORDS_COUNT, failedRecordsCount);
             }
-            fieldsToBeUpdated.put(Constants.DATE_UPDATE_ON, new Timestamp(System.currentTimeMillis()));
+            fieldsToBeUpdated.put(Constants.DATE_UPDATE_ON, Instant.now());
             cassandraOperation.updateRecord(Constants.KEYSPACE_SUNBIRD, Constants.TABLE_USER_BULK_UPDATE,
                     fieldsToBeUpdated, compositeKeys);
         } catch (Exception e) {

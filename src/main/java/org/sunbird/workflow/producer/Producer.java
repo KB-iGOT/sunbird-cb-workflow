@@ -14,10 +14,12 @@ public class Producer {
     Logger logger = LogManager.getLogger(Producer.class);
 
     @Autowired
+    private ObjectMapper mapper;
+
+    @Autowired
     KafkaTemplate<String, String> kafkaTemplate;
 
     public void push(String topic, Object value) {
-        ObjectMapper mapper = new ObjectMapper();
         String message = null;
         try {
             message = mapper.writeValueAsString(value);

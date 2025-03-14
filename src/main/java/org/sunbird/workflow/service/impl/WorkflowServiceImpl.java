@@ -1,38 +1,14 @@
 package org.sunbird.workflow.service.impl;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintWriter;
-import java.math.BigInteger;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.collections.MapUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.poi.util.StringUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -51,14 +27,7 @@ import org.sunbird.workflow.config.Constants;
 import org.sunbird.workflow.exception.ApplicationException;
 import org.sunbird.workflow.exception.BadRequestException;
 import org.sunbird.workflow.exception.InvalidDataInputException;
-import org.sunbird.workflow.models.Response;
-import org.sunbird.workflow.models.SBApiResponse;
-import org.sunbird.workflow.models.SearchCriteria;
-import org.sunbird.workflow.models.SearchCriteriaV2;
-import org.sunbird.workflow.models.WfAction;
-import org.sunbird.workflow.models.WfRequest;
-import org.sunbird.workflow.models.WfStatus;
-import org.sunbird.workflow.models.WorkFlowModel;
+import org.sunbird.workflow.models.*;
 import org.sunbird.workflow.postgres.entity.WfAuditEntity;
 import org.sunbird.workflow.postgres.entity.WfStatusCountDTO;
 import org.sunbird.workflow.postgres.entity.WfStatusEntity;
@@ -74,9 +43,15 @@ import org.sunbird.workflow.utils.ElasticsearchServiceManager;
 import org.sunbird.workflow.utils.LRUCache;
 import org.sunbird.workflow.utils.ProjectUtil;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class WorkflowServiceImpl implements Workflowservice {
@@ -94,6 +69,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 	private Configuration configuration;
 
 	@Autowired
+	@Lazy
 	private UserProfileWfService userProfileWfService;
 
 	@Autowired
@@ -958,7 +934,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 			for (Object[] result : resultSet) {
 				WfStatusCountDTO dto = new WfStatusCountDTO();
 				dto.setCurrentStatus((String) result[0]);
-				dto.setStatusCount(((BigInteger) result[1]).longValue());
+				dto.setStatusCount(((Long) result[1]));
 				statusCountDTOs.add(dto);
 			}
 			localCache.put(applicationId,statusCountDTOs);
@@ -1083,7 +1059,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 			uploadedFileDetails.put(Constants.FILE_NAME, uploadResponse.getResult().get(Constants.NAME));
 			uploadedFileDetails.put(Constants.FILE_PATH, uploadResponse.getResult().get(Constants.URL));
 			uploadedFileDetails.put(Constants.CREATED_BY, userId);
-			uploadedFileDetails.put(Constants.DATE_CREATED_ON, new Timestamp(System.currentTimeMillis()));
+			uploadedFileDetails.put(Constants.DATE_CREATED_ON, Instant.now());
 			uploadedFileDetails.put(Constants.STATUS, Constants.INITIATED_CAPITAL);
 			uploadedFileDetails.put(Constants.COMMENT, "");
 
@@ -1217,7 +1193,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 	public void identifyAndMarkOrgTransferRequest(Response response) {
 		try {
 			List<Map<String, Object>> userDataList = (List<Map<String, Object>>) response.getResult().get(Constants.DATA);
-			TypeReference<List<HashMap<String, Object>>> typeRef = new TypeReference<List<HashMap<String, Object>>>() {
+			TypeReference<List<Map<String, Object>>> typeRef = new TypeReference<List<Map<String, Object>>>() {
 			};
 			for (Map<String, Object> userData : userDataList) {
 				List<WfStatusEntity> wfInfoList = (List<WfStatusEntity>) userData.get("wfInfo");
@@ -1285,7 +1261,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 			uploadedFileDetails.put(Constants.FILE_NAME, uploadResponse.getResult().get(Constants.NAME));
 			uploadedFileDetails.put(Constants.FILE_PATH, uploadResponse.getResult().get(Constants.URL));
 			uploadedFileDetails.put(Constants.CREATED_BY, userId);
-			uploadedFileDetails.put(Constants.DATE_CREATED_ON, new Timestamp(System.currentTimeMillis()));
+			uploadedFileDetails.put(Constants.DATE_CREATED_ON, Instant.now());
 			uploadedFileDetails.put(Constants.STATUS, Constants.INITIATED_CAPITAL);
 			uploadedFileDetails.put(Constants.COMMENT, "");
 

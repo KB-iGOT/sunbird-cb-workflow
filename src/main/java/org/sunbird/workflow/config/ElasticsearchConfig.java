@@ -45,8 +45,7 @@ public class ElasticsearchConfig {
                 .setRequestConfigCallback(requestConfigBuilder -> requestConfigBuilder
                         .setConnectTimeout(5000) // 5 seconds connect timeout
                         .setSocketTimeout(60000) // 60 seconds socket timeout
-                )
-                .setMaxRetryTimeoutMillis(60000); // 60 seconds max retry timeout
+                );
 
         RestHighLevelClient restClient = new RestHighLevelClient(builder);
         logger.info("ElasticsearchConfig:: RestHighLevelClient initialisation done.");
