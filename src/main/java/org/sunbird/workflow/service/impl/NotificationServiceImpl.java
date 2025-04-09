@@ -536,4 +536,50 @@ public class NotificationServiceImpl {
 		}
 	}
 
+	public void sendNotificationToMdoLeader(List<String> mdoMails, WfRequest wfRequest, String communityName, String creationDate, List<Map<String, Object>> moderators) {
+		try {
+			String moderatorDetails = moderators.stream()
+					.map(mod -> {
+						String name = (String) mod.getOrDefault("moderatorName", "");
+						return name;
+					})
+					.filter(StringUtils::isNotBlank)
+					.distinct()
+					.collect(Collectors.joining(", "));
+
+			Map<String, Object> params = new HashMap<>();
+			params.put("communityName", communityName);
+			params.put("creationDate", creationDate);
+			params.put("moderatorNames", moderatorDetails);
+			params.put("sender", Constants.KARMYOGI_BHARAT);
+			params.put("supportEmail", configuration.getSenderMail());
+
+			Template template = new Template();
+			template.setId(configuration.getCommunityModeratorTransferTemplate());
+
+			String emailBody = constructEmailTemplate(template.getId(), params);
+			template.setData(emailBody);
+			template.setParams(params);
+
+			NotificationRequest notificationRequest = new NotificationRequest();
+			notificationRequest.setMode("email");
+			notificationRequest.setDeliveryType("message");
+			notificationRequest.setIds(mdoMails);
+			notificationRequest.setTemplate(template);
+
+			Config config = new Config();
+			config.setSubject("Urgent: Moderator Transfer Request for " + communityName);
+			config.setSender(configuration.getSenderMail());
+			notificationRequest.setConfig(config);
+
+			Map<String, Object> wrapper = new HashMap<>();
+			wrapper.put("request", Collections.singletonMap("notifications", Arrays.asList(notificationRequest)));
+
+			sendNotification(wrapper);
+
+			logger.info("Email sent to MDO admins: {}", mdoMails);
+		} catch (Exception e) {
+			logger.error("Error sending notification to MDO admins", e);
+		}
+	}
 }

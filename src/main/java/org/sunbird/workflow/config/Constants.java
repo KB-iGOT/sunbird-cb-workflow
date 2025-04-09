@@ -380,6 +380,9 @@ public class Constants {
 	public static final String SEARCH_SCORE = "searchScore";
 	public static final String WF_INFO = "wfInfo";
 	public static final String USER_INFO = "userInfo";
+	public static final String ORGANISATIONS = "organisations";
+	public static final String COMMUNITY_MODERATOR = "COMMUNITY_MODERATOR";
+	public static final String MDO_LEADER = "MDO_LEADER";
 
 	public static final List<String> USER_DEFAULT_SEARCH_FIELDS = Collections
 			.unmodifiableList(Arrays.asList(PROFILE_DETAILS_PERSONAL_DETAILS_PRIMARY_EMAIL,

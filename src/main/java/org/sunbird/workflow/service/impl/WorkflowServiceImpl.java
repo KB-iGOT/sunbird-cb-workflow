@@ -227,6 +227,21 @@ public class WorkflowServiceImpl implements Workflowservice {
 			producer.push(configuration.getWorkFlowNotificationTopic(), wfRequest);
 			producer.push(configuration.getWorkflowApplicationTopic(), wfRequest);
 
+			StringBuilder url = new StringBuilder(configuration.getLmsServiceHost()).append(configuration.getLmsUserSearchEndPoint());
+			Map<String, Object> request = buildUserSearchRequest(wfRequest.getUserId());
+			Map<String, Object> updateResponse = (Map<String, Object>) requestServiceImpl.fetchResultUsingPost(url, request, Map.class, null);
+			if (updateResponse != null
+					&& "OK".equalsIgnoreCase((String) updateResponse.get(Constants.RESPONSE_CODE))) {
+				if(hasCommunityModeratorRole(updateResponse)) {
+					log.info("User {} has role COMMUNITY_MODERATOR. Triggering Kafka event...", wfRequest.getUserId());
+					producer.push(configuration.getCommunityModeratorTransferTopic(), wfRequest);
+				} else {
+					log.info("User {} does NOT have COMMUNITY_MODERATOR role. No Kafka event triggered.", wfRequest.getUserId());
+				}
+			} else {
+				log.error("Failed to retrieve user details OR response code not OK for userId: {}. No Kafka event triggered.",
+						wfRequest.getUserId());
+			}
 		} catch (IOException e) {
 			throw new ApplicationException(Constants.WORKFLOW_PARSING_ERROR_MESSAGE, e);
 		}
@@ -851,7 +866,8 @@ public class WorkflowServiceImpl implements Workflowservice {
 			StringBuilder uri = new StringBuilder();
 			switch (serviceName) {
 				case Constants.PROFILE_SERVICE_NAME:
-					uri.append(configuration.getLmsServiceHost() + configuration.getProfileServiceConfigPath());
+//					uri.append(configuration.getLmsServiceHost() + configuration.getProfileServiceConfigPath());
+					uri.append("https://portal.dev.karmayogibharat.net/api/data/v1/system/settings/get/wfProfileServiceConfig");
 					break;
 				case Constants.USER_REGISTRATION_SERVICE_NAME:
 					uri.append(configuration.getLmsServiceHost() + configuration.getUserRegistrationServiceConfigPath());
@@ -1685,5 +1701,39 @@ public class WorkflowServiceImpl implements Workflowservice {
 			default:
 				wfRequest.setRequestType(requestKey);
 		}
+	}
+
+	public static Map<String, Object> buildUserSearchRequest(String userId) {
+		Map<String, Object> filters = Map.of(Constants.USER_ID, userId);
+		Map<String, Object> request = Map.of(Constants.FILTERS, filters);
+		return Map.of(Constants.REQUEST, request);
+	}
+
+	private boolean hasCommunityModeratorRole(Map<String, Object> responseMap) {
+		try {
+			Map<String, Object> result = (Map<String, Object>) responseMap.get("result");
+			Map<String, Object> response = (Map<String, Object>) result.get("response");
+			List<Map<String, Object>> content = (List<Map<String, Object>>) response.get("content");
+
+			if (content == null || content.isEmpty()) return false;
+
+			Map<String, Object> user = content.get(0);
+			List<Map<String, Object>> organisations = (List<Map<String, Object>>) user.get("organisations");
+
+			if (organisations == null) return false;
+
+			for (Map<String, Object> org : organisations) {
+				List<String> roles = (List<String>) org.get("roles");
+				if (roles != null && roles.contains("COMMUNITY_MODERATOR")) {
+					return true;
+				}
+			}
+
+		} catch (ClassCastException | NullPointerException e) {
+			log.error("Failed to parse roles from user search response", e);
+			return false;
+		}
+
+		return false;
 	}
 }
