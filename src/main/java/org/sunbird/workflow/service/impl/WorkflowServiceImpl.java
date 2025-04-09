@@ -866,8 +866,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 			StringBuilder uri = new StringBuilder();
 			switch (serviceName) {
 				case Constants.PROFILE_SERVICE_NAME:
-//					uri.append(configuration.getLmsServiceHost() + configuration.getProfileServiceConfigPath());
-					uri.append("https://portal.dev.karmayogibharat.net/api/data/v1/system/settings/get/wfProfileServiceConfig");
+					uri.append(configuration.getLmsServiceHost() + configuration.getProfileServiceConfigPath());
 					break;
 				case Constants.USER_REGISTRATION_SERVICE_NAME:
 					uri.append(configuration.getLmsServiceHost() + configuration.getUserRegistrationServiceConfigPath());
