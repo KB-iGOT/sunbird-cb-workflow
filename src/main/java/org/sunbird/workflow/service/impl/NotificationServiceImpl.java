@@ -536,4 +536,50 @@ public class NotificationServiceImpl {
 		}
 	}
 
+	public void sendNotificationToMdoLeader(List<String> mdoMails, WfRequest wfRequest, String communityName, String creationDate, List<Map<String, Object>> moderators) {
+		try {
+			String moderatorDetails = moderators.stream()
+					.map(mod -> {
+						String name = (String) mod.getOrDefault(Constants.MODERATOR_NAME, "");
+						return name;
+					})
+					.filter(StringUtils::isNotBlank)
+					.distinct()
+					.collect(Collectors.joining(", "));
+
+			Map<String, Object> params = new HashMap<>();
+			params.put(Constants.COMMUNITY_NAME, communityName);
+			params.put(Constants.CREATION_DATE, creationDate);
+			params.put(Constants.MODERATOR_NAMES, moderatorDetails);
+			params.put(Constants.SENDER, Constants.KARMYOGI_BHARAT);
+			params.put(Constants.SUPPORT_EMAIL, configuration.getSenderMail());
+
+			Template template = new Template();
+			template.setId(configuration.getCommunityModeratorTransferTemplate());
+
+			String emailBody = constructEmailTemplate(template.getId(), params);
+			template.setData(emailBody);
+			template.setParams(params);
+
+			NotificationRequest notificationRequest = new NotificationRequest();
+			notificationRequest.setMode(Constants.EMAIL);
+			notificationRequest.setDeliveryType(Constants.MESSAGE);
+			notificationRequest.setIds(mdoMails);
+			notificationRequest.setTemplate(template);
+
+			Config config = new Config();
+			config.setSubject(String.format(Constants.MODERATOR_TRANSFER_SUBJECT_TEMPLATE, communityName));
+			config.setSender(configuration.getSenderMail());
+			notificationRequest.setConfig(config);
+
+			Map<String, Object> wrapper = new HashMap<>();
+			wrapper.put(Constants.REQUEST, Collections.singletonMap(Constants.NOTIFICATIONS, Arrays.asList(notificationRequest)));
+
+			sendNotification(wrapper);
+
+			logger.info("Email sent to MDO admins: {}", mdoMails);
+		} catch (Exception e) {
+			logger.error("Error sending notification to MDO admins", e);
+		}
+	}
 }

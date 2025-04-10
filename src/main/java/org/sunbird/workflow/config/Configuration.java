@@ -245,6 +245,18 @@ public class Configuration {
     @Value("${lms.service.user.search.limit}")
     private Integer lmsUserSearchLimit;
 
+    @Value("${kafka.topics.community.moderator.transfer}")
+    private String communityModeratorTransferTopic;
+
+    @Value("${notification.template.community.moderator.transfer}")
+    private String communityModeratorTransferTemplate;
+
+    @Value("${community.read.endpoint}")
+    private String communityReadEndpoint;
+
+    @Value("${community.service.base.url}")
+    private String communityServiceBaseUrl;
+
     public String getAdminBlendedProgramEnrolEndPoint() {
         return adminBlendedProgramEnrolEndPoint;
     }
@@ -879,4 +891,20 @@ public class Configuration {
     public Integer getLmsUserSearchLimit() { return lmsUserSearchLimit; }
 
     public void setLmsUserSearchLimit(Integer lmsUserSearchLimit) { this.lmsUserSearchLimit = lmsUserSearchLimit; }
+
+    public String getCommunityModeratorTransferTopic() {
+        return communityModeratorTransferTopic;
+    }
+
+    public String getCommunityModeratorTransferTemplate() {
+        return communityModeratorTransferTemplate;
+    }
+
+    public String getCommunityReadEndpoint() {
+        return communityReadEndpoint;
+    }
+
+    public String getCommunityServiceBaseUrl() {
+        return communityServiceBaseUrl;
+    }
 }
