@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.datatype.jsr310.ser.InstantSerializer;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
@@ -16,6 +17,8 @@ import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Instant;
+
 @SpringBootApplication
 public class WorkflowApplication {
 
@@ -25,9 +28,13 @@ public class WorkflowApplication {
 
 	@Bean
 	public ObjectMapper objectMapper() {
+		JavaTimeModule javaTimeModule = new JavaTimeModule();
+
+		// This will force Jackson to write epoch milliseconds as long for Instant
+		javaTimeModule.addSerializer(Instant.class, InstantSerializer.INSTANCE);
 		ObjectMapper objectMapper = new ObjectMapper()
 				.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
-		objectMapper.registerModule(new JavaTimeModule());
+		objectMapper.registerModule(javaTimeModule);
 		objectMapper.enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 		return objectMapper;
 	}
