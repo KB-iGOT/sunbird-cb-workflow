@@ -898,7 +898,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 				default:
 					break;
 			}
-			wfConfig = (Map<String, Object>) requestServiceImpl.fetchResultUsingGet(uri, null);
+			wfConfig = (Map<String, Object>) requestServiceImpl.fetchResultUsingGet(uri);
 			Map<String, Object> result = (Map<String, Object>) wfConfig.get(Constants.RESULT);
 			Map<String, Object> response = (Map<String, Object>) result.get(Constants.RESPONSE);
 			Map<String,Object> wfStates = mapper.readValue((String) response.get(Constants.VALUE),Map.class);
