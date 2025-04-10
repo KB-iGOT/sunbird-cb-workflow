@@ -114,7 +114,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         Map<String, Object> batchDetailsMap = new HashMap<>();
         String validationError = validateBatchUserRequestAccess(wfRequest, batchDetailsMap);
         wfRequest.setBatchName((String) batchDetailsMap.get(Constants.BATCH_NAME));
-        wfRequest.setBatchStartDate(Date.from((Instant) batchDetailsMap.get(Constants.START_DATE)));
+        wfRequest.setBatchStartDate((Date)batchDetailsMap.get(Constants.START_DATE));
         if (Constants.BATCH_START_DATE_ERROR.equals(validationError)) {
             response.put(Constants.ERROR_MESSAGE, configuration.getBatchInProgressMessage());
             response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
