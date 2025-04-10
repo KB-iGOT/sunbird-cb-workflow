@@ -35,7 +35,7 @@ public class WorkflowApplication {
 		ObjectMapper objectMapper = new ObjectMapper()
 				.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
 		objectMapper.registerModule(javaTimeModule);
-		objectMapper.enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+		objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 		return objectMapper;
 	}
 
