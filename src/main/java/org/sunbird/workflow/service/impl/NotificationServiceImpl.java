@@ -540,7 +540,7 @@ public class NotificationServiceImpl {
 		try {
 			String moderatorDetails = moderators.stream()
 					.map(mod -> {
-						String name = (String) mod.getOrDefault("moderatorName", "");
+						String name = (String) mod.getOrDefault(Constants.MODERATOR_NAME, "");
 						return name;
 					})
 					.filter(StringUtils::isNotBlank)
@@ -548,11 +548,11 @@ public class NotificationServiceImpl {
 					.collect(Collectors.joining(", "));
 
 			Map<String, Object> params = new HashMap<>();
-			params.put("communityName", communityName);
-			params.put("creationDate", creationDate);
-			params.put("moderatorNames", moderatorDetails);
-			params.put("sender", Constants.KARMYOGI_BHARAT);
-			params.put("supportEmail", configuration.getSenderMail());
+			params.put(Constants.COMMUNITY_NAME, communityName);
+			params.put(Constants.CREATION_DATE, creationDate);
+			params.put(Constants.MODERATOR_NAMES, moderatorDetails);
+			params.put(Constants.SENDER, Constants.KARMYOGI_BHARAT);
+			params.put(Constants.SUPPORT_EMAIL, configuration.getSenderMail());
 
 			Template template = new Template();
 			template.setId(configuration.getCommunityModeratorTransferTemplate());
@@ -562,18 +562,18 @@ public class NotificationServiceImpl {
 			template.setParams(params);
 
 			NotificationRequest notificationRequest = new NotificationRequest();
-			notificationRequest.setMode("email");
-			notificationRequest.setDeliveryType("message");
+			notificationRequest.setMode(Constants.EMAIL);
+			notificationRequest.setDeliveryType(Constants.MESSAGE);
 			notificationRequest.setIds(mdoMails);
 			notificationRequest.setTemplate(template);
 
 			Config config = new Config();
-			config.setSubject("Urgent: Moderator Transfer Request for " + communityName);
+			config.setSubject(String.format(Constants.MODERATOR_TRANSFER_SUBJECT_TEMPLATE, communityName));
 			config.setSender(configuration.getSenderMail());
 			notificationRequest.setConfig(config);
 
 			Map<String, Object> wrapper = new HashMap<>();
-			wrapper.put("request", Collections.singletonMap("notifications", Arrays.asList(notificationRequest)));
+			wrapper.put(Constants.REQUEST, Collections.singletonMap(Constants.NOTIFICATIONS, Arrays.asList(notificationRequest)));
 
 			sendNotification(wrapper);
 

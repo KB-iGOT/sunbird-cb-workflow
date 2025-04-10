@@ -383,6 +383,16 @@ public class Constants {
 	public static final String ORGANISATIONS = "organisations";
 	public static final String COMMUNITY_MODERATOR = "COMMUNITY_MODERATOR";
 	public static final String MDO_LEADER = "MDO_LEADER";
+	public static final String ORG_ID = "orgId";
+	public static final String DISCUSSION_COMMUNITIES = "discussionCommunities";
+	public static final String COMMUNITY_NAME = "communityName";
+	public static final String MODERATORS = "moderators";
+	public static final String COMMUNITY_DETAILS = "communityDetails";
+	public static final String MODERATOR_NAME = "moderatorName";
+	public static final String CREATION_DATE   = "creationDate";
+	public static final String MODERATOR_NAMES = "moderatorNames";
+	public static final String NOTIFICATIONS = "notifications";
+	public static final String MODERATOR_TRANSFER_SUBJECT_TEMPLATE = "Urgent: Moderator Transfer Request for \"%s\"";
 
 	public static final List<String> USER_DEFAULT_SEARCH_FIELDS = Collections
 			.unmodifiableList(Arrays.asList(PROFILE_DETAILS_PERSONAL_DETAILS_PRIMARY_EMAIL,

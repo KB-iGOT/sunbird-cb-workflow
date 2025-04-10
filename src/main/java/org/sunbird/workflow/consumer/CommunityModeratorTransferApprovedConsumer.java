@@ -58,13 +58,13 @@ public class CommunityModeratorTransferApprovedConsumer {
             if (jsonNode.isArray()) {
                 List<WfRequest> requests = mapper.readValue(payload, new TypeReference<List<WfRequest>>() {});
                 for (WfRequest wfRequest : requests) {
-                    if ("approve".equalsIgnoreCase(wfRequest.getAction())) {
+                    if (Constants.APPROVE_STATE.equalsIgnoreCase(wfRequest.getAction())) {
                         processApprovedTransfer(wfRequest);
                     }
                 }
             } else {
                 WfRequest wfRequest = mapper.treeToValue(jsonNode, WfRequest.class);
-                if ("approve".equalsIgnoreCase(wfRequest.getAction())) {
+                if (Constants.APPROVE_STATE.equalsIgnoreCase(wfRequest.getAction())) {
                     processApprovedTransfer(wfRequest);
                 }
             }
@@ -84,7 +84,7 @@ public class CommunityModeratorTransferApprovedConsumer {
             Map<String, Object> userResponse = (Map<String, Object>) requestServiceImpl
                     .fetchResultUsingPost(userSearchUrl, userSearchRequest, Map.class, null);
 
-            if (!"OK".equalsIgnoreCase((String) userResponse.get("responseCode"))) {
+            if (!"OK".equalsIgnoreCase((String) userResponse.get(Constants.RESPONSE_CODE))) {
                 logger.warn("User search failed for userId: {}", wfRequest.getUserId());
                 return;
             }
@@ -107,16 +107,16 @@ public class CommunityModeratorTransferApprovedConsumer {
     private void fetchModeratorsAndNotifyMdoLeaders(String communityId, WfRequest wfRequest) {
         try {
             StringBuilder communityReadUrl = new StringBuilder(configuration.getCommunityServiceBaseUrl())
-                    .append(configuration.getCommunityReadEndpoint()).append("/"+communityId);
+                    .append(configuration.getCommunityReadEndpoint()).append(communityId);
 
             Map<String, Object> response = (Map<String, Object>) requestServiceImpl
-                    .fetchResultUsingGet(communityReadUrl, null);
+                    .fetchResultUsingGet(communityReadUrl);
 
-            Map<String, Object> communityDetails = (Map<String, Object>) ((Map<String, Object>) response.get("result")).get("communityDetails");
-            String orgId = (String) communityDetails.get("orgId");
-            String communityName = (String) communityDetails.get("communityName");
-            String createdOn = (String) communityDetails.get("communityName");
-            List<Map<String, Object>> moderators = (List<Map<String, Object>>) communityDetails.get("moderators");
+            Map<String, Object> communityDetails = (Map<String, Object>) ((Map<String, Object>) response.get(Constants.RESULT)).get(Constants.COMMUNITY_DETAILS);
+            String orgId = (String) communityDetails.get(Constants.ORG_ID);
+            String communityName = (String) communityDetails.get(Constants.COMMUNITY_NAME);
+            String createdOn = (String) communityDetails.get(Constants.COMMUNITY_NAME);
+            List<Map<String, Object>> moderators = (List<Map<String, Object>>) communityDetails.get(Constants.MODERATORS);
 
             if (StringUtils.isNotBlank(orgId)) {
                 List<String> mdoLeaders = userProfileWfService.getMdoAdminAndPCDetails(orgId, Collections.singletonList(Constants.MDO_LEADER));
@@ -144,11 +144,11 @@ public class CommunityModeratorTransferApprovedConsumer {
 
     private List<String> extractCommunityIds(Map<String, Object> userResponse) {
         List<Map<String, Object>> contentList = (List<Map<String, Object>>)
-                ((Map<String, Object>) ((Map<String, Object>) userResponse.get("result")).get("response")).get("content");
+                ((Map<String, Object>) ((Map<String, Object>) userResponse.get(Constants.RESULT)).get(Constants.RESPONSE)).get(Constants.CONTENT);
 
         return contentList.stream()
-                .filter(map -> map.containsKey("discussionCommunities"))
-                .flatMap(map -> ((List<String>) map.get("discussionCommunities")).stream())
+                .filter(map -> map.containsKey(Constants.DISCUSSION_COMMUNITIES))
+                .flatMap(map -> ((List<String>) map.get(Constants.DISCUSSION_COMMUNITIES)).stream())
                 .distinct()
                 .collect(Collectors.toList());
     }
