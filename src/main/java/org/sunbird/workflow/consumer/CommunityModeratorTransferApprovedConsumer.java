@@ -58,13 +58,13 @@ public class CommunityModeratorTransferApprovedConsumer {
             if (jsonNode.isArray()) {
                 List<WfRequest> requests = mapper.readValue(payload, new TypeReference<List<WfRequest>>() {});
                 for (WfRequest wfRequest : requests) {
-                    if (Constants.APPROVE_STATE.equalsIgnoreCase(wfRequest.getAction())) {
+                    if (Constants.APPROVE_STATE.equalsIgnoreCase(wfRequest.getAction()) || Constants.INITIATE.equalsIgnoreCase(wfRequest.getAction())) {
                         processApprovedTransfer(wfRequest);
                     }
                 }
             } else {
                 WfRequest wfRequest = mapper.treeToValue(jsonNode, WfRequest.class);
-                if (Constants.APPROVE_STATE.equalsIgnoreCase(wfRequest.getAction())) {
+                if (Constants.APPROVE_STATE.equalsIgnoreCase(wfRequest.getAction()) || Constants.INITIATE.equalsIgnoreCase(wfRequest.getAction())) {
                     processApprovedTransfer(wfRequest);
                 }
             }
