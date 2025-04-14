@@ -37,6 +37,10 @@ public class CommunityModeratorTransferApprovedConsumer {
     @Autowired private UserProfileWfServiceImpl userProfileWfService;
     @Autowired private NotificationServiceImpl notificationUtil;
 
+    public Map<String, String> buildAuthHeaders() {
+        return Map.of(Constants.X_AUTH_TOKEN, configuration.getAuthToken());
+    }
+
     @KafkaListener(topics = "${kafka.topics.community.moderator.transfer}", groupId = "community-moderator-transfer-group")
     public void processMessage(ConsumerRecord<String, String> data) {
         try {
@@ -110,7 +114,7 @@ public class CommunityModeratorTransferApprovedConsumer {
                     .append(configuration.getCommunityReadEndpoint()).append(communityId);
 
             Map<String, Object> response = (Map<String, Object>) requestServiceImpl
-                    .fetchResultUsingGet(communityReadUrl);
+                    .fetchResultUsingGet(communityReadUrl, buildAuthHeaders());
 
             Map<String, Object> communityDetails = (Map<String, Object>) ((Map<String, Object>) response.get(Constants.RESULT)).get(Constants.COMMUNITY_DETAILS);
             String orgId = (String) communityDetails.get(Constants.ORG_ID);

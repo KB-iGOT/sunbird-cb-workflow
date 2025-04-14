@@ -257,6 +257,9 @@ public class Configuration {
     @Value("${community.service.base.url}")
     private String communityServiceBaseUrl;
 
+    @Value("${community.auth.token}")
+    private String authToken;
+
     public String getAdminBlendedProgramEnrolEndPoint() {
         return adminBlendedProgramEnrolEndPoint;
     }
@@ -906,5 +909,9 @@ public class Configuration {
 
     public String getCommunityServiceBaseUrl() {
         return communityServiceBaseUrl;
+    }
+
+    public String getAuthToken() {
+        return authToken;
     }
 }

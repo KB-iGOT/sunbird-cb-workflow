@@ -8,9 +8,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
@@ -67,6 +65,42 @@ public class RequestServiceImpl {
 		}
 		return response;
 	}
+
+	public Object fetchResultUsingGet(StringBuilder uri, Map<String, String> headerMap) {
+		mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
+		Object response = null;
+
+		StringBuilder str = new StringBuilder(this.getClass().getCanonicalName()).append(".fetchResult:")
+				.append(System.lineSeparator());
+		str.append("URI: ").append(uri.toString()).append(System.lineSeparator());
+
+		try {
+			log.debug(str.toString());
+
+			HttpHeaders headers = new HttpHeaders();
+			if (headerMap != null) {
+				headerMap.forEach(headers::set);
+			}
+
+			HttpEntity<String> entity = new HttpEntity<>(headers);
+
+			ResponseEntity<Map> responseEntity = restTemplate.exchange(
+					uri.toString(),
+					HttpMethod.GET,
+					entity,
+					Map.class
+			);
+
+			response = responseEntity.getBody();
+		} catch (HttpClientErrorException e) {
+			log.error("External Service threw an Exception: ", e);
+		} catch (Exception e) {
+			log.error("Exception while fetching from searcher: ", e);
+		}
+
+		return response;
+	}
+
 
 	/**
 	 *
