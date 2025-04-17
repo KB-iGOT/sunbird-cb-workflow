@@ -71,7 +71,7 @@ public class CassandraOperationImpl implements CassandraOperation {
         return count;
     }
 
-    private Select processQuery(String keyspaceName, String tableName, Map<String, Object> propertyMap, List<String> fields) {
+    /*private Select processQuery(String keyspaceName, String tableName, Map<String, Object> propertyMap, List<String> fields) {
         Select selectFrom;
         if (CollectionUtils.isNotEmpty(fields)) {
             selectFrom = QueryBuilder.selectFrom(keyspaceName, tableName).columns(fields.toArray(new String[0]));
@@ -96,6 +96,125 @@ public class CassandraOperationImpl implements CassandraOperation {
             }
             selectQuery = selectQuery.allowFiltering();
         }
+
+        return selectQuery;
+    }
+*/
+    private Select processQuery(String keyspaceName, String tableName, Map<String, Object> propertyMap,
+                                List<String> fields) {
+
+        // Check if we have multiple IN clauses that might cause the error
+        boolean hasMultipleListValues = propertyMap.values().stream()
+                .filter(v -> v instanceof List && ((List<?>) v).size() > 1)
+                .count() > 1;
+
+        // If we have multiple IN clauses, we need to handle it differently
+        if (hasMultipleListValues) {
+            return processQueryForMultipleInClauses(keyspaceName, tableName, propertyMap, fields);
+        }
+
+        // Normal processing for simpler cases
+        Select selectFrom;
+        if (CollectionUtils.isNotEmpty(fields)) {
+            selectFrom = QueryBuilder.selectFrom(keyspaceName, tableName).columns(fields.toArray(new String[0]));
+        } else {
+            selectFrom = QueryBuilder.selectFrom(keyspaceName, tableName).all();
+        }
+
+        Select selectQuery = selectFrom;
+        if (MapUtils.isNotEmpty(propertyMap)) {
+            for (Entry<String, Object> entry : propertyMap.entrySet()) {
+                if (entry.getValue() instanceof List) {
+                    List<?> list = (List<?>) entry.getValue();
+                    if (CollectionUtils.isNotEmpty(list)) {
+                        // If there's only one value in the list, use equals instead of IN
+                        if (list.size() == 1) {
+                            selectQuery = selectQuery.whereColumn(entry.getKey())
+                                    .isEqualTo(QueryBuilder.literal(list.get(0)));
+                        } else {
+                            List<Term> terms = list.stream()
+                                    .map(QueryBuilder::literal)
+                                    .collect(Collectors.toList());
+                            selectQuery = selectQuery.whereColumn(entry.getKey()).in(terms);
+                        }
+                    }
+                } else {
+                    selectQuery = selectQuery.whereColumn(entry.getKey())
+                            .isEqualTo(QueryBuilder.literal(entry.getValue()));
+                }
+            }
+            selectQuery = selectQuery.allowFiltering();
+        }
+
+        return selectQuery;
+    }
+
+    /**
+     * Handle the case where we have multiple IN clauses that might cause the error:
+     * "Cannot restrict clustering columns by IN relations when a collection is selected by the query"
+     */
+    private Select processQueryForMultipleInClauses(String keyspaceName, String tableName,
+                                                    Map<String, Object> propertyMap, List<String> fields) {
+
+        // Find the first list property to use as the primary IN clause
+        Map.Entry<String, Object> primaryListEntry = propertyMap.entrySet().stream()
+                .filter(e -> e.getValue() instanceof List && ((List<?>) e.getValue()).size() > 1)
+                .findFirst()
+                .orElse(null);
+
+        // If no list found, fall back to standard processing
+        if (primaryListEntry == null) {
+            return processQuery(keyspaceName, tableName, propertyMap, fields);
+        }
+
+        // Set up the base query with field selection
+        Select selectFrom;
+        if (CollectionUtils.isNotEmpty(fields)) {
+            selectFrom = QueryBuilder.selectFrom(keyspaceName, tableName).columns(fields.toArray(new String[0]));
+        } else {
+            selectFrom = QueryBuilder.selectFrom(keyspaceName, tableName).all();
+        }
+
+        Select selectQuery = selectFrom;
+
+        // Create a modified property map without the primary list property
+        Map<String, Object> modifiedPropertyMap = new HashMap<>(propertyMap);
+        modifiedPropertyMap.remove(primaryListEntry.getKey());
+
+        // Add all non-list conditions or single-value lists
+        for (Entry<String, Object> entry : modifiedPropertyMap.entrySet()) {
+            if (entry.getValue() instanceof List) {
+                List<?> list = (List<?>) entry.getValue();
+                if (CollectionUtils.isNotEmpty(list)) {
+                    if (list.size() == 1) {
+                        // For lists with a single value, use equals
+                        selectQuery = selectQuery.whereColumn(entry.getKey())
+                                .isEqualTo(QueryBuilder.literal(list.get(0)));
+                    } else {
+                        // For other lists, still use IN (but we separated the primary one)
+                        List<Term> terms = list.stream()
+                                .map(QueryBuilder::literal)
+                                .collect(Collectors.toList());
+                        selectQuery = selectQuery.whereColumn(entry.getKey()).in(terms);
+                    }
+                }
+            } else {
+                selectQuery = selectQuery.whereColumn(entry.getKey())
+                        .isEqualTo(QueryBuilder.literal(entry.getValue()));
+            }
+        }
+
+        // Add the primary list using IN clause
+        List<?> primaryList = (List<?>) primaryListEntry.getValue();
+        if (CollectionUtils.isNotEmpty(primaryList)) {
+            List<Term> terms = primaryList.stream()
+                    .map(QueryBuilder::literal)
+                    .collect(Collectors.toList());
+            selectQuery = selectQuery.whereColumn(primaryListEntry.getKey()).in(terms);
+        }
+
+        // Add filtering directive
+        selectQuery = selectQuery.allowFiltering();
 
         return selectQuery;
     }
