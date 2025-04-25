@@ -128,5 +128,8 @@ public interface WfStatusRepo extends JpaRepository<WfStatusEntity, String> {
     @Query(value = "select distinct userid from wingspan.wf_status where service_name = :serviceName and current_status = :currentStatus and dept_name = :deptName and request_type in (:requestType) " + 
     "AND userid NOT IN (SELECT userid FROM wingspan.wf_status WHERE service_name = :serviceName AND current_status = :currentStatus AND dept_name = :deptName and request_type = :excludedRequestType)", nativeQuery = true)
     Page<String> getListOfDistinctUserIdsUsingRequestTypeForProfileApproval(String serviceName, String currentStatus, String deptName, List<String> requestType, String excludedRequestType, Pageable pageable);
+
+    @Query(value = "SELECT * FROM wingspan.wf_status WHERE userid = ?1 AND current_status = ?2 AND in_workflow = ?3 AND request_type IN ('GROUP_CHANGE', 'DESIGNATION_CHANGE')", nativeQuery = true)
+    List<WfStatusEntity> findByUserIdAndCurrentStatus(String userId, String currentStatus, boolean status);
 }
 
