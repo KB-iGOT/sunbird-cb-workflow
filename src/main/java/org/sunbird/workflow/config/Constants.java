@@ -393,6 +393,9 @@ public class Constants {
 	public static final String MODERATOR_NAMES = "moderatorNames";
 	public static final String NOTIFICATIONS = "notifications";
 	public static final String MODERATOR_TRANSFER_SUBJECT_TEMPLATE = "Urgent: Moderator Transfer Request for \"%s\"";
+	public static final String ORG_TRANSFER_STATE = "orgTransferState";
+	public static final String inWorkflow = "inWorkflow";
+	public static final String GROUP_DESGINATION_ENTITIES = "groupDesignationEntities";
 
 	public static final List<String> USER_DEFAULT_SEARCH_FIELDS = Collections
 			.unmodifiableList(Arrays.asList(PROFILE_DETAILS_PERSONAL_DETAILS_PRIMARY_EMAIL,
