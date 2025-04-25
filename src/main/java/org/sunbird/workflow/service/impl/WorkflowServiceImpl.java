@@ -50,6 +50,7 @@ import java.nio.file.Paths;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -194,18 +195,31 @@ public class WorkflowServiceImpl implements Workflowservice {
 			}
 
 			WfStatus wfStatusCheckForNextState = getWfStatus(nextState, workFlowModel);
+			Boolean inWorkflow = !wfStatusCheckForNextState.getIsLastState();
 
 			applicationStatus.setLastUpdatedOn(new Date());
 			applicationStatus.setCurrentStatus(nextState);
 			applicationStatus.setActorUUID(wfRequest.getActorUserId());
 			applicationStatus.setUpdateFieldValues(mapper.writeValueAsString(wfRequest.getUpdateFieldValues()));
-			applicationStatus.setInWorkflow(!wfStatusCheckForNextState.getIsLastState());
+			applicationStatus.setInWorkflow(inWorkflow);
 			applicationStatus.setDeptName(wfRequest.getDeptName());
 			applicationStatus.setComment(wfRequest.getComment());
 			applicationStatus.setServiceName(serviceName);
 			addModificationEntry(applicationStatus,userId,wfRequest.getAction(),role);
 			String fieldKey = null;
 			WfStatusEntity savedEntity = wfStatusRepo.save(applicationStatus);
+			if (Constants.ORG_TRANSFER_REQUEST.equalsIgnoreCase(applicationStatus.getRequestType())) {
+				log.info("Entering transfer request handling for userId: {}", applicationStatus.getUserId());
+				List<WfStatusEntity> listEntities = wfStatusRepo.findByUserIdAndCurrentStatus(savedEntity.getUserId(), Constants.SEND_FOR_APPROVAL, Boolean.TRUE);
+				Map<String, WfStatusEntity> entityMap = listEntities.stream()
+						.collect(Collectors.toMap(WfStatusEntity::getWfId, Function.identity()));
+				Map<String, Object> payload = new HashMap<>();
+				payload.put(Constants.ORG_TRANSFER_STATE, nextState);
+				payload.put(Constants.inWorkflow, inWorkflow);
+				payload.put(Constants.GROUP_DESGINATION_ENTITIES, new ArrayList<>(entityMap.values()));
+				producer.push(configuration.getTransferRequestStatusChangeTopic(), payload);
+				log.info(" Transfer status change message sent successfully for userId: {}", savedEntity.getUserId());
+			}
 			List<HashMap<String, Object>> updatedValueList = wfRequest.getUpdateFieldValues();
 			for(Map<String, Object> updatedValue : updatedValueList){
 				if(updatedValue.containsKey(Constants.TO_VALUE)){
