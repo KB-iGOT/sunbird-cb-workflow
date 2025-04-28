@@ -195,7 +195,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 			}
 
 			WfStatus wfStatusCheckForNextState = getWfStatus(nextState, workFlowModel);
-			Boolean inWorkflow = wfStatusCheckForNextState.getIsLastState();
+			Boolean inWorkflow = !wfStatusCheckForNextState.getIsLastState();
 
 			applicationStatus.setLastUpdatedOn(new Date());
 			applicationStatus.setCurrentStatus(nextState);
@@ -580,7 +580,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 					actionMap = new HashMap<>();
 					actionMap.put(Constants.ACTION_CONSTANT, action.getAction());
 					actionMap.put(Constants.ROLES_CONSTANT, action.getRoles());
-					actionMap.put(Constants.IS_WORKFLOW_TERMINATED, wfStatus.getIsLastState());
+					actionMap.put(Constants.IS_WORKFLOW_TERMINATED, !wfStatus.getIsLastState());
 					nextActionArray.add(actionMap);
 				}
 			}

@@ -311,7 +311,7 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
     private void updateApplicationStatus(WfStatusEntity applicationStatus, WfRequest wfRequest, String nextState,
                                          String userId, String role, WorkFlowModel workFlowModel) throws IOException {
         WfStatus nextWfStatus = getWfStatus(nextState, workFlowModel);
-        Boolean inWorkflow = nextWfStatus.getIsLastState();
+        Boolean inWorkflow = !nextWfStatus.getIsLastState();
 
         applicationStatus.setLastUpdatedOn(new Date());
         applicationStatus.setCurrentStatus(nextState);

@@ -29,11 +29,7 @@ public class WfStatus {
     }
 
     public Boolean getIsLastState() {
-        if (isLastState) {
-            return false;
-        } else {
-            return true;
-        }
+        return isLastState;
     }
 
     public void setIsLastState(Boolean isLastState) {

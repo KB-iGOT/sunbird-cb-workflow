@@ -838,7 +838,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
             applicationStatus.setCurrentStatus(nextState);
             applicationStatus.setActorUUID(wfRequest.getActorUserId());
             applicationStatus.setUpdateFieldValues(mapper.writeValueAsString(wfRequest.getUpdateFieldValues()));
-            applicationStatus.setInWorkflow(wfStatusCheckForNextState.getIsLastState());
+            applicationStatus.setInWorkflow(!wfStatusCheckForNextState.getIsLastState());
             applicationStatus.setDeptName(wfRequest.getDeptName());
             applicationStatus.setComment(wfRequest.getComment());
             applicationStatus.setServiceName(serviceName);
@@ -1011,7 +1011,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
             applicationStatus.setCurrentStatus(nextState);
             applicationStatus.setActorUUID(wfRequest.getActorUserId());
             applicationStatus.setUpdateFieldValues(mapper.writeValueAsString(wfRequest.getUpdateFieldValues()));
-            applicationStatus.setInWorkflow(wfStatusCheckForNextState.getIsLastState());
+            applicationStatus.setInWorkflow(!wfStatusCheckForNextState.getIsLastState());
             applicationStatus.setDeptName(wfRequest.getDeptName());
             applicationStatus.setComment(wfRequest.getComment());
             applicationStatus.setServiceName(wfRequest.getServiceName());
