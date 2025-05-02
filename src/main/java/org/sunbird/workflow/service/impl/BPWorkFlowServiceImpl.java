@@ -750,23 +750,28 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                         })
         );
 
-        Map<String, Object> propertyMap = new HashMap<>();
-        propertyMap.put(Constants.COURSE_ID, coursesList);
-        propertyMap.put(Constants.BATCH_ID, batchidsList);
-        //propertyMap.put(Constants.ENROLLMENT_TYPE, Constants.INVITE_ONLY);
-        List<Map<String, Object>> list= cassandraOperation.getRecordsByProperties(
-                Constants.KEYSPACE_SUNBIRD_COURSES,
-                Constants.TABLE_COURSE_BATCH,
-                propertyMap,
-                Arrays.asList(Constants.BATCH_ID, Constants.COURSE_ID, Constants.START_DATE, Constants.END_DATE)
-        );
+        if (CollectionUtils.isNotEmpty(coursesList) || CollectionUtils.isNotEmpty(batchidsList)) {
+            Map<String, Object> propertyMap = new HashMap<>();
+            propertyMap.put(Constants.COURSE_ID, coursesList);
+            propertyMap.put(Constants.BATCH_ID, batchidsList);
+            //propertyMap.put(Constants.ENROLLMENT_TYPE, Constants.INVITE_ONLY);
+            List<Map<String, Object>> list= cassandraOperation.getRecordsByProperties(
+                    Constants.KEYSPACE_SUNBIRD_COURSES,
+                    Constants.TABLE_COURSE_BATCH,
+                    propertyMap,
+                    Arrays.asList(Constants.BATCH_ID, Constants.COURSE_ID, Constants.START_DATE, Constants.END_DATE)
+            );
 
-        // Stream to filter and collect only non-null "endDate" maps
-        return list.stream()
-                .filter(item -> {
-                    return item != null && item.containsKey("end_date") && item.get("end_date") != null;
-                })
-                .collect(Collectors.toList());
+            // Stream to filter and collect only non-null "endDate" maps
+            return list.stream()
+                    .filter(item -> {
+                        return item != null && item.containsKey("end_date") && item.get("end_date") != null;
+                    })
+                    .collect(Collectors.toList());
+        } else {
+            return new ArrayList<>();
+        }
+
     }
 
     /**
