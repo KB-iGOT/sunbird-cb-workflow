@@ -1168,6 +1168,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
             WfStatusEntity wfStatus = wfStatusRepo.findByWfId(wfId);
 
             if (wfStatus == null) {
+                logger.error("Workflow ID not found: {}", wfId);
                 response.getResult().computeIfAbsent("missingWorkflows", k -> new ArrayList<String>());
                 ((List<String>) response.getResult().get("missingWorkflows")).add(wfId);
                 continue;
@@ -1227,11 +1228,10 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
     private List<String> parseAndValidateHeaders(String headerLine, List<String> expectedHeaders, List<String> errors) {
         List<String> actualHeaders = Arrays.stream(headerLine.split(","))
                 .map(String::trim)
-                .map(String::toLowerCase)
-                .collect(Collectors.toList());
+                .toList();
         List<String> missingHeaders = expectedHeaders.stream()
-                .filter(expected -> !actualHeaders.contains(expected.toLowerCase()))
-                .collect(Collectors.toList());
+                .filter(expected -> !actualHeaders.stream().anyMatch(actual -> actual.equalsIgnoreCase(expected)))
+                .toList();
 
         if (!missingHeaders.isEmpty()) {
             errors.add("Missing/MissMatching headers: " + missingHeaders);
