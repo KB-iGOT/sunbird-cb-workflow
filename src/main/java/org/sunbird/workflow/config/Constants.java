@@ -396,6 +396,12 @@ public class Constants {
 	public static final String ORG_TRANSFER_STATE = "orgTransferState";
 	public static final String inWorkflow = "inWorkflow";
 	public static final String GROUP_DESGINATION_ENTITIES = "groupDesignationEntities";
+	public static final String API_WORKFLOW_LOAD_CSV_BULK_APPROVAL = "api.workflow.load.csv.bulk.approval";
+	public static final String ACTION_APPROVE_REJECT = "action(approve/reject)";
+	public static final String ACTION_UPDATED_NOT_UPDATED = "status(updated/Not updated)";
+	public static final String UPDATED = "Updated";
+	public static final String NOT_UPDATED = "Not updated";
+
 
 	public static final List<String> USER_DEFAULT_SEARCH_FIELDS = Collections
 			.unmodifiableList(Arrays.asList(PROFILE_DETAILS_PERSONAL_DETAILS_PRIMARY_EMAIL,
