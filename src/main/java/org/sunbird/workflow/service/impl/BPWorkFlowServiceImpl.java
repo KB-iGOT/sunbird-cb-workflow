@@ -1,32 +1,26 @@
 package org.sunbird.workflow.service.impl;
 
 
-import java.io.IOException;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import org.apache.commons.collections.CollectionUtils;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import org.springframework.util.ObjectUtils;
-
+import org.springframework.web.multipart.MultipartFile;
 import org.sunbird.workflow.config.Configuration;
 import org.sunbird.workflow.config.Constants;
 import org.sunbird.workflow.exception.ApplicationException;
@@ -41,6 +35,11 @@ import org.sunbird.workflow.service.ContentReadService;
 import org.sunbird.workflow.service.Workflowservice;
 import org.sunbird.workflow.utils.CassandraOperation;
 
+import java.io.*;
+import java.nio.file.Files;
+import java.time.Instant;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 
@@ -1027,5 +1026,360 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
             throw new ApplicationException(Constants.WORKFLOW_PARSING_ERROR_MESSAGE, e);
         }
     }
+
+
+    @Override
+    public ResponseEntity<ByteArrayResource> generateUserApprovalCsv(SearchCriteria criteria) {
+        Response response = workflowService.applicationsSearch(null, null, criteria,
+                Constants.BLENDED_PROGRAM_SEARCH_ENABLED);
+
+        List<LinkedHashMap<String, String>> userApprovalRecords = new ArrayList<>();
+        List<Map<String, Object>> dataList = (List<Map<String, Object>>) response.getResult().get(Constants.DATA);
+        if (ObjectUtils.isEmpty(dataList)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ByteArrayResource("No data found".getBytes()));
+        }
+        for (Map<String, Object> item : dataList) {
+            Map<String, Object> userInfo = (Map<String, Object>) item.get(Constants.USER_INFO);
+            List<WfStatusEntity> wfInfos = (List<WfStatusEntity>) item.get(Constants.WF_INFO);
+            String email = "";
+            String firstName = "";
+            if (Objects.nonNull(userInfo)) {
+                email = (String) userInfo.get(Constants.EMAIL);
+                firstName = (String) userInfo.get(Constants.FIRST_NAME);
+            }
+            if (CollectionUtils.isEmpty(wfInfos)) {
+                userApprovalRecords.add(buildRow(email, firstName, "", ""));
+            } else {
+                for (WfStatusEntity wfInfo : wfInfos) {
+                    String wfId = wfInfo.getWfId();
+                    String userId = wfInfo.getUserId();
+                    userApprovalRecords.add(buildRow(email, firstName, wfId, userId));
+                }
+            }
+        }
+        if (userApprovalRecords.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ByteArrayResource("No valid user approval data found".getBytes()));
+        }
+        File logFile = null;
+        try {
+            logFile = writeApprovalDataToCsv(userApprovalRecords, "BP_user_approval_data");
+            byte[] fileContent = Files.readAllBytes(logFile.toPath());
+            ByteArrayResource resource = new ByteArrayResource(fileContent);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + logFile.getName())
+                    .contentType(MediaType.parseMediaType("text/csv"))
+                    .contentLength(fileContent.length)
+                    .body(resource);
+
+        } catch (IOException e) {
+            logger.error("Error writing approval CSV file", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ByteArrayResource("Error generating CSV file".getBytes()));
+        } finally {
+            deleteTempFile(logFile);
+        }
+    }
+
+    private LinkedHashMap<String, String> buildRow(String email, String firstName, String wfId, String userId) {
+        LinkedHashMap<String, String> row = new LinkedHashMap<>();
+        row.put(Constants.EMAIL, email);
+        row.put(Constants.USER_NAME, firstName);
+        row.put(Constants.WF_ID_CONSTANT, wfId);
+        row.put(Constants.USER_ID, userId);
+        row.put(Constants.ACTION_APPROVE_REJECT, "");
+        return row;
+    }
+
+    public File writeApprovalDataToCsv(List<LinkedHashMap<String, String>> logs, String originalFileName) throws IOException {
+        logger.info("Logs written to file: {}", originalFileName);
+        String csvFileName = originalFileName + "_log.csv";
+        String tempDir = System.getProperty("java.io.tmpdir");
+        String csvFilePath = tempDir + File.separator + csvFileName;
+        File logFile = new File(csvFilePath);
+        if (!logFile.exists()) {
+            logFile.getParentFile().mkdirs();
+            logFile.createNewFile();
+        }
+        try (FileWriter writer = new FileWriter(csvFilePath)) {
+            if (!logs.isEmpty()) {
+                LinkedHashMap<String, String> firstLog = logs.get(0);
+                StringBuilder header = new StringBuilder();
+                for (String key : firstLog.keySet()) {
+                    header.append(escapeSpecialCharacters(key)).append(",");
+                }
+                writer.write(header.toString());
+                writer.write(System.lineSeparator());
+                for (LinkedHashMap<String, String> logEntry : logs) {
+                    StringBuilder row = new StringBuilder();
+                    for (String key : firstLog.keySet()) {
+                        row.append(escapeSpecialCharacters(logEntry.getOrDefault(key, ""))).append(",");
+                    }
+                    writer.write(row.toString());
+                    writer.write(System.lineSeparator());
+                }
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return logFile;
+    }
+
+    private String escapeSpecialCharacters(String value) {
+        String escapedValue = value;
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            escapedValue = "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return escapedValue;
+    }
+
+    /**
+     * This method is responsible for loading the approval data from the CSV file.
+     *
+     * @param file      - The uploaded CSV file
+     * @param contentId - Content ID
+     * @return - ResponseEntity with the result of the operation
+     */
+    @Override
+    public ResponseEntity<?> loadApprovalDataFromCsv(MultipartFile file, String contentId) throws IOException {
+        logger.info("BPWorkFlowServiceImpl::loadApprovalDataFromCsv");
+        SBApiResponse response = SBApiResponse.createDefaultResponse(Constants.API_WORKFLOW_LOAD_CSV_BULK_APPROVAL);
+        String fileName = file.getOriginalFilename();
+        if (!isValidFileFormat(fileName)) {
+            logger.error("Invalid file format for file: {}", fileName);
+            response.getParams().setStatus(Constants.FAILED);
+            response.getParams().setErrmsg("Invalid file format. Only  CSV (.csv) files are supported.");
+            response.setResponseCode(HttpStatus.BAD_REQUEST);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+        List<String> validationErrors = new ArrayList<>();
+        List<Map<String, String>> validRows = validateAndExtractApprovalData(file, validationErrors);
+
+        if (!validationErrors.isEmpty()) {
+            response.getParams().setStatus(Constants.FAILED);
+            response.getResult().put("validationErrors", validationErrors);
+            response.setResponseCode(HttpStatus.BAD_REQUEST);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+        List<String[]> updatedRows = new ArrayList<>();
+        for (Map<String, String> row : validRows) {
+            String wfId = row.get(Constants.WF_ID_CONSTANT);
+            WfStatusEntity wfStatus = wfStatusRepo.findByWfId(wfId);
+
+            if (wfStatus == null) {
+                response.getResult().computeIfAbsent("missingWorkflows", k -> new ArrayList<String>());
+                ((List<String>) response.getResult().get("missingWorkflows")).add(wfId);
+                continue;
+            }
+            processRow(row, wfStatus, contentId, updatedRows, response);
+        }
+        return prepareCsvResponse(file, updatedRows);
+    }
+
+    private boolean isValidFileFormat(String fileName) {
+        if (fileName == null) {
+            return false;
+        }
+        String lowerCaseFileName = fileName.toLowerCase();
+        return lowerCaseFileName.endsWith(".csv");
+    }
+
+    private void deleteTempFile(File logFile) {
+        if (logFile != null && logFile.exists()) {
+            try {
+                Files.delete(logFile.toPath());
+            } catch (IOException ex) {
+                logger.warn("Failed to delete temp file: {}", logFile.getAbsolutePath(), ex);
+            }
+        }
+    }
+
+    private List<Map<String, String>> validateAndExtractApprovalData(MultipartFile file, List<String> errors) {
+        List<Map<String, String>> validRows = new ArrayList<>();
+        final List<String> expectedHeaders = List.of(Constants.EMAIL, Constants.USER_NAME, Constants.WF_ID_CONSTANT, Constants.USER_ID, Constants.ACTION_APPROVE_REJECT);
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
+            String line;
+            boolean isFirstLine = true;
+            int rowNumber = 1;
+            List<String> actualHeaders = new ArrayList<>();
+            while ((line = reader.readLine()) != null) {
+                if (isFirstLine) {
+                    actualHeaders = parseAndValidateHeaders(line, expectedHeaders, errors);
+                    if (!errors.isEmpty()) return validRows;
+                    isFirstLine = false;
+                    continue;
+                }
+                rowNumber++;
+                Map<String, String> row = processDataRow(line, actualHeaders, rowNumber, errors);
+                if (row != null) {
+                    validRows.add(row);
+                }
+            }
+        } catch (IOException e) {
+            errors.add("Error reading file: " + e.getMessage());
+        }
+
+        return validRows;
+    }
+
+    private List<String> parseAndValidateHeaders(String headerLine, List<String> expectedHeaders, List<String> errors) {
+        List<String> actualHeaders = Arrays.stream(headerLine.split(","))
+                .map(String::trim)
+                .map(String::toLowerCase)
+                .collect(Collectors.toList());
+        List<String> missingHeaders = expectedHeaders.stream()
+                .filter(expected -> !actualHeaders.contains(expected.toLowerCase()))
+                .collect(Collectors.toList());
+
+        if (!missingHeaders.isEmpty()) {
+            errors.add("Missing/MissMatching headers: " + missingHeaders);
+        }
+        return actualHeaders;
+    }
+
+    private Map<String, String> processDataRow(String line, List<String> expectedHeaders, int rowNumber, List<String> errors) {
+        String[] tokens = line.split(",", -1); // keep empty strings
+        if (tokens.length < expectedHeaders.size()) {
+            errors.add("Row " + rowNumber + " is incomplete: expected " + expectedHeaders.size() + " columns.");
+            return null;
+        }
+
+        Map<String, String> row = new HashMap<>();
+        for (int i = 0; i < expectedHeaders.size(); i++) {
+            String key = expectedHeaders.get(i);
+            String value = i < tokens.length ? tokens[i].trim() : "";
+            row.put(key, value);
+        }
+
+        List<String> emptyFields = expectedHeaders.stream()
+                .filter(header -> row.get(header) == null || row.get(header).isEmpty())
+                .collect(Collectors.toList());
+        if (!emptyFields.isEmpty()) {
+            errors.add("Row " + rowNumber + " has empty required fields: " + emptyFields);
+            return null;
+        }
+        String action = row.get(Constants.ACTION_APPROVE_REJECT);
+        if (!"approve".equalsIgnoreCase(action) && !"reject".equalsIgnoreCase(action)) {
+            errors.add("Row " + rowNumber + " has invalid action: " + action);
+            return null;
+        }
+        return row;
+    }
+
+    private WfRequest buildWfRequest(String wfId, String userId, String action,
+                                     WfStatusEntity wfStatus, String contentId) {
+        WfRequest wfRequest = new WfRequest();
+
+        wfRequest.setWfId(wfId);
+        wfRequest.setUserId(userId);
+        wfRequest.setAction(action.toUpperCase());
+        wfRequest.setApplicationId(wfStatus.getApplicationId());
+        wfRequest.setActorUserId(wfStatus.getActorUUID());
+        wfRequest.setServiceName(wfStatus.getServiceName());
+        wfRequest.setRootOrgId(wfStatus.getRootOrg());
+        wfRequest.setCourseId(contentId);
+        wfRequest.setDeptName(wfStatus.getDeptName());
+        wfRequest.setState(wfStatus.getCurrentStatus());
+        ObjectMapper objectMapper = new ObjectMapper();
+        String updateFieldValuesStr = wfStatus.getUpdateFieldValues();
+        try {
+            List<HashMap<String, Object>> updateFieldValues = objectMapper.readValue(
+                    updateFieldValuesStr,
+                    new TypeReference<List<HashMap<String, Object>>>() {
+                    }
+            );
+            wfRequest.setUpdateFieldValues(updateFieldValues);
+        } catch (IOException e) {
+            logger.error("Error parsing updateFieldValues: {}", e.getMessage());
+        }
+        return wfRequest;
+    }
+
+    private String writeUpdatedCsv(MultipartFile originalFile, List<String[]> updatedRows) throws IOException {
+        String originalFileName = originalFile.getOriginalFilename();
+        String updatedFileName = originalFileName.replace(".csv", "_updated.csv");
+        File tempFile = new File(System.getProperty("java.io.tmpdir"), updatedFileName);
+        try (
+                BufferedWriter writer = Files.newBufferedWriter(tempFile.toPath());
+                CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT
+                        .withHeader(Constants.EMAIL, Constants.USER_NAME, Constants.WF_ID_CONSTANT, Constants.USER_ID, Constants.ACTION_APPROVE_REJECT, Constants.ACTION_UPDATED_NOT_UPDATED, Constants.ERROR))
+        ) {
+            for (String[] row : updatedRows) {
+                csvPrinter.printRecord((Object[]) row);
+            }
+            csvPrinter.flush();
+        }
+        logger.info("Updated CSV file written to: {}", tempFile.getAbsolutePath());
+        return tempFile.getAbsolutePath();
+    }
+
+    private void processRow(Map<String, String> row, WfStatusEntity wfStatus, String contentId,
+                            List<String[]> updatedRows, SBApiResponse response) {
+        String wfId = row.get(Constants.WF_ID_CONSTANT);
+        String userId = row.get(Constants.USER_ID);
+        String action = row.get(Constants.ACTION_APPROVE_REJECT);
+        String userName = row.get(Constants.USER_NAME);
+        String emailId = row.get(Constants.EMAIL);
+
+        try {
+            WfRequest wfRequest = buildWfRequest(wfId, userId, action, wfStatus, contentId);
+            Response updateApprovalResponse = updateBPWorkFlow(
+                    wfStatus.getRootOrg(), wfStatus.getOrg(), wfRequest, userId, ""
+            );
+
+            String resultStatus = Constants.NOT_UPDATED;
+            String error = "";
+
+            if (updateApprovalResponse != null && updateApprovalResponse.getResult() != null) {
+                Map<String, Object> result = updateApprovalResponse.getResult();
+                if ("OK".equalsIgnoreCase((String) result.get("status"))) {
+                    resultStatus = Constants.UPDATED;
+                } else {
+                    error = (String) result.get("message");
+                }
+            } else {
+                error = "Null response";
+            }
+
+            updatedRows.add(new String[]{emailId, userName, wfId, userId, action, resultStatus, error});
+
+        } catch (Exception e) {
+            logger.error("Failed to update workflow for wfId: {}", wfId, e);
+
+            response.getResult().computeIfAbsent("updateFailures", k -> new ArrayList<Map<String, String>>());
+            Map<String, String> failureDetails = new HashMap<>();
+            failureDetails.put(Constants.WF_ID_CONSTANT, wfId);
+            failureDetails.put("error", e.getMessage() != null ? e.getMessage() : "Unknown error");
+            ((List<Map<String, String>>) response.getResult().get("updateFailures")).add(failureDetails);
+
+            String errorMessage = e.getMessage() != null ? e.getMessage() : "Unknown error";
+            updatedRows.add(new String[]{emailId, userName, wfId, userId, action, Constants.NOT_UPDATED, errorMessage});
+        }
+    }
+
+    private ResponseEntity<?> prepareCsvResponse(MultipartFile file, List<String[]> updatedRows) {
+        File tempFile = null;
+        try {
+            String updatedFileName = writeUpdatedCsv(file, updatedRows);
+            tempFile = new File(updatedFileName);
+            byte[] fileContent = Files.readAllBytes(tempFile.toPath());
+            ByteArrayResource resource = new ByteArrayResource(fileContent);
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + tempFile.getName())
+                    .contentType(MediaType.parseMediaType("text/csv"))
+                    .contentLength(fileContent.length)
+                    .body(resource);
+        } catch (IOException e) {
+            logger.error("Error writing or reading the result CSV", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ByteArrayResource("Error generating result CSV file".getBytes()));
+        } finally {
+            deleteTempFile(tempFile);
+        }
+    }
+
 
 }

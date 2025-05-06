@@ -1,23 +1,16 @@
 package org.sunbird.workflow.controller;
 
+import java.io.IOException;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.sunbird.workflow.config.Constants;
-import org.sunbird.workflow.models.Response;
-import org.sunbird.workflow.models.SearchCriteria;
-import org.sunbird.workflow.models.SearchCriteriaV2;
-import org.sunbird.workflow.models.WfRequest;
+import org.sunbird.workflow.models.*;
 import org.sunbird.workflow.service.BPWorkFlowService;
 
 import org.sunbird.workflow.service.DomainWhiteListWorkFlowService;
@@ -153,4 +146,19 @@ public class BPWorkFlowController {
         Response response = bPWorkFlowService.blendedProgramStatusCount(searchCriteria);
         return new ResponseEntity<>(response, (HttpStatus) response.get(Constants.STATUS));
     }
+
+    @PostMapping(path = "/getUserApprovalDataInCsv", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> getUserApprovalDataInCsv(@RequestBody SearchCriteria searchCriteria) {
+        return bPWorkFlowService.generateUserApprovalCsv(searchCriteria);
+    }
+
+    @PostMapping(value = "/bulkApprovalDataFromCsv/{contentId}", consumes = "multipart/form-data")
+    public ResponseEntity<?> loadApprovalDataFromCsv(
+            @RequestParam(value = "file") MultipartFile file,
+            @PathVariable String contentId) throws IOException {
+        return bPWorkFlowService.loadApprovalDataFromCsv(file, contentId);
+    }
+
+
+
 }
