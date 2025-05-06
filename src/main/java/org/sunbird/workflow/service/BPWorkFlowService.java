@@ -1,11 +1,15 @@
 package org.sunbird.workflow.service;
 
-import java.util.Map;
-
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 import org.sunbird.workflow.models.Response;
 import org.sunbird.workflow.models.SearchCriteria;
 import org.sunbird.workflow.models.SearchCriteriaV2;
 import org.sunbird.workflow.models.WfRequest;
+
+import java.io.IOException;
+import java.util.Map;
 
 public interface BPWorkFlowService {
 
@@ -59,4 +63,8 @@ public interface BPWorkFlowService {
 
     public Response bpPCSearch(String rootOrg, String org, SearchCriteriaV2 criteria);
     public Response bpMDOSearch(String rootOrg, String org, SearchCriteriaV2 criteria);
+
+    ResponseEntity<ByteArrayResource> generateUserApprovalCsv(SearchCriteria criteria);
+
+    ResponseEntity<?> loadApprovalDataFromCsv(MultipartFile file, String contentId) throws IOException;
     }

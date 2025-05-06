@@ -5,7 +5,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import org.joda.time.DateTime;
 import org.springframework.http.HttpStatus;
+import org.sunbird.workflow.config.Constants;
 
 public class SBApiResponse {
     private String id;
@@ -89,5 +91,16 @@ public class SBApiResponse {
 
 	public boolean containsKey(String key) {
 		return response.containsKey(key);
+	}
+
+	public static SBApiResponse createDefaultResponse(String api) {
+		SBApiResponse response = new SBApiResponse();
+		response.setId(api);
+		response.setVer(Constants.API_VERSION_1);
+		response.setParams(new SunbirdApiRespParam(UUID.randomUUID().toString()));
+		response.getParams().setStatus(Constants.SUCCESS);
+		response.setResponseCode(HttpStatus.OK);
+		response.setTs(DateTime.now().toString());
+		return response;
 	}
 }
