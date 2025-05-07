@@ -1376,6 +1376,11 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
     }
 
     private String processApprovalStatus(Response response, String wfId) {
+        try {
+            logger.info(mapper.writeValueAsString(response));
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
         Map<String, Object> result = response.getResult();
         Object statusObj = result.get(Constants.STATUS);
 
