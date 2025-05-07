@@ -1382,6 +1382,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
             throw new RuntimeException(e);
         }
         Map<String, Object> result = response.getResult();
+        logger.info("Extracted result: {}", result);
         Object statusObj = result.get(Constants.STATUS);
 
         if (!"OK".equalsIgnoreCase(String.valueOf(statusObj))) {
@@ -1390,10 +1391,11 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         }
 
         Object dataObj = result.get(Constants.DATA);
+        logger.info("Extracted 'data' from result: {}", dataObj);
         if (dataObj instanceof Map) {
             Map<String, Object> dataMap = (Map<String, Object>) dataObj;
             Object wfStatusResp = dataMap.get(Constants.STATUS);
-
+            logger.info("Workflow 'status' inside 'data' for wfId {}: {}", wfId, wfStatusResp);
             if (Constants.APPROVED_STATE.equalsIgnoreCase(String.valueOf(wfStatusResp))) {
                 logger.info("Workflow approved for wfId {}.", wfId);
                 return Constants.UPDATED;
