@@ -1328,20 +1328,35 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
             Response updateApprovalResponse = updateBPWorkFlow(
                     wfStatus.getRootOrg(), wfStatus.getOrg(), wfRequest, userId, ""
             );
-
+            logger.info("updateApprovalResponse for wfId {}: {}", wfId, updateApprovalResponse);
             String resultStatus = Constants.NOT_UPDATED;
             String error = "";
 
             if (updateApprovalResponse != null && updateApprovalResponse.getResult() != null) {
                 Map<String, Object> result = updateApprovalResponse.getResult();
-                if ("OK".equalsIgnoreCase((String) result.get("status"))) {
-                    resultStatus = Constants.UPDATED;
+                Object statusObj = result.get("status");
+
+                if (statusObj != null && "OK".equalsIgnoreCase(statusObj.toString())) {
+                    Object dataObj = result.get("data");
+                    if (dataObj instanceof Map) {
+                        Map<String, Object> dataMap = (Map<String, Object>) dataObj;
+                        Object approvalStatusObj = dataMap.get("status");
+                        if (approvalStatusObj != null && "APPROVED".equalsIgnoreCase(approvalStatusObj.toString())) {
+                            resultStatus = Constants.UPDATED;
+                        } else {
+                            error = "Workflow status is not APPROVED";
+                        }
+                    } else {
+                        error = "Invalid data structure";
+                    }
                 } else {
-                    error = (String) result.get("message");
+                    Object msgObj = result.get("message");
+                    error = msgObj != null ? msgObj.toString() : "Unknown error";
                 }
             } else {
                 error = "Null response";
             }
+
 
             updatedRows.add(new String[]{emailId, userName, wfId, userId, action, resultStatus, error});
 
