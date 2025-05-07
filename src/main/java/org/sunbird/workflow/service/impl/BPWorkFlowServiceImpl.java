@@ -1323,55 +1323,30 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         String userName = row.get(Constants.USER_NAME);
         String emailId = row.get(Constants.EMAIL);
 
+        String resultStatus = Constants.NOT_UPDATED;
+        String error = "";
+
         try {
             WfRequest wfRequest = buildWfRequest(wfId, userId, action, wfStatus, contentId);
             Response updateApprovalResponse = updateBPWorkFlow(
                     wfStatus.getRootOrg(), wfStatus.getOrg(), wfRequest, userId, ""
             );
-            logger.info("updateApprovalResponse for wfId {}: {}", wfId, updateApprovalResponse);
-            String resultStatus = Constants.NOT_UPDATED;
-            String error = "";
 
-            if (updateApprovalResponse != null && updateApprovalResponse.getResult() != null) {
-                Map<String, Object> result = updateApprovalResponse.getResult();
-                Object statusObj = result.get("status");
-
-                if (statusObj != null && "OK".equalsIgnoreCase(statusObj.toString())) {
-                    Object dataObj = result.get("data");
-                    if (dataObj instanceof Map) {
-                        Map<String, Object> dataMap = (Map<String, Object>) dataObj;
-                        Object approvalStatusObj = dataMap.get("status");
-                        if (approvalStatusObj != null && "APPROVED".equalsIgnoreCase(approvalStatusObj.toString())) {
-                            resultStatus = Constants.UPDATED;
-                        } else {
-                            error = "Workflow status is not APPROVED";
-                        }
-                    } else {
-                        error = "Invalid data structure";
-                    }
-                } else {
-                    Object msgObj = result.get("message");
-                    error = msgObj != null ? msgObj.toString() : "Unknown error";
+            if (isValidResponse(updateApprovalResponse)) {
+                resultStatus = processApprovalStatus(updateApprovalResponse, wfId);
+                if (!Constants.UPDATED.equals(resultStatus)) {
+                    error = "Unexpected or failed workflow status for wfId " + wfId;
                 }
             } else {
-                error = "Null response";
+                error = "Null or invalid response for wfId " + wfId;
             }
 
-
-            updatedRows.add(new String[]{emailId, userName, wfId, userId, action, resultStatus, error});
-
         } catch (Exception e) {
-            logger.error("Failed to update workflow for wfId: {}", wfId, e);
-
-            response.getResult().computeIfAbsent("updateFailures", k -> new ArrayList<Map<String, String>>());
-            Map<String, String> failureDetails = new HashMap<>();
-            failureDetails.put(Constants.WF_ID_CONSTANT, wfId);
-            failureDetails.put("error", e.getMessage() != null ? e.getMessage() : "Unknown error");
-            ((List<Map<String, String>>) response.getResult().get("updateFailures")).add(failureDetails);
-
-            String errorMessage = e.getMessage() != null ? e.getMessage() : "Unknown error";
-            updatedRows.add(new String[]{emailId, userName, wfId, userId, action, Constants.NOT_UPDATED, errorMessage});
+            error = e.getMessage() != null ? e.getMessage() : "Unknown error";
+            logger.error("Exception while processing wfId {}: {}", wfId, error, e);
+            addFailureToResponse(response, wfId, error);
         }
+        updatedRows.add(new String[]{emailId, userName, wfId, userId, action, resultStatus, error});
     }
 
     private ResponseEntity<?> prepareCsvResponse(MultipartFile file, List<String[]> updatedRows) {
@@ -1394,6 +1369,42 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         } finally {
             deleteTempFile(tempFile);
         }
+    }
+
+    private boolean isValidResponse(Response response) {
+        return response != null && response.getResult() != null;
+    }
+
+    private String processApprovalStatus(Response response, String wfId) {
+        Map<String, Object> result = response.getResult();
+        Object statusObj = result.get(Constants.STATUS);
+
+        if (!"OK".equalsIgnoreCase(String.valueOf(statusObj))) {
+            logger.error("Workflow transition failed for wfId {}: {}", wfId, statusObj);
+            return Constants.NOT_UPDATED;
+        }
+
+        Object dataObj = result.get(Constants.DATA);
+        if (dataObj instanceof Map) {
+            Map<String, Object> dataMap = (Map<String, Object>) dataObj;
+            Object wfStatusResp = dataMap.get(Constants.STATUS);
+
+            if (Constants.APPROVED_STATE.equalsIgnoreCase(String.valueOf(wfStatusResp))) {
+                logger.info("Workflow approved for wfId {}.", wfId);
+                return Constants.UPDATED;
+            } else {
+                logger.warn("Unexpected workflow status for wfId {}: {}", wfId, wfStatusResp);
+            }
+        }
+        return Constants.NOT_UPDATED;
+    }
+
+    private void addFailureToResponse(SBApiResponse response, String wfId, String error) {
+        response.getResult().computeIfAbsent("updateFailures", k -> new ArrayList<Map<String, String>>());
+        Map<String, String> failureDetails = new HashMap<>();
+        failureDetails.put(Constants.WF_ID_CONSTANT, wfId);
+        failureDetails.put("error", error);
+        ((List<Map<String, String>>) response.getResult().get("updateFailures")).add(failureDetails);
     }
 
 
