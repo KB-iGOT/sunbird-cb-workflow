@@ -1383,10 +1383,13 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         }
         Map<String, Object> result = response.getResult();
         logger.info("Extracted result: {}", result);
-        Object statusObj = result.get(Constants.STATUS);
 
-        if (!"OK".equalsIgnoreCase(String.valueOf(statusObj))) {
-            logger.error("Workflow transition failed for wfId {}: {}", wfId, statusObj);
+        Object statusObj = result.get(Constants.STATUS);
+        String statusStr = String.valueOf(statusObj).trim().toUpperCase();
+        logger.info("Status in result: {}", statusStr);
+
+        if (!("OK".equals(statusStr) || "200 OK".equals(statusStr))) {
+            logger.error("Workflow transition failed for wfId {}: {}", wfId, statusStr);
             return Constants.NOT_UPDATED;
         }
 
@@ -1394,6 +1397,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         logger.info("Extracted 'data' from result: {}", dataObj);
         if (dataObj instanceof Map) {
             Map<String, Object> dataMap = (Map<String, Object>) dataObj;
+            logger.info("Data map: {}", dataMap);
             Object wfStatusResp = dataMap.get(Constants.STATUS);
             logger.info("Workflow 'status' inside 'data' for wfId {}: {}", wfId, wfStatusResp);
             if (Constants.APPROVED_STATE.equalsIgnoreCase(String.valueOf(wfStatusResp))) {
