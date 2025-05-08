@@ -1377,16 +1377,16 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
 
     private String processApprovalStatus(Response response, String wfId) {
         try {
-            logger.info(mapper.writeValueAsString(response));
+            logger.debug("Raw response: {}", mapper.writeValueAsString(response));
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
         Map<String, Object> result = response.getResult();
-        logger.info("Extracted result: {}", result);
+        logger.debug("Extracted result: {}", result);
 
         Object statusObj = result.get(Constants.STATUS);
         String statusStr = String.valueOf(statusObj).trim().toUpperCase();
-        logger.info("Status in result: {}", statusStr);
+        logger.debug("Status in result: {}", statusStr);
 
         if (!("OK".equals(statusStr) || "200 OK".equals(statusStr))) {
             logger.error("Workflow transition failed for wfId {}: {}", wfId, statusStr);
@@ -1394,14 +1394,13 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         }
 
         Object dataObj = result.get(Constants.DATA);
-        logger.info("Extracted 'data' from result: {}", dataObj);
+        logger.debug("Extracted 'data' from result: {}", dataObj);
         if (dataObj instanceof Map) {
             Map<String, Object> dataMap = (Map<String, Object>) dataObj;
-            logger.info("Data map: {}", dataMap);
             Object wfStatusResp = dataMap.get(Constants.STATUS);
-            logger.info("Workflow 'status' inside 'data' for wfId {}: {}", wfId, wfStatusResp);
-            if (Constants.APPROVED_STATE.equalsIgnoreCase(String.valueOf(wfStatusResp))) {
-                logger.info("Workflow approved for wfId {}.", wfId);
+            String wfStatusStr = String.valueOf(wfStatusResp).trim().toUpperCase();
+            logger.debug("Workflow 'status' inside 'data' for wfId {}: {}", wfId, wfStatusResp);
+            if (Constants.APPROVED_STATE.equalsIgnoreCase(wfStatusStr) || Constants.REJECTED.equalsIgnoreCase(wfStatusStr)) {
                 return Constants.UPDATED;
             } else {
                 logger.warn("Unexpected workflow status for wfId {}: {}", wfId, wfStatusResp);
