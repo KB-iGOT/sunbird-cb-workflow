@@ -1127,6 +1127,10 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
     }
 
     private String escapeSpecialCharacters(String value) {
+        if (StringUtils.isEmpty(value)) {
+            logger.error("Value is null");
+            return "null";
+        }
         String escapedValue = value;
         if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
             escapedValue = "\"" + value.replace("\"", "\"\"") + "\"";
@@ -1292,7 +1296,8 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
             );
             wfRequest.setUpdateFieldValues(updateFieldValues);
         } catch (IOException e) {
-            logger.error("Error parsing updateFieldValues: {}", e.getMessage());
+            logger.error("Error parsing updateFieldValues '{}': {}", updateFieldValuesStr, e.getMessage());
+
         }
         return wfRequest;
     }
