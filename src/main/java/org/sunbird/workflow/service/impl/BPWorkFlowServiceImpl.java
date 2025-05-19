@@ -1129,7 +1129,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
     private String escapeSpecialCharacters(String value) {
         if (StringUtils.isEmpty(value)) {
             logger.error("Value is null");
-            return "null";
+            return "";
         }
         String escapedValue = value;
         if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
@@ -1333,8 +1333,17 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
 
         try {
             WfRequest wfRequest = buildWfRequest(wfId, userId, action, wfStatus, contentId);
+            String currentStatus = wfStatus.getCurrentStatus();
+            String role;
+            if (Constants.SEND_FOR_MDO_APPROVAL.equalsIgnoreCase(currentStatus)) {
+                role = Constants.MDO_ADMIN;
+            } else if (Constants.SEND_FOR_PC_APPROVAL.equalsIgnoreCase(currentStatus)) {
+                role = Constants.PROGRAM_COORDINATOR;
+            } else {
+                role = "";
+            }
             Response updateApprovalResponse = updateBPWorkFlow(
-                    wfStatus.getRootOrg(), wfStatus.getOrg(), wfRequest, userId, ""
+                    wfStatus.getRootOrg(), wfStatus.getOrg(), wfRequest, userId, role
             );
 
             if (isValidResponse(updateApprovalResponse)) {
