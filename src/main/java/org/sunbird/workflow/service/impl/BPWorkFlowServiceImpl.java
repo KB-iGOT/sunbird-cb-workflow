@@ -1414,7 +1414,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
             Object wfStatusResp = dataMap.get(Constants.STATUS);
             String wfStatusStr = String.valueOf(wfStatusResp).trim().toUpperCase();
             logger.debug("Workflow 'status' inside 'data' for wfId {}: {}", wfId, wfStatusResp);
-            if (Constants.APPROVED_STATE.equalsIgnoreCase(wfStatusStr) || Constants.REJECTED.equalsIgnoreCase(wfStatusStr)) {
+            if (Constants.APPROVED_STATE.equalsIgnoreCase(wfStatusStr) || Constants.REJECTED.equalsIgnoreCase(wfStatusStr) || Constants.SEND_FOR_PC_APPROVAL.equalsIgnoreCase(wfStatusStr) || Constants.SEND_FOR_MDO_APPROVAL.equalsIgnoreCase(wfStatusStr)) {
                 return Constants.UPDATED;
             } else {
                 logger.warn("Unexpected workflow status for wfId {}: {}", wfId, wfStatusResp);
