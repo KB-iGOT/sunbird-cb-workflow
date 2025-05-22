@@ -29,6 +29,7 @@ import org.sunbird.workflow.utils.CassandraOperation;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -316,6 +317,7 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
     private void updateApplicationStatus(WfStatusEntity applicationStatus, WfRequest wfRequest, String nextState,
                                          String userId, String role, WorkFlowModel workFlowModel) throws IOException {
         WfStatus nextWfStatus = getWfStatus(nextState, workFlowModel);
+        Boolean inWorkflow = nextWfStatus.getIsLastState() ? false : true;
 
         applicationStatus.setLastUpdatedOn(new Date());
         applicationStatus.setCurrentStatus(nextState);
@@ -326,7 +328,19 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
         applicationStatus.setComment(wfRequest.getComment());
         addModificationEntry(applicationStatus, userId, wfRequest.getAction(), role);
 
-        wfStatusRepo.save(applicationStatus);
+        WfStatusEntity savedEntity = wfStatusRepo.save(applicationStatus);
+        if (Constants.ORG_TRANSFER_REQUEST.equalsIgnoreCase(applicationStatus.getRequestType())) {
+            logger.info("Entering transfer request handling for userId: {}", applicationStatus.getUserId());
+            List<WfStatusEntity> listEntities = wfStatusRepo.findByUserIdAndCurrentStatus(savedEntity.getUserId(), Constants.SEND_FOR_APPROVAL, Boolean.TRUE);
+            Map<String, WfStatusEntity> entityMap = listEntities.stream()
+                    .collect(Collectors.toMap(WfStatusEntity::getWfId, Function.identity()));
+            Map<String, Object> payload = new HashMap<>();
+            payload.put(Constants.ORG_TRANSFER_STATE, nextState);
+            payload.put(Constants.inWorkflow, inWorkflow);
+            payload.put(Constants.GROUP_DESGINATION_ENTITIES, new ArrayList<>(entityMap.values()));
+            producer.push(configuration.getTransferRequestStatusChangeTopic(), payload);
+            logger.info(" Transfer status change message sent successfully for userId: {}", savedEntity.getUserId());
+        }
     }
 
     private void handleSpecialFields(WfRequest wfRequest) {
