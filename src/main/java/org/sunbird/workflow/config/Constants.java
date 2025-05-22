@@ -402,7 +402,7 @@ public class Constants {
 	public static final String UPDATED = "Updated";
 	public static final String NOT_UPDATED = "Not updated";
 
-
+	public static final String BASIC_PROFILE_KEY = "user:basicProfile:";
 	public static final List<String> USER_DEFAULT_SEARCH_FIELDS = Collections
 			.unmodifiableList(Arrays.asList(PROFILE_DETAILS_PERSONAL_DETAILS_PRIMARY_EMAIL,
 					FIRST_NAME_CAMEL_CASE, PROFILE_DETAILS_PERSONAL_DETAILS_MOBILE));

@@ -1,7 +1,10 @@
 package org.sunbird.workflow.service.impl;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.commons.collections.MapUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -13,6 +16,7 @@ import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import org.sunbird.workflow.config.Configuration;
 import org.sunbird.workflow.config.Constants;
+import org.sunbird.workflow.config.RedisCacheMgr;
 import org.sunbird.workflow.exception.ApplicationException;
 import org.sunbird.workflow.exception.BadRequestException;
 import org.sunbird.workflow.exception.InvalidDataInputException;
@@ -25,7 +29,6 @@ import org.sunbird.workflow.utils.CassandraOperation;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -51,6 +54,9 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
 
     @Autowired
     private Producer producer;
+
+    @Autowired
+    private RedisCacheMgr redisCacheMgr;
 
     @Override
     public Response workflowTransition(String rootOrg, String org, Map<String, Object> requestBody) {
@@ -111,9 +117,9 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
                             }
                             data.add(responseData);
                         }
-                        if (!CollectionUtils.isEmpty(wfRequestsForEvent)) {
-                            pushWorkflowEvents(serviceName, userId, wfRequestsForEvent);
-                        }
+//                        if (!CollectionUtils.isEmpty(wfRequestsForEvent)) {
+//                            pushWorkflowEvents(serviceName, userId, wfRequestsForEvent);
+//                        }
                         logger.info("Completed workflowTransition successfully for userId: {}", userId);
                     }
                     response.put(Constants.MESSAGE, Constants.SUCCESS);
@@ -272,7 +278,6 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
 
             // Update workflow status entity
             updateApplicationStatus(applicationStatus, wfRequest, nextState, userId, role, workFlowModel);
-
             // Handle specific fields if applicable
             handleSpecialFields(wfRequest);
 
@@ -311,29 +316,19 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
     private void updateApplicationStatus(WfStatusEntity applicationStatus, WfRequest wfRequest, String nextState,
                                          String userId, String role, WorkFlowModel workFlowModel) throws IOException {
         WfStatus nextWfStatus = getWfStatus(nextState, workFlowModel);
-        Boolean inWorkflow = nextWfStatus.getIsLastState() ? false : true;
 
         applicationStatus.setLastUpdatedOn(new Date());
         applicationStatus.setCurrentStatus(nextState);
         applicationStatus.setActorUUID(wfRequest.getActorUserId());
         applicationStatus.setUpdateFieldValues(mapper.writeValueAsString(wfRequest.getUpdateFieldValues()));
-        applicationStatus.setInWorkflow(inWorkflow);
+        applicationStatus.setInWorkflow(!nextWfStatus.getIsLastState());
         applicationStatus.setDeptName(wfRequest.getDeptName());
         applicationStatus.setComment(wfRequest.getComment());
         addModificationEntry(applicationStatus, userId, wfRequest.getAction(), role);
 
-       WfStatusEntity savedEntity = wfStatusRepo.save(applicationStatus);
-        if (Constants.ORG_TRANSFER_REQUEST.equalsIgnoreCase(applicationStatus.getRequestType())) {
-            logger.info("Entering transfer request handling for userId: {}", applicationStatus.getUserId());
-            List<WfStatusEntity> listEntities = wfStatusRepo.findByUserIdAndCurrentStatus(savedEntity.getUserId(), Constants.SEND_FOR_APPROVAL, Boolean.TRUE);
-            Map<String, WfStatusEntity> entityMap = listEntities.stream()
-                    .collect(Collectors.toMap(WfStatusEntity::getWfId, Function.identity()));
-            Map<String, Object> payload = new HashMap<>();
-            payload.put(Constants.ORG_TRANSFER_STATE, nextState);
-            payload.put(Constants.inWorkflow, inWorkflow);
-            payload.put(Constants.GROUP_DESGINATION_ENTITIES, new ArrayList<>(entityMap.values()));
-            producer.push(configuration.getTransferRequestStatusChangeTopic(), payload);
-            logger.info(" Transfer status change message sent successfully for userId: {}", savedEntity.getUserId());
+        WfStatusEntity savedEntity = wfStatusRepo.save(applicationStatus);
+        if (savedEntity != null  && Constants.APPROVED.equalsIgnoreCase(savedEntity.getCurrentStatus())) {
+            processAndUpdateProfessionalDetails(savedEntity.getUserId(), savedEntity.getUpdateFieldValues());
         }
     }
 
@@ -523,4 +518,54 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
         }
 
     }
+
+    public void processAndUpdateProfessionalDetails(String userId, String updateFieldValuesJson) {
+        try {
+            JsonNode updateFieldValuesArray = mapper.readTree(updateFieldValuesJson);
+
+            for (JsonNode updateEntry : updateFieldValuesArray) {
+                String fieldKey = updateEntry.get(Constants.FIELD_KEY).asText();
+
+                if (Constants.PROFESSIONAL_DETAILS.equals(fieldKey)) {
+                    JsonNode toValueNode = updateEntry.get(Constants.TO_VALUE);
+
+                    String group = toValueNode.has(Constants.GROUP) ? toValueNode.get(Constants.GROUP).asText() : null;
+                    String designation = toValueNode.has(Constants.DESIGNATION) ? toValueNode.get(Constants.DESIGNATION).asText() : null;
+
+                    updateProfessionalDetailsInCache(userId, group, designation);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error processing update_field_values JSON", e);
+        }
+    }
+
+    public void updateProfessionalDetailsInCache(String userId, String group, String designation) {
+        String key = Constants.BASIC_PROFILE_KEY + userId;
+
+        try  {
+            String cachedData = redisCacheMgr.getContentFromCache(key);
+            if (cachedData != null) {
+                ObjectNode profileNode = (ObjectNode) mapper.readTree(cachedData);
+
+                if (profileNode != null && profileNode.has(Constants.PROFESSIONAL_DETAILS)) {
+                    ArrayNode professionalDetailsArray = (ArrayNode) profileNode.get(Constants.PROFESSIONAL_DETAILS);
+
+                    for (JsonNode profDetail : professionalDetailsArray) {
+                        ObjectNode profDetailObj = (ObjectNode) profDetail;
+                        if (group != null) profDetailObj.put(Constants.GROUP, group);
+                        if (designation != null) profDetailObj.put(Constants.DESIGNATION, designation);
+                    }
+                }
+
+                redisCacheMgr.putInBasicProfileCache(key, mapper.writeValueAsString(profileNode));
+            } else {
+                logger.warn("No cache found for user " + userId);
+            }
+        } catch (Exception e) {
+            logger.error("Error updating professionalDetails in Redis cache", e);
+        }
+    }
+
+
 }
