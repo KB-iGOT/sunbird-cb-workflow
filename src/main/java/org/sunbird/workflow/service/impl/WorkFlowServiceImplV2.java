@@ -326,10 +326,7 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
         applicationStatus.setComment(wfRequest.getComment());
         addModificationEntry(applicationStatus, userId, wfRequest.getAction(), role);
 
-        WfStatusEntity savedEntity = wfStatusRepo.save(applicationStatus);
-        if (savedEntity != null  && Constants.APPROVED.equalsIgnoreCase(savedEntity.getCurrentStatus())) {
-            processAndUpdateProfessionalDetails(savedEntity.getUserId(), savedEntity.getUpdateFieldValues());
-        }
+        wfStatusRepo.save(applicationStatus);
     }
 
     private void handleSpecialFields(WfRequest wfRequest) {
