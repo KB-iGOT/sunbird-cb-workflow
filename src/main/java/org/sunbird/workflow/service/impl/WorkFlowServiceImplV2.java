@@ -117,9 +117,9 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
                             }
                             data.add(responseData);
                         }
-//                        if (!CollectionUtils.isEmpty(wfRequestsForEvent)) {
-//                            pushWorkflowEvents(serviceName, userId, wfRequestsForEvent);
-//                        }
+                        if (!CollectionUtils.isEmpty(wfRequestsForEvent)) {
+                            pushWorkflowEvents(serviceName, userId, wfRequestsForEvent);
+                        }
                         logger.info("Completed workflowTransition successfully for userId: {}", userId);
                     }
                     response.put(Constants.MESSAGE, Constants.SUCCESS);
