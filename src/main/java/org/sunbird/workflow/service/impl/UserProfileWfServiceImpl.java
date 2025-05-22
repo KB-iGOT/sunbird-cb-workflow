@@ -21,6 +21,7 @@ import org.springframework.util.ObjectUtils;
 import org.springframework.web.client.RestTemplate;
 import org.sunbird.workflow.config.Configuration;
 import org.sunbird.workflow.config.Constants;
+import org.sunbird.workflow.config.RedisCacheMgr;
 import org.sunbird.workflow.exception.ApplicationException;
 import org.sunbird.workflow.models.WfRequest;
 import org.sunbird.workflow.postgres.entity.WfStatusEntity;
@@ -63,6 +64,8 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 	@Autowired
 	private WorkflowAuditProcessingServiceImpl workflowAuditProcessingService;
 
+	@Autowired
+	private RedisCacheMgr redisCacheMgr;
 	/**
 	 * Update user profile based on wf request
 	 *
@@ -580,14 +583,14 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 				}
 			}
 			if (isUpdateRequired) {
-				updateUserProfileData(userId, profileDetails, wfRequests);
+				updateUserProfileData(userId, profileDetails, wfRequests, existingUserResponse);
 			}
 		} catch (Exception e) {
 			logger.error("Exception occurred : ", e);
 		}
 	}
 
-	private void updateUserProfileData(String userId, Map<String, Object> profileDetails, List<WfRequest> wfRequests) {
+	private void updateUserProfileData(String userId, Map<String, Object> profileDetails, List<WfRequest> wfRequests, Map<String, Object> userDetails) {
 		try {
 			Map<String, Object> profileUpdateRequest = new HashMap<>();
 			profileUpdateRequest.put(Constants.USER_ID, userId);
@@ -598,12 +601,23 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 
 			Map<String, Object> updateUserApiResp = requestServiceImpl
 					.fetchResultUsingPatch(configuration.getLmsServiceHost() + configuration.getUserProfileUpdateEndPoint(), profileUpdateRequestBody, getHeaders());
+
 			if (updateUserApiResp == null || !Constants.OK.equals(updateUserApiResp.get(Constants.RESPONSE_CODE))) {
 				Map<String, Object> params = (Map<String, Object>) updateUserApiResp.getOrDefault(Constants.PARAMS, Collections.emptyMap());
 				String updateError = (String) params.getOrDefault(Constants.ERROR_MESSAGE, "Unknown error");
 				String errorMessage = "User update failed: " + updateError;
 				logger.error("User update failed: {}", updateError);
 				failedCaseProfileUpdate(wfRequests, errorMessage);
+			} else {
+				logger.info("Caching basic profile data for userId: {}", userId);
+				Map<String, Object> cacheData = new HashMap<>();
+				cacheData.put(Constants.ROOT_ORG_ID, userDetails.getOrDefault(Constants.ROOT_ORG_ID, ""));
+				cacheData.put(Constants.FIRSTNAME, userDetails.getOrDefault(Constants.FIRST_NAME_CAMEL_CASE, ""));
+				cacheData.put(Constants.ID, userDetails.getOrDefault(Constants.ID, ""));
+				cacheData.put(Constants.PROFILE_DETAILS, profileDetails);
+				cacheData.put(Constants.CHANNEL, userDetails.getOrDefault(Constants.CHANNEL, ""));
+				redisCacheMgr.putInBasicProfileCache(Constants.BASIC_PROFILE_KEY+userId, mapper.writeValueAsString(cacheData));
+				logger.info("sucessfully updated user profile for userId: {}", userId);
 			}
 		} catch (Exception e) {
 			logger.error("Error updating user profile for userId: {}", userId, e);
