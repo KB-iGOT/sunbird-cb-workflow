@@ -405,4 +405,5 @@ public class Constants {
 	public static final List<String> USER_DEFAULT_SEARCH_FIELDS = Collections
 			.unmodifiableList(Arrays.asList(PROFILE_DETAILS_PERSONAL_DETAILS_PRIMARY_EMAIL,
 					FIRST_NAME_CAMEL_CASE, PROFILE_DETAILS_PERSONAL_DETAILS_MOBILE));
+	public static final String PROFILE_DETAILS_KEY = "profiledetails";
 }
