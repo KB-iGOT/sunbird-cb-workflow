@@ -612,7 +612,7 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 				logger.info("Caching basic profile data for userId: {}", userId);
 				Map<String, Object> cacheData = new HashMap<>();
 				cacheData.put(Constants.ROOT_ORG_ID, userDetails.getOrDefault(Constants.ROOT_ORG_ID, ""));
-				cacheData.put(Constants.FIRSTNAME, userDetails.getOrDefault(Constants.FIRST_NAME_CAMEL_CASE, ""));
+				cacheData.put(Constants.FIRST_NAME_CAMEL_CASE, userDetails.getOrDefault(Constants.FIRST_NAME_CAMEL_CASE, ""));
 				cacheData.put(Constants.ID, userDetails.getOrDefault(Constants.ID, ""));
 				cacheData.put(Constants.PROFILE_DETAILS_KEY, profileDetails);
 				cacheData.put(Constants.CHANNEL, userDetails.getOrDefault(Constants.CHANNEL, ""));
