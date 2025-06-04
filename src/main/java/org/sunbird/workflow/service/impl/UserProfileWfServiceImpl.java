@@ -614,7 +614,7 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 				cacheData.put(Constants.ROOT_ORG_ID, userDetails.getOrDefault(Constants.ROOT_ORG_ID, ""));
 				cacheData.put(Constants.FIRST_NAME_CAMEL_CASE, userDetails.getOrDefault(Constants.FIRST_NAME_CAMEL_CASE, ""));
 				cacheData.put(Constants.ID, userDetails.getOrDefault(Constants.ID, ""));
-				cacheData.put(Constants.PROFILE_DETAILS_KEY, profileDetails);
+				cacheData.put(Constants.PROFILE_DETAILS, profileDetails);
 				cacheData.put(Constants.CHANNEL, userDetails.getOrDefault(Constants.CHANNEL, ""));
 				cacheData.put(Constants.USERNAME_LOWERCASE, userDetails.getOrDefault(Constants.USER_NAME,""));
 				redisCacheMgr.putInBasicProfileCache(Constants.BASIC_PROFILE_KEY+userId, mapper.writeValueAsString(cacheData));
