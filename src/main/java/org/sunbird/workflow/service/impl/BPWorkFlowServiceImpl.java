@@ -1265,6 +1265,10 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
             return null;
         }
         String action = row.get(Constants.ACTION_APPROVE_REJECT);
+        if (action.trim().isEmpty()) {
+            logger.info("Row {} skipped: 'action' field is empty. Value received: '{}'", rowNumber, action);
+            return Collections.emptyMap();
+        }
         if (!"approve".equalsIgnoreCase(action) && !"reject".equalsIgnoreCase(action)) {
             errors.add("Row " + rowNumber + " has invalid action: " + action);
             return null;
