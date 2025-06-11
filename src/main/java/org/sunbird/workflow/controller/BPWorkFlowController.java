@@ -154,7 +154,7 @@ public class BPWorkFlowController {
 
     @PostMapping(value = "/bulkApprovalDataFromCsv/{contentId}", consumes = "multipart/form-data")
     public ResponseEntity<?> loadApprovalDataFromCsv(
-            @RequestParam(value = "file") MultipartFile file,
+            @RequestParam("file") MultipartFile file,
             @PathVariable String contentId) throws IOException {
         return bPWorkFlowService.loadApprovalDataFromCsv(file, contentId);
     }
