@@ -1256,22 +1256,32 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
             String value = i < tokens.length ? tokens[i].trim() : "";
             row.put(key, value);
         }
-
-        List<String> emptyFields = expectedHeaders.stream()
-                .filter(header -> row.get(header) == null || row.get(header).isEmpty())
-                .collect(Collectors.toList());
-        if (!emptyFields.isEmpty()) {
-            errors.add("Row " + rowNumber + " has empty required fields: " + emptyFields);
+            List<String> otherEmptyFields = expectedHeaders.stream()
+                    .filter(header -> !header.equals(Constants.ACTION_APPROVE_REJECT) &&
+                            (row.get(header) == null || row.get(header).trim().isEmpty()))
+                    .collect(Collectors.toList());
+        String action = row.get(Constants.ACTION_APPROVE_REJECT);
+        if (action == null) {
+            errors.add("Row " + rowNumber + " is missing 'action' field.");
             return null;
         }
-        String action = row.get(Constants.ACTION_APPROVE_REJECT);
         if (action.trim().isEmpty()) {
-            logger.info("Row {} skipped: 'action' field is empty. Value received: '{}'", rowNumber, action);
-            return Collections.emptyMap();
+            if (!otherEmptyFields.isEmpty()) {
+                errors.add("Row " + rowNumber + " has empty required fields: " + otherEmptyFields + " and empty action.");
+                return null;
+            }
+            logger.info("Row {} skipped: 'action' field is empty.", rowNumber);
+            return Collections.emptyMap(); // Skip row silently
         }
+      
         if (!"approve".equalsIgnoreCase(action) && !"reject".equalsIgnoreCase(action)) {
             errors.add("Row " + rowNumber + " has invalid action: " + action);
             return null;
+        }
+
+        if (!otherEmptyFields.isEmpty()) {
+                errors.add("Row " + rowNumber + " has empty required fields: " + otherEmptyFields + ", while action is also empty.");
+                return null;
         }
         return row;
     }
