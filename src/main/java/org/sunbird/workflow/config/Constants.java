@@ -407,5 +407,12 @@ public class Constants {
 					FIRST_NAME_CAMEL_CASE, PROFILE_DETAILS_PERSONAL_DETAILS_MOBILE));
 	public static final String PROFILE_DETAILS_KEY = "profiledetails";
 	public static final String USERNAME_LOWERCASE = "username";
+	public static final String USER_TRANSFER = "USER_TRANSFER";
+	public static final String PROFILE_VERIFICATION = "PROFILE_VERIFICATION";
+	public static final String ALERT = "ALERT";
+	public static final String SUB_CATEGORY = "subCategory";
+	public static final String SUB_TYPE = "subType";
+	public static final String USER_IDS = "userIds";
+
 
 }

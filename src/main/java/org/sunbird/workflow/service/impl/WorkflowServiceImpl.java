@@ -37,11 +37,7 @@ import org.sunbird.workflow.producer.Producer;
 import org.sunbird.workflow.service.StorageService;
 import org.sunbird.workflow.service.UserProfileWfService;
 import org.sunbird.workflow.service.Workflowservice;
-import org.sunbird.workflow.utils.AccessTokenValidator;
-import org.sunbird.workflow.utils.CassandraOperation;
-import org.sunbird.workflow.utils.ElasticsearchServiceManager;
-import org.sunbird.workflow.utils.LRUCache;
-import org.sunbird.workflow.utils.ProjectUtil;
+import org.sunbird.workflow.utils.*;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -99,6 +95,9 @@ public class WorkflowServiceImpl implements Workflowservice {
 	@Autowired
 	ElasticsearchServiceManager eServiceManager;
 
+	@Autowired
+	NotificationTriggerService notificationTriggerService;
+
 	/**
 	 * Change the status of workflow application
 	 *
@@ -142,6 +141,9 @@ public class WorkflowServiceImpl implements Workflowservice {
 			changeStatusResponse = changeStatus(rootOrg, org, wfRequest, userId, role);
 			wfIds.add(changeStatusResponse.get(Constants.WF_ID_CONSTANT));
 			changedStatus = changeStatusResponse.get(Constants.STATUS);
+		}
+		if (wfRequest.getServiceName().equalsIgnoreCase(Constants.PROFILE_SERVICE_NAME)) {
+			sendNotification(wfRequest);
 		}
 		data.put(Constants.STATUS, changedStatus);
 		data.put(Constants.WF_IDS_CONSTANT, wfIds);
@@ -1700,7 +1702,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 	}
 
 	private void addRequestTypeInProfileWF(WfRequest wfRequest){
-		String requestKey = ((Map<String, Object>) wfRequest.getUpdateFieldValues().get(0).get(Constants.TO_VALUE)).keySet().iterator().next();
+			String requestKey = ((Map<String, Object>) wfRequest.getUpdateFieldValues().get(0).get(Constants.TO_VALUE)).keySet().iterator().next();
 		switch (requestKey) {
 			case "group":
 				wfRequest.setRequestType("GROUP_CHANGE");
@@ -1748,5 +1750,83 @@ public class WorkflowServiceImpl implements Workflowservice {
 		}
 
 		return false;
+	}
+
+	private void sendNotification(WfRequest wfRequest) {
+		String requestKey = ((Map<String, Object>) wfRequest.getUpdateFieldValues().get(0).get(Constants.TO_VALUE)).keySet().iterator().next();
+		switch (requestKey) {
+			case "group":
+			case "designation":
+				sendProfileVerificationNotification(wfRequest, wfRequest.getRootOrgId());
+				break;
+			case "name":
+				sendOrgTransferNotification(wfRequest, requestKey);
+				break;
+			default:
+				log.info("No specific notification to send for request key: {}", requestKey);
+		}
+	}
+
+	private void sendOrgTransferNotification(WfRequest wfRequest, String key) {
+		log.info("Sending org transfer notification for user: {}", wfRequest.getUserId());
+		Map<String, Object> toValueMap = (Map<String, Object>) wfRequest.getUpdateFieldValues().get(0).get(Constants.TO_VALUE);
+		String doptName = toValueMap.get(key).toString();
+		List<String> userIds = callUserSearchApiToGetMdoleaderUserId(doptName, "");
+		Map<String, Object> data = new HashMap<>();
+		data.put("id", wfRequest.getUserId());
+		notificationTriggerService.triggerNotification(Constants.USER_TRANSFER, Constants.ALERT,
+				userIds, data);
+	}
+
+	private void sendProfileVerificationNotification(WfRequest wfRequest, String rootOrgId) {
+		log.info("Sending profile verification notification for user: {}", wfRequest.getUserId());
+		List<String> userIds = callUserSearchApiToGetMdoleaderUserId("", rootOrgId);
+		Map<String, Object> data = new HashMap<>();
+		data.put("id", wfRequest.getUserId());
+		notificationTriggerService.triggerNotification(Constants.PROFILE_VERIFICATION, Constants.ALERT,
+				userIds, data);
+	}
+
+	private List<String> callUserSearchApiToGetMdoleaderUserId(String doptName, String rootOrgId) {
+		StringBuilder url = new StringBuilder(configuration.getLmsServiceHost()).append(configuration.getLmsUserSearchEndPoint());
+		Map<String, Object> filters = new HashMap<>();
+		if (!StringUtils.isEmpty(rootOrgId)) {
+			filters.put("rootOrgId", rootOrgId);
+		} else {
+			filters.put("rootOrgName", doptName);
+		}
+		filters.put("status", 1);
+		filters.put("organisations.roles", Collections.singletonList("MDO_LEADER"));
+		List<String> fields = Collections.singletonList("userId");
+		Map<String, Object> requestMap = new HashMap<>();
+		requestMap.put("filters", filters);
+		requestMap.put("fields", fields);
+
+		Map<String, Object> finalRequest = new HashMap<>();
+		finalRequest.put("request", requestMap);
+		HashMap<String, String> headersValue = new HashMap<>();
+		headersValue.put(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+		Object response = requestServiceImpl.fetchResultUsingPost(url, finalRequest, Map.class, headersValue);
+		List<String> userIds = new ArrayList<>();
+		if (response instanceof Map<?, ?> responseMap) {
+			Object resultObj = responseMap.get("result");
+			if (resultObj instanceof Map<?, ?> resultMap) {
+				Object responseObj = resultMap.get("response");
+				if (responseObj instanceof Map<?, ?> responseContent) {
+					Object contentListObj = responseContent.get("content");
+					if (contentListObj instanceof List<?> contentList) {
+						for (Object userObj : contentList) {
+							if (userObj instanceof Map<?, ?> userMap) {
+								Object userId = userMap.get("userId");
+								if (userId instanceof String) {
+									userIds.add((String) userId);
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		return userIds;
 	}
 }
