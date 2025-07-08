@@ -107,14 +107,14 @@ public class WorkflowServiceImpl implements Workflowservice {
 	 * @return
 	 */
 
-	public Response workflowTransition(String rootOrg, String org, WfRequest wfRequest,String userId,String role) {
-		String requestKey=null;
-		String doptName=null;
+	public Response workflowTransition(String rootOrg, String org, WfRequest wfRequest, String userId, String role) {
+		String requestKey = null;
+		String doptName = null;
 		for (Map<String, Object> fieldChange : wfRequest.getUpdateFieldValues()) {
 			Map<String, Object> toValue = (Map<String, Object>) fieldChange.get(Constants.TO_VALUE);
 			if (toValue.containsKey(Constants.NAME)) {
 				requestKey = Constants.NAME;
-				doptName= (String) toValue.get(Constants.NAME);
+				doptName = (String) toValue.get(Constants.NAME);
 				break;
 			} else if (requestKey == null && (toValue.containsKey(Constants.GROUP) || toValue.containsKey(Constants.DESIGNATION))) {
 				requestKey = toValue.containsKey(Constants.GROUP) ? Constants.GROUP : Constants.DESIGNATION;
