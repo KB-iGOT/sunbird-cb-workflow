@@ -142,7 +142,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 			wfIds.add(changeStatusResponse.get(Constants.WF_ID_CONSTANT));
 			changedStatus = changeStatusResponse.get(Constants.STATUS);
 		}
-		if (wfRequest.getServiceName().equalsIgnoreCase(Constants.PROFILE_SERVICE_NAME)) {
+		if (wfRequest.getServiceName().equalsIgnoreCase(Constants.PROFILE_SERVICE_NAME) && !wfRequest.getAction().equalsIgnoreCase("WITHDRAW")) {
 			sendNotification(wfRequest);
 		}
 		data.put(Constants.STATUS, changedStatus);
