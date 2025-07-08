@@ -108,6 +108,18 @@ public class WorkflowServiceImpl implements Workflowservice {
 	 */
 
 	public Response workflowTransition(String rootOrg, String org, WfRequest wfRequest,String userId,String role) {
+		String requestKey=null;
+		String deptName=null;
+		for (Map<String, Object> fieldChange : wfRequest.getUpdateFieldValues()) {
+			Map<String, Object> toValue = (Map<String, Object>) fieldChange.get(Constants.TO_VALUE);
+			if (toValue.containsKey("name")) {
+				requestKey = "name";
+				deptName= (String) toValue.get("name");
+				break;
+			} else if (requestKey == null && (toValue.containsKey("group") || toValue.containsKey("designation"))) {
+				requestKey = toValue.containsKey("group") ? "group" : "designation";
+			}
+		}
 		HashMap<String, String> changeStatusResponse;
 		List<String> wfIds = new ArrayList<>();
 		String changedStatus = null;
@@ -143,7 +155,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 			changedStatus = changeStatusResponse.get(Constants.STATUS);
 		}
 		if (wfRequest.getServiceName().equalsIgnoreCase(Constants.PROFILE_SERVICE_NAME) && !wfRequest.getAction().equalsIgnoreCase(Constants.WITHDRAW)) {
-			sendNotification(wfRequest);
+			sendNotification(requestKey, deptName, wfRequest);
 		}
 		data.put(Constants.STATUS, changedStatus);
 		data.put(Constants.WF_IDS_CONSTANT, wfIds);
@@ -1752,25 +1764,22 @@ public class WorkflowServiceImpl implements Workflowservice {
 		return false;
 	}
 
-	private void sendNotification(WfRequest wfRequest) {
-		String requestKey = ((Map<String, Object>) wfRequest.getUpdateFieldValues().get(0).get(Constants.TO_VALUE)).keySet().iterator().next();
+	private void sendNotification(String requestKey, String deptName, WfRequest wfRequest) {
 		switch (requestKey) {
 			case "group":
 			case "designation":
 				sendProfileVerificationNotification(wfRequest, wfRequest.getRootOrgId());
 				break;
 			case "name":
-				sendOrgTransferNotification(wfRequest, requestKey);
+				sendOrgTransferNotification(wfRequest, deptName);
 				break;
 			default:
 				log.info("No specific notification to send for request key: {}", requestKey);
 		}
 	}
 
-	private void sendOrgTransferNotification(WfRequest wfRequest, String key) {
+	private void sendOrgTransferNotification(WfRequest wfRequest, String doptName) {
 		log.info("Sending org transfer notification for user: {}", wfRequest.getUserId());
-		Map<String, Object> toValueMap = (Map<String, Object>) wfRequest.getUpdateFieldValues().get(0).get(Constants.TO_VALUE);
-		String doptName = toValueMap.get(key).toString();
 		List<String> userIds = callUserSearchApiToGetMdoleaderUserId(doptName, "");
 		Map<String, Object> data = new HashMap<>();
 		data.put("id", wfRequest.getUserId());
