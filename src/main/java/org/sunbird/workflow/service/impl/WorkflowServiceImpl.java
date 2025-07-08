@@ -109,15 +109,15 @@ public class WorkflowServiceImpl implements Workflowservice {
 
 	public Response workflowTransition(String rootOrg, String org, WfRequest wfRequest,String userId,String role) {
 		String requestKey=null;
-		String deptName=null;
+		String doptName=null;
 		for (Map<String, Object> fieldChange : wfRequest.getUpdateFieldValues()) {
 			Map<String, Object> toValue = (Map<String, Object>) fieldChange.get(Constants.TO_VALUE);
-			if (toValue.containsKey("name")) {
-				requestKey = "name";
-				deptName= (String) toValue.get("name");
+			if (toValue.containsKey(Constants.NAME)) {
+				requestKey = Constants.NAME;
+				doptName= (String) toValue.get(Constants.NAME);
 				break;
-			} else if (requestKey == null && (toValue.containsKey("group") || toValue.containsKey("designation"))) {
-				requestKey = toValue.containsKey("group") ? "group" : "designation";
+			} else if (requestKey == null && (toValue.containsKey(Constants.GROUP) || toValue.containsKey(Constants.DESIGNATION))) {
+				requestKey = toValue.containsKey(Constants.GROUP) ? Constants.GROUP : Constants.DESIGNATION;
 			}
 		}
 		HashMap<String, String> changeStatusResponse;
@@ -155,7 +155,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 			changedStatus = changeStatusResponse.get(Constants.STATUS);
 		}
 		if (wfRequest.getServiceName().equalsIgnoreCase(Constants.PROFILE_SERVICE_NAME) && !wfRequest.getAction().equalsIgnoreCase(Constants.WITHDRAW)) {
-			sendNotification(requestKey, deptName, wfRequest);
+			sendNotification(requestKey, doptName, wfRequest);
 		}
 		data.put(Constants.STATUS, changedStatus);
 		data.put(Constants.WF_IDS_CONSTANT, wfIds);
