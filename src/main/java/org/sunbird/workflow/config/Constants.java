@@ -413,6 +413,6 @@ public class Constants {
 	public static final String SUB_CATEGORY = "subCategory";
 	public static final String SUB_TYPE = "subType";
 	public static final String USER_IDS = "userIds";
-
+	public static final String PLACE_HOLDER = "placeholders";
 
 }
