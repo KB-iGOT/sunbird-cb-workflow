@@ -1781,19 +1781,36 @@ public class WorkflowServiceImpl implements Workflowservice {
 	private void sendOrgTransferNotification(WfRequest wfRequest, String doptName) {
 		log.info("Sending org transfer notification for user: {}", wfRequest.getUserId());
 		List<String> userIds = callUserSearchApiToGetMdoleaderUserId(doptName, "");
+		Map<String, Object> userData = userProfileRead(wfRequest.getUserId());
+		Map<String, Object> placeholder = new HashMap<>();
+		if (MapUtils.isNotEmpty(userData)) {
+			placeholder.put(Constants.USER_NAME, userData.get(Constants.USER_NAME));
+			Map<String, Object> profileDetails = (Map<String, Object>) userData.get(Constants.PROFILE_DETAILS);
+			if (MapUtils.isNotEmpty(profileDetails)) {
+				Map<String, Object> employmentDetails = (Map<String, Object>) profileDetails.get(Constants.EMPLOYMENT_DETAILS);
+				if (MapUtils.isNotEmpty(employmentDetails)) {
+					placeholder.put(Constants.DEPARTMENT_NAME, employmentDetails.get(Constants.DEPARTMENT_NAME));
+				}
+			}
+		}
 		Map<String, Object> data = new HashMap<>();
 		data.put("id", wfRequest.getUserId());
 		notificationTriggerService.triggerNotification(Constants.USER_TRANSFER, Constants.ALERT,
-				userIds, data);
+				userIds, data, placeholder);
 	}
 
 	private void sendProfileVerificationNotification(WfRequest wfRequest, String rootOrgId) {
 		log.info("Sending profile verification notification for user: {}", wfRequest.getUserId());
 		List<String> userIds = callUserSearchApiToGetMdoleaderUserId("", rootOrgId);
+		Map<String, Object> userData = userProfileRead(wfRequest.getUserId());
+		Map<String, Object> placeholder = new HashMap<>();
+		if (MapUtils.isNotEmpty(userData)) {
+			placeholder.put(Constants.USER_NAME, userData.get(Constants.USER_NAME));
+		}
 		Map<String, Object> data = new HashMap<>();
 		data.put("id", wfRequest.getUserId());
 		notificationTriggerService.triggerNotification(Constants.PROFILE_VERIFICATION, Constants.ALERT,
-				userIds, data);
+				userIds, data,placeholder);
 	}
 
 	private List<String> callUserSearchApiToGetMdoleaderUserId(String doptName, String rootOrgId) {
@@ -1837,5 +1854,31 @@ public class WorkflowServiceImpl implements Workflowservice {
 			}
 		}
 		return userIds;
+	}
+
+	private Map<String, Object> userProfileRead(String userId) {
+		log.info("WorkflowServiceImpl: userProfileRead for userId: {}", userId);
+		String url = configuration.getLmsServiceHost() +
+				configuration.getUserProfileReadEndPoint().replace(Constants.USER_ID_VALUE, userId);
+		Object response = requestServiceImpl.fetchResultUsingGet(new StringBuilder(url));
+		if (response == null) {
+			return null;
+		}
+		Map<String, Object> readResponse = mapper.convertValue(response, Map.class);
+		Object resultObj = readResponse.get(Constants.RESULT);
+		if (!(resultObj instanceof Map)) {
+			return null;
+		}
+		Map<String, Object> resultMap = (Map<String, Object>) resultObj;
+		if (MapUtils.isEmpty(resultMap)) {
+			log.error("User profile read response is empty for userId: {}", userId);
+			return null;
+		}
+		Object userResponseObj = resultMap.get(Constants.RESPONSE);
+		if (!(userResponseObj instanceof Map)) {
+			log.error("User profile read response is empty for userId: {}", userId);
+			return null;
+		}
+		return (Map<String, Object>) userResponseObj;
 	}
 }
