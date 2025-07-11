@@ -72,10 +72,12 @@ public class NotificationTriggerService {
             String subCategory,
             String subType,
             List<String> userIds,
-            Map<String, Object> data
+            Map<String, Object> data,
+            Map<String, Object> placeHolder
     ) {
         Map<String, Object> message = new HashMap<>();
         message.put(DATA, data);
+        message.put(PLACE_HOLDER, placeHolder);
         log.info("notifications message in triggerNotification:{}", message);
 
         try {
