@@ -1783,12 +1783,12 @@ public class WorkflowServiceImpl implements Workflowservice {
 		List<String> userIds = callUserSearchApiToGetMdoleaderUserId(doptName, "");
 		Map<String, Object> userData = userProfileRead(wfRequest.getUserId());
 		Map<String, Object> placeholder = new HashMap<>();
-		if (userData != null) {
+		if (MapUtils.isNotEmpty(userData)) {
 			placeholder.put(Constants.USER_NAME, userData.get(Constants.USER_NAME));
 			Map<String, Object> profileDetails = (Map<String, Object>) userData.get(Constants.PROFILE_DETAILS);
-			if (profileDetails != null) {
+			if (MapUtils.isNotEmpty(profileDetails)) {
 				Map<String, Object> employmentDetails = (Map<String, Object>) profileDetails.get(Constants.EMPLOYMENT_DETAILS);
-				if (employmentDetails != null) {
+				if (MapUtils.isNotEmpty(employmentDetails)) {
 					placeholder.put(Constants.DEPARTMENT_NAME, employmentDetails.get(Constants.DEPARTMENT_NAME));
 				}
 			}
@@ -1796,7 +1796,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 		Map<String, Object> data = new HashMap<>();
 		data.put("id", wfRequest.getUserId());
 		notificationTriggerService.triggerNotification(Constants.USER_TRANSFER, Constants.ALERT,
-				userIds, data,placeholder);
+				userIds, data, placeholder);
 	}
 
 	private void sendProfileVerificationNotification(WfRequest wfRequest, String rootOrgId) {
@@ -1804,7 +1804,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 		List<String> userIds = callUserSearchApiToGetMdoleaderUserId("", rootOrgId);
 		Map<String, Object> userData = userProfileRead(wfRequest.getUserId());
 		Map<String, Object> placeholder = new HashMap<>();
-		if (userData != null) {
+		if (MapUtils.isNotEmpty(userData)) {
 			placeholder.put(Constants.USER_NAME, userData.get(Constants.USER_NAME));
 		}
 		Map<String, Object> data = new HashMap<>();
@@ -1857,6 +1857,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 	}
 
 	private Map<String, Object> userProfileRead(String userId) {
+		log.info("WorkflowServiceImpl: userProfileRead for userId: {}", userId);
 		String url = configuration.getLmsServiceHost() +
 				configuration.getUserProfileReadEndPoint().replace(Constants.USER_ID_VALUE, userId);
 		Object response = requestServiceImpl.fetchResultUsingGet(new StringBuilder(url));
@@ -1869,8 +1870,13 @@ public class WorkflowServiceImpl implements Workflowservice {
 			return null;
 		}
 		Map<String, Object> resultMap = (Map<String, Object>) resultObj;
+		if(MapUtils.isEmpty(resultMap)){
+			log.error("User profile read response is empty for userId: {}", userId);
+			return null;
+		}
 		Object userResponseObj = resultMap.get(Constants.RESPONSE);
 		if (!(userResponseObj instanceof Map)) {
+			log.error("User profile read response is empty for userId: {}", userId);
 			return null;
 		}
 		return (Map<String, Object>) userResponseObj;
