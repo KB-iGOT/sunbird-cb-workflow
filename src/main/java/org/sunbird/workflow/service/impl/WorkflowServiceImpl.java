@@ -1870,7 +1870,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 			return null;
 		}
 		Map<String, Object> resultMap = (Map<String, Object>) resultObj;
-		if(MapUtils.isEmpty(resultMap)){
+		if (MapUtils.isEmpty(resultMap)) {
 			log.error("User profile read response is empty for userId: {}", userId);
 			return null;
 		}
