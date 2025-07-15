@@ -1795,8 +1795,10 @@ public class WorkflowServiceImpl implements Workflowservice {
 		}
 		Map<String, Object> data = new HashMap<>();
 		data.put("id", wfRequest.getUserId());
-		notificationTriggerService.triggerNotification(Constants.USER_TRANSFER, Constants.ALERT,
-				userIds, data, placeholder);
+		if (!wfRequest.getAction().equalsIgnoreCase(Constants.REJECT)) {
+			notificationTriggerService.triggerNotification(Constants.USER_TRANSFER, Constants.ALERT,
+					userIds, data, placeholder);
+		}
 	}
 
 	private void sendProfileVerificationNotification(WfRequest wfRequest, String rootOrgId) {
