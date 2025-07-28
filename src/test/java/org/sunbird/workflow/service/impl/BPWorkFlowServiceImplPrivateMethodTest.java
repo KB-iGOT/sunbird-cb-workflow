@@ -1,0 +1,512 @@
+package org.sunbird.workflow.service.impl;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.Mock;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.sunbird.workflow.config.Configuration;
+import org.sunbird.workflow.config.Constants;
+import org.sunbird.workflow.exception.InvalidDataInputException;
+import org.sunbird.workflow.models.*;
+import org.sunbird.workflow.postgres.entity.WfStatusEntity;
+import org.sunbird.workflow.postgres.repo.WfStatusRepo;
+import org.sunbird.workflow.producer.Producer;
+
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.*;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.util.ReflectionTestUtils.setField;
+
+class BPWorkFlowServiceImplPrivateMethodTest {
+
+    private BPWorkFlowServiceImpl bpWorkFlowService;
+
+    @Mock
+    WfStatusRepo wfStatusRepo;
+
+    @Mock
+    ObjectMapper mapper;
+
+    @Mock
+    Configuration configuration;
+
+    @Mock
+    Producer producer;
+
+    @Captor
+    private ArgumentCaptor<WfStatusEntity> wfStatusCaptor;
+
+    @BeforeEach
+    void setUp() {
+        bpWorkFlowService = new BPWorkFlowServiceImpl();
+        // Injecting ObjectMapper since it is used in the method
+        try {
+            var mapperField = BPWorkFlowServiceImpl.class.getDeclaredField("mapper");
+            mapperField.setAccessible(true);
+            mapperField.set(bpWorkFlowService, new ObjectMapper());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private String invokeProcessApprovalStatus(Response response, String wfId) throws Exception {
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("processApprovalStatus", Response.class, String.class);
+        method.setAccessible(true);
+        return (String) method.invoke(bpWorkFlowService, response, wfId);
+    }
+
+    @Test
+    void testProcessApprovalStatus_okStatus_returnsUpdated() throws Exception {
+        // Setup
+        BPWorkFlowServiceImpl service = new BPWorkFlowServiceImpl();
+        ObjectMapper mapper = new ObjectMapper();
+        setField(service, "mapper", mapper);
+
+        Response response = mock(Response.class);
+        Map<String, Object> dataMap = new HashMap<>();
+        dataMap.put(Constants.STATUS, "APPROVED");
+
+        Map<String, Object> resultMap = new HashMap<>();
+        resultMap.put(Constants.STATUS, "OK");
+        resultMap.put(Constants.DATA, dataMap);
+
+        when(response.getResult()).thenReturn(resultMap);
+
+        // Invoke private method using reflection
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("processApprovalStatus", Response.class, String.class);
+        method.setAccessible(true);
+        String result = (String) method.invoke(service, response, "wf-123");
+
+        // Assert
+        assertEquals(Constants.UPDATED, result);
+    }
+
+    @Test
+    void testProcessApprovalStatus_InvalidWorkflowStatus() throws Exception {
+        Response response = new Response();
+        Map<String, Object> dataMap = Map.of(Constants.STATUS, "UNKNOWN_STATUS");
+        Map<String, Object> result = Map.of(Constants.STATUS, "OK", Constants.DATA, dataMap);
+        response.put("result",result);
+
+        String resultStr = invokeProcessApprovalStatus(response, "wf5");
+        assertEquals(Constants.NOT_UPDATED, resultStr);
+    }
+
+    @Test
+    void testProcessApprovalStatus_DataNotMap() throws Exception {
+        Response response = new Response();
+        Map<String, Object> result = new HashMap<>();
+        result.put(Constants.STATUS, "OK");
+        result.put(Constants.DATA, "string-instead-of-map");
+        response.put("result",result);
+
+        String resultStr = invokeProcessApprovalStatus(response, "wf6");
+        assertEquals(Constants.NOT_UPDATED, resultStr);
+    }
+
+    @Test
+    void testProcessApprovalStatus_InvalidTopStatus() throws Exception {
+        Response response = new Response();
+        Map<String, Object> result = new HashMap<>();
+        result.put(Constants.STATUS, "500");
+        response.put("result",result);
+
+        String resultStr = invokeProcessApprovalStatus(response, "wf7");
+        assertEquals(Constants.NOT_UPDATED, resultStr);
+    }
+
+    @Test
+    void testProcessApprovalStatus_NullStatus() throws Exception {
+        Response response = new Response();
+        response.put("result",new HashMap<>());
+        String resultStr = invokeProcessApprovalStatus(response, "wf8");
+        assertEquals(Constants.NOT_UPDATED, resultStr);
+    }
+
+    private Map<String, String> invokeProcessDataRow(String line, List<String> headers, int rowNumber, List<String> errors) throws Exception {
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod(
+                "processDataRow", String.class, List.class, int.class, List.class);
+        method.setAccessible(true);
+        return (Map<String, String>) method.invoke(bpWorkFlowService, line, headers, rowNumber, errors);
+    }
+
+    @Test
+    void testReturnNullDueToIncompleteRow() throws Exception {
+        List<String> headers = List.of("name", "email", "action");
+        List<String> errors = new ArrayList<>();
+        String line = "John";  // only 1 column
+
+        Map<String, String> result = invokeProcessDataRow(line, headers, 1, errors);
+
+        assertNull(result);
+        assertEquals(1, errors.size());
+        assertTrue(errors.get(0).contains("incomplete"));
+    }
+
+    @Test
+    void testReturnNullDueToMissingActionField() throws Exception {
+        List<String> headers = List.of("name", "email", "action");
+        List<String> errors = new ArrayList<>();
+        String line = "John,john@example.com,"; // empty action
+
+        Map<String, String> result = invokeProcessDataRow(line, headers, 2, errors);
+
+        assertNull(result);
+        assertEquals(1, errors.size());
+    }
+
+    @Test
+    void testReturnNullDueToInvalidAction() throws Exception {
+        List<String> headers = List.of("name", "email", "action");
+        List<String> errors = new ArrayList<>();
+        String line = "John,john@example.com,INVALID_ACTION";
+
+        Map<String, String> result = invokeProcessDataRow(line, headers, 3, errors);
+
+        assertNull(result);
+        assertEquals(1, errors.size());
+    }
+
+    @Test
+    void testReturnNullDueToMissingActionKey() throws Exception {
+        List<String> headers = List.of("name", "email", "not_action");
+        List<String> errors = new ArrayList<>();
+        String line = "John,john@example.com,dummy";
+
+        Map<String, String> result = invokeProcessDataRow(line, headers, 4, errors);
+
+        assertNull(result);
+        assertEquals(1, errors.size());
+        assertTrue(errors.get(0).contains("missing 'action' field"));
+    }
+
+    @Test
+    void testReturnNullDueToEmptyFieldsAndEmptyAction() throws Exception {
+        List<String> headers = List.of("name", "email", "action");
+        List<String> errors = new ArrayList<>();
+        String line = ",,";
+
+        Map<String, String> result = invokeProcessDataRow(line, headers, 5, errors);
+
+        assertNull(result);
+        assertEquals(1, errors.size());
+    }
+
+@Test
+void testValidateWfRequestMultilevelEnrol_stateMissing() {
+    WfRequest request = new WfRequest();
+    request.setApplicationId("appId");
+    request.setActorUserId("actorId");
+    request.setUserId("userId");
+
+    Map<String, Object> toValue = new HashMap<>();
+    toValue.put("key", "val");
+
+    HashMap<String, Object> updateField = new HashMap<>();
+    updateField.put(Constants.TO_VALUE, toValue);
+
+    List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
+    updateFieldValues.add(updateField);
+    request.setUpdateFieldValues(updateFieldValues);
+    InvalidDataInputException ex = assertThrows(InvalidDataInputException.class, () ->
+            ReflectionTestUtils.invokeMethod(bpWorkFlowService, "validateWfRequestMultilevelEnrol", request));
+
+    assertEquals(Constants.STATE_VALIDATION_ERROR, ex.getMessage());
+}
+
+    @Test
+    void testValidateWfRequestMultilevelEnrol_applicationIdMissing() {
+        WfRequest request = new WfRequest();
+        request.setState("state");
+        request.setActorUserId("actorId");
+        request.setUserId("userId");
+
+        Map<String, Object> toValue = new HashMap<>();
+        toValue.put("key", "val");
+
+        HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.TO_VALUE, toValue);
+
+        List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
+        updateFieldValues.add(updateField);
+        request.setUpdateFieldValues(updateFieldValues);
+        InvalidDataInputException ex = assertThrows(InvalidDataInputException.class, () ->
+                ReflectionTestUtils.invokeMethod(bpWorkFlowService, "validateWfRequestMultilevelEnrol", request));
+
+        assertEquals(Constants.APPLICATION_ID_VALIDATION_ERROR, ex.getMessage());
+    }
+
+    @Test
+    void testValidateWfRequestMultilevelEnrol_actorUserIdMissing() {
+        WfRequest request = new WfRequest();
+        request.setState("state");
+        request.setApplicationId("appId");
+        request.setUserId("userId");
+
+        Map<String, Object> toValue = new HashMap<>();
+        toValue.put("key", "val");
+
+        HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.TO_VALUE, toValue);
+
+        List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
+        updateFieldValues.add(updateField);
+        request.setUpdateFieldValues(updateFieldValues);
+        InvalidDataInputException ex = assertThrows(InvalidDataInputException.class, () ->
+                ReflectionTestUtils.invokeMethod(bpWorkFlowService, "validateWfRequestMultilevelEnrol", request));
+
+        assertEquals(Constants.ACTOR_UUID_VALIDATION_ERROR, ex.getMessage());
+    }
+
+    @Test
+    void testValidateWfRequestMultilevelEnrol_userIdMissing() {
+        WfRequest request = new WfRequest();
+        request.setState("state");
+        request.setApplicationId("appId");
+        request.setActorUserId("actorId");
+        Map<String, Object> toValue = new HashMap<>();
+        toValue.put("key", "val");
+
+        HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.TO_VALUE, toValue);
+
+        List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
+        updateFieldValues.add(updateField);
+        request.setUpdateFieldValues(updateFieldValues);
+        InvalidDataInputException ex = assertThrows(InvalidDataInputException.class, () ->
+                ReflectionTestUtils.invokeMethod(bpWorkFlowService, "validateWfRequestMultilevelEnrol", request));
+
+        assertEquals(Constants.USER_UUID_VALIDATION_ERROR, ex.getMessage());
+    }
+
+    @Test
+    void testValidateWfRequestMultilevelEnrol_updateFieldValuesMissing() {
+        WfRequest request = new WfRequest();
+        request.setState("state");
+        request.setApplicationId("appId");
+        request.setActorUserId("actorId");
+        request.setUserId("userId");
+        request.setUpdateFieldValues(null);
+
+        InvalidDataInputException ex = assertThrows(InvalidDataInputException.class, () ->
+                ReflectionTestUtils.invokeMethod(bpWorkFlowService, "validateWfRequestMultilevelEnrol", request));
+
+        assertEquals(Constants.FIELD_VALUE_VALIDATION_ERROR, ex.getMessage());
+    }
+
+    @Test
+    void testValidateWfRequestMultilevelEnrol_validRequest_noException() {
+        WfRequest request = new WfRequest();
+        request.setState("state");
+        request.setApplicationId("appId");
+        request.setActorUserId("actorId");
+        request.setUserId("userId");
+
+        Map<String, Object> toValue = new HashMap<>();
+        toValue.put("key", "val");
+
+        HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.TO_VALUE, toValue);
+
+        List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
+        updateFieldValues.add(updateField);
+        request.setUpdateFieldValues(updateFieldValues);
+        assertDoesNotThrow(() ->
+                ReflectionTestUtils.invokeMethod(bpWorkFlowService, "validateWfRequestMultilevelEnrol", request));
+    }
+
+    @Test
+    void testGetWfAction_validAction_shouldReturnAction() throws Exception {
+        WfAction action1 = new WfAction();
+        action1.setAction("approve");
+        WfStatus wfStatus = new WfStatus();
+        wfStatus.setActions(Arrays.asList(action1));
+
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("getWfAction", String.class, WfStatus.class);
+        method.setAccessible(true);
+        WfAction result = (WfAction) method.invoke(bpWorkFlowService, "approve", wfStatus);
+
+        assertNotNull(result);
+        assertEquals("approve", result.getAction());
+    }
+
+    @Test
+    void testGetWfStatus_validState_shouldReturnStatus() throws Exception {
+        WfStatus status1 = new WfStatus();
+        status1.setState("initiated");
+        WorkFlowModel model = new WorkFlowModel();
+        model.setWfstates(List.of(status1));
+
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("getWfStatus", String.class, WorkFlowModel.class);
+        method.setAccessible(true);
+
+        WfStatus result = (WfStatus) method.invoke(bpWorkFlowService, "initiated", model);
+
+        assertNotNull(result);
+        assertEquals("initiated", result.getState());
+    }
+
+    @Test
+    void testValidateWfRequest_shouldThrowForMissingState() throws Exception {
+        WfRequest request = new WfRequest();
+        invokeValidateWfRequest(request, null);
+    }
+
+    @Test
+    void testValidateWfRequest_shouldThrowForMissingApplicationId() throws Exception {
+        WfRequest request = new WfRequest();
+        request.setState("ACTIVE");
+        invokeValidateWfRequest(request, null);
+    }
+
+    @Test
+    void testValidateWfRequest_shouldThrowForMissingActorUserId() throws Exception {
+        WfRequest request = new WfRequest();
+        request.setState("ACTIVE");
+        request.setApplicationId("app123");
+        invokeValidateWfRequest(request, null);
+    }
+
+    @Test
+    void testValidateWfRequest_shouldThrowForMissingUserId() throws Exception {
+        WfRequest request = new WfRequest();
+        request.setState("ACTIVE");
+        request.setApplicationId("app123");
+        request.setActorUserId("actor123");
+        invokeValidateWfRequest(request, null);
+    }
+
+    @Test
+    void testValidateWfRequest_shouldThrowForEmptyFieldValues() throws Exception {
+        WfRequest request = new WfRequest();
+        request.setState("ACTIVE");
+        request.setApplicationId("app123");
+        request.setActorUserId("actor123");
+        request.setUserId("user123");
+        request.setUpdateFieldValues(Collections.emptyList());
+        invokeValidateWfRequest(request, null);
+    }
+
+    @Test
+    void testValidateWfRequest_shouldThrowForMissingServiceName() throws Exception {
+        WfRequest request = new WfRequest();
+        request.setState("ACTIVE");
+        request.setApplicationId("app123");
+        request.setActorUserId("actor123");
+        request.setUserId("user123");
+        Map<String, Object> toValue = new HashMap<>();
+        toValue.put("key", "val");
+
+        HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.TO_VALUE, toValue);
+
+        List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
+        updateFieldValues.add(updateField);
+        request.setUpdateFieldValues(updateFieldValues);
+        invokeValidateWfRequest(request, null);
+    }
+
+    @Test
+    void testValidateWfRequest_success_1() throws Exception {
+        WfRequest request = new WfRequest();
+        request.setState("ACTIVE");
+        request.setApplicationId("app123");
+        request.setActorUserId("actor123");
+        request.setUserId("user123");
+        Map<String, Object> toValue = new HashMap<>();
+        toValue.put("key", "val");
+
+        HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.TO_VALUE, toValue);
+
+        List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
+        updateFieldValues.add(updateField);
+        request.setUpdateFieldValues(updateFieldValues);
+        request.setServiceName("testService");
+
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("validateWfRequest", WfRequest.class);
+        method.setAccessible(true);
+
+        // Should not throw
+        method.invoke(bpWorkFlowService, request);
+    }
+
+    private void invokeValidateWfRequest(WfRequest request, String expectedErrorMessage) throws Exception {
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("validateWfRequest", WfRequest.class);
+        method.setAccessible(true);
+
+        InvocationTargetException ex = assertThrows(InvocationTargetException.class, () -> {
+            method.invoke(bpWorkFlowService, request);
+        });
+
+        assertEquals(expectedErrorMessage, ex.getMessage());
+    }
+
+    @Test
+    void testSaveAdminEnrollUserIntoWfStatus() throws Exception {
+        // Create instance of class under test
+        BPWorkFlowServiceImpl service = new BPWorkFlowServiceImpl();
+
+        // Mock dependencies
+        WfStatusRepo wfStatusRepo = mock(WfStatusRepo.class);
+        ObjectMapper mapper = mock(ObjectMapper.class);
+        Configuration configuration = mock(Configuration.class);
+
+        // Inject mocks via reflection
+        setPrivateField(service, "wfStatusRepo", wfStatusRepo);
+        setPrivateField(service, "mapper", mapper);
+        setPrivateField(service, "configuration", configuration);
+
+        // Prepare test data
+        String rootOrg = "rootOrg";
+        String org = "org";
+        WfRequest request = new WfRequest();
+        request.setApplicationId("appId");
+        request.setUserId("userId");
+        request.setActorUserId("actorId");
+        request.setState("state");
+        request.setServiceName("test-service");
+        Map<String, Object> toValue = new HashMap<>();
+        toValue.put("key", "val");
+
+        HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.TO_VALUE, toValue);
+
+        List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
+        updateFieldValues.add(updateField);
+        request.setUpdateFieldValues(updateFieldValues);
+        request.setNominatedByMdo(true);
+        request.setDeptName("HR");
+        request.setComment("comment");
+
+        when(mapper.writeValueAsString(any())).thenReturn("{\"field\":\"value\"}");
+
+        // Invoke private method using reflection
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("saveAdminEnrollUserIntoWfStatus", String.class, String.class, WfRequest.class);
+        method.setAccessible(true);
+
+        Response response = (Response) method.invoke(service, rootOrg, org, request);
+
+        // Assert response content
+        assertEquals("Application status changed to ADMIN_ENROLL_IS_IN_PROGRESS", response.get("message"));
+        assertEquals(200, ((org.springframework.http.HttpStatus) response.get("status")).value());
+        assertNotNull(((Map<String, Object>) response.get("data")).get("wfIds"));
+        assertEquals("ADMIN_ENROLL_IS_IN_PROGRESS", ((Map<String, Object>) response.get("data")).get("status"));
+
+        // Verify save was called
+        verify(wfStatusRepo, times(1)).save(any(WfStatusEntity.class));
+    }
+
+    // Utility to inject private field via reflection
+    private void setPrivateField(Object target, String fieldName, Object value) throws Exception {
+        var field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.set(target, value);
+    }
+}
