@@ -210,6 +210,33 @@ class ElasticsearchServiceManagerTest {
     }
 
     @Test
+    void testUpdateWfRequest_append_false_withUpdated() throws IOException {
+        when(client.update(any(UpdateRequest.class), eq(RequestOptions.DEFAULT))).thenReturn(updateResponse);
+        when(updateResponse.getResult()).thenReturn(DocWriteResponse.Result.UPDATED);
+
+        boolean result = service.updateWfRequest("user123", "uuid123", false);
+        assertTrue(result);
+    }
+
+    @Test
+    void testUpdateWfRequest_append_false_withNoop() throws IOException {
+        when(client.update(any(UpdateRequest.class), eq(RequestOptions.DEFAULT))).thenReturn(updateResponse);
+        when(updateResponse.getResult()).thenReturn(DocWriteResponse.Result.NOOP);
+
+        boolean result = service.updateWfRequest("user123", "uuid123", false);
+        assertTrue(result);
+    }
+
+    @Test
+    void testUpdateWfRequest_append_false_withNotFound() throws IOException {
+        when(client.update(any(UpdateRequest.class), eq(RequestOptions.DEFAULT))).thenReturn(updateResponse);
+        when(updateResponse.getResult()).thenReturn(DocWriteResponse.Result.NOT_FOUND);
+
+        boolean result = service.updateWfRequest("user123", "uuid123", false);
+        assertTrue(result);
+    }
+
+    @Test
     void testUpdateWfRequest_exception() throws IOException {
         when(client.update(any(UpdateRequest.class), eq(RequestOptions.DEFAULT))).thenThrow(IOException.class);
 
@@ -226,6 +253,23 @@ class ElasticsearchServiceManagerTest {
         assertTrue(result);
     }
 
+    @Test
+    void testUpdateWfRequestObject_append_true_Created() throws IOException {
+        when(client.update(any(UpdateRequest.class), eq(RequestOptions.DEFAULT))).thenReturn(updateResponse);
+        when(updateResponse.getResult()).thenReturn(DocWriteResponse.Result.CREATED);
+
+        boolean result = service.updateWfRequestObject("wf1", "user1", "dept1", "attr1", true);
+        assertTrue(result);
+    }
+
+    @Test
+    void testUpdateWfRequestObject_append_true_Default() throws IOException {
+        when(client.update(any(UpdateRequest.class), eq(RequestOptions.DEFAULT))).thenReturn(updateResponse);
+        when(updateResponse.getResult()).thenReturn(DocWriteResponse.Result.NOT_FOUND);
+
+        boolean result = service.updateWfRequestObject("wf1", "user1", "dept1", "attr1", true);
+        assertTrue(result);
+    }
     @Test
     void testUpdateWfRequestObject_append_false() throws IOException {
         when(client.update(any(UpdateRequest.class), eq(RequestOptions.DEFAULT))).thenReturn(updateResponse);

@@ -351,6 +351,18 @@ class UserProfileWfServiceImplTest {
     }
 
     @Test
+    void testGetMdoAdminAndPCDetails_nullResponse() {
+
+        when(configuration.getLmsServiceHost()).thenReturn("host");
+        when(configuration.getLmsUserSearchEndPoint()).thenReturn("/search");
+        when(configuration.getMdoAdminSearchFields()).thenReturn(List.of("field"));        when(requestServiceImpl.fetchResultUsingPost(any(), any(), any(), any(HashMap.class))).thenReturn(null);
+
+        List<String> result = userProfileWfServiceImpl.getMdoAdminAndPCDetails("rootOrgId", List.of("role"));
+        assertTrue(result.isEmpty());
+    }
+
+
+    @Test
     void getVerifiedProfileSchema_shouldReturnNullIfDataIsNull() {
         when(requestServiceImpl.fetchResultUsingGet(any())).thenReturn(null);
         when(configuration.getLmsServiceHost()).thenReturn("host");
@@ -674,4 +686,216 @@ class UserProfileWfServiceImplTest {
         method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, userDetails);
     }
 
+    @Test
+    void testGetMdoAdminAndPCDetails_successWithEmptyContent() {
+        String rootOrgId = "org2";
+        List<String> roles = List.of("Admin");
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("content", Collections.emptyList());
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("response", response);
+
+        Map<String, Object> mdoAdminSearchResult = new HashMap<>();
+        mdoAdminSearchResult.put("responseCode", "OK");
+        mdoAdminSearchResult.put("result", result);
+
+        when(configuration.getLmsServiceHost()).thenReturn("http://dummy-host");
+        when(configuration.getLmsUserSearchEndPoint()).thenReturn("/search");
+        when(configuration.getMdoAdminSearchFields()).thenReturn(List.of("email"));
+
+        when(requestServiceImpl.fetchResultUsingPost(any(), any(), eq(Map.class), any()))
+                .thenReturn(mdoAdminSearchResult);
+
+        List<String> resultEmails = userProfileWfServiceImpl.getMdoAdminAndPCDetails(rootOrgId, roles);
+
+        assertTrue(resultEmails.isEmpty());
+    }
+
+    @Test
+    void testGetMdoAdminAndPCDetails_successWithNullSearchResult() {
+        String rootOrgId = "org3";
+        List<String> roles = List.of("Admin");
+
+        when(configuration.getLmsServiceHost()).thenReturn("http://dummy-host");
+        when(configuration.getLmsUserSearchEndPoint()).thenReturn("/search");
+        when(configuration.getMdoAdminSearchFields()).thenReturn(List.of("email"));
+
+        when(requestServiceImpl.fetchResultUsingPost(any(), any(), eq(Map.class), any()))
+                .thenReturn(null);
+
+        List<String> resultEmails = userProfileWfServiceImpl.getMdoAdminAndPCDetails(rootOrgId, roles);
+
+        assertTrue(resultEmails.isEmpty());
+    }
+
+    @Test
+    void testGetMdoAdminAndPCDetails_invalidResponseCode() {
+        String rootOrgId = "org4";
+        List<String> roles = List.of("PC");
+
+        Map<String, Object> mdoAdminSearchResult = new HashMap<>();
+        mdoAdminSearchResult.put("responseCode", "FAILURE");
+
+        when(configuration.getLmsServiceHost()).thenReturn("http://dummy-host");
+        when(configuration.getLmsUserSearchEndPoint()).thenReturn("/search");
+        when(configuration.getMdoAdminSearchFields()).thenReturn(List.of("email"));
+
+        when(requestServiceImpl.fetchResultUsingPost(any(), any(), eq(Map.class), any()))
+                .thenReturn(mdoAdminSearchResult);
+
+        List<String> resultEmails = userProfileWfServiceImpl.getMdoAdminAndPCDetails(rootOrgId, roles);
+
+        assertTrue(resultEmails.isEmpty());
+    }
+
+    @Test
+    void testGetMdoAdminAndPCDetails_missingNestedFields() {
+        String rootOrgId = "org5";
+        List<String> roles = List.of("MDO");
+
+        Map<String, Object> content = new HashMap<>();
+        // No profileDetails present
+
+        List<Map<String, Object>> contents = List.of(content);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("content", contents);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("response", response);
+
+        Map<String, Object> mdoAdminSearchResult = new HashMap<>();
+        mdoAdminSearchResult.put("responseCode", "OK");
+        mdoAdminSearchResult.put("result", result);
+
+        when(configuration.getLmsServiceHost()).thenReturn("http://dummy-host");
+        when(configuration.getLmsUserSearchEndPoint()).thenReturn("/search");
+        when(configuration.getMdoAdminSearchFields()).thenReturn(List.of("email"));
+
+        when(requestServiceImpl.fetchResultUsingPost(any(), any(), eq(Map.class), any()))
+                .thenReturn(mdoAdminSearchResult);
+
+        List<String> resultEmails = userProfileWfServiceImpl.getMdoAdminAndPCDetails(rootOrgId, roles);
+
+        assertTrue(resultEmails.isEmpty());
+    }
+
+    @Test
+    void testUpdateRequestWithWF_ArrayListMatch() {
+        String uuid = "123";
+
+        Map<String, Object> existingProfileDetail = new HashMap<>();
+        List<Map<String, Object>> fieldData = new ArrayList<>();
+        Map<String, Object> item = new HashMap<>();
+        item.put("osid", "osid-1");
+        item.put("key1", "value1");
+        fieldData.add(item);
+
+        existingProfileDetail.put("fieldKey1", fieldData);
+
+        HashMap<String, Object> wfObj = new HashMap<>();
+        wfObj.put("osid", "osid-1");
+        wfObj.put("fieldKey", "fieldKey1");
+        wfObj.put("toValue", Map.of("key2", "value2"));
+
+        List<HashMap<String, Object>> wfList = List.of(wfObj);
+
+        when(mapper.convertValue(eq(fieldData), eq(ArrayList.class))).thenReturn((ArrayList) fieldData);
+
+        Map<String, Object> result = userProfileWfServiceImpl.updateRequestWithWF(uuid, wfList, existingProfileDetail);
+
+        assertNotNull(result);
+        assertTrue(((List<Map<String, Object>>) result.get("fieldKey1")).get(0).containsKey("key1"));
+        assertTrue(((List<Map<String, Object>>) result.get("fieldKey1")).get(0).containsKey("key2"));
+    }
+
+    @Test
+    void testUpdateRequestWithWF_HashMap() {
+        Map<String, Object> existingProfileDetail = new HashMap<>();
+        Map<String, Object> mapData = new HashMap<>();
+        mapData.put("existingKey", "existingValue");
+        existingProfileDetail.put("fieldKey2", mapData);
+
+        HashMap<String, Object> wfObj = new HashMap<>();
+        wfObj.put("fieldKey", "fieldKey2");
+        wfObj.put("toValue", Map.of("keyX", "valX"));
+
+        List<HashMap<String, Object>> wfList = List.of(wfObj);
+
+        when(mapper.convertValue(eq(mapData), eq(Map.class))).thenReturn(mapData);
+
+        Map<String, Object> result = userProfileWfServiceImpl.updateRequestWithWF("uuid", wfList, existingProfileDetail);
+
+        assertNotNull(result);
+        assertTrue(((Map<String, Object>) result.get("fieldKey2")).containsKey("existingKey"));
+        assertTrue(((Map<String, Object>) result.get("fieldKey2")).containsKey("keyX"));
+    }
+
+    @Test
+    void testUpdateRequestWithWF_BooleanField() {
+        Map<String, Object> existingProfileDetail = new HashMap<>();
+        existingProfileDetail.put("verifiedKarmayogi", Boolean.FALSE);
+
+        Map<String, Object> toValue = Map.of("verifiedKarmayogi", Boolean.TRUE);
+        HashMap<String, Object> wfObj = new HashMap<>();
+        wfObj.put("fieldKey", "verifiedKarmayogi");
+        wfObj.put("toValue", toValue);
+
+        List<HashMap<String, Object>> wfList = List.of(wfObj);
+
+        Map<String, Object> result = userProfileWfServiceImpl.updateRequestWithWF("uuid", wfList, existingProfileDetail);
+
+        assertEquals(Boolean.TRUE, result.get("verifiedKarmayogi"));
+    }
+
+    @Test
+    void testUpdateRequestWithWF_NullField_VerifiedKarmayogi() {
+        Map<String, Object> existingProfileDetail = new HashMap<>();
+
+        Map<String, Object> toValue = Map.of("verifiedKarmayogi", Boolean.TRUE);
+        HashMap<String, Object> wfObj = new HashMap<>();
+        wfObj.put("fieldKey", "verifiedKarmayogi");
+        wfObj.put("toValue", toValue);
+
+        List<HashMap<String, Object>> wfList = List.of(wfObj);
+
+        Map<String, Object> result = userProfileWfServiceImpl.updateRequestWithWF("uuid", wfList, existingProfileDetail);
+
+        assertEquals(Boolean.TRUE, result.get("verifiedKarmayogi"));
+    }
+
+    @Test
+    void testUpdateRequestWithWF_NullField_ProfessionalDetails() {
+        Map<String, Object> existingProfileDetail = new HashMap<>();
+
+        Map<String, Object> profDetail = Map.of("designation", "Engineer");
+        HashMap<String, Object> wfObj = new HashMap<>();
+        wfObj.put("fieldKey", "professionalDetails");
+        wfObj.put("toValue", profDetail);
+
+        List<HashMap<String, Object>> wfList = List.of(wfObj);
+
+        Map<String, Object> result = userProfileWfServiceImpl.updateRequestWithWF("uuid", wfList, existingProfileDetail);
+
+        List<Map<String, Object>> profList = (List<Map<String, Object>>) result.get("professionalDetails");
+        assertNotNull(profList);
+        assertEquals("Engineer", profList.get(0).get("designation"));
+    }
+
+    @Test
+    void testUpdateRequestWithWF_NullField_UnknownKey() {
+        Map<String, Object> existingProfileDetail = new HashMap<>();
+
+        HashMap<String, Object> wfObj = new HashMap<>();
+        wfObj.put("fieldKey", "someUnknownField");
+        wfObj.put("toValue", Map.of("val", 1));
+
+        List<HashMap<String, Object>> wfList = List.of(wfObj);
+
+        Map<String, Object> result = userProfileWfServiceImpl.updateRequestWithWF("uuid", wfList, existingProfileDetail);
+
+        assertNull(result); // logs error and returns null
+    }
 }
