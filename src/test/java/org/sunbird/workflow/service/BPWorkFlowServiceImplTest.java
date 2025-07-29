@@ -285,6 +285,70 @@ class BPWorkFlowServiceImplTest {
     }
 
     @Test
+    void enrolBPWorkFlow_success_1() throws Exception {
+        wfRequest = getRequest();
+
+        Map<String, Object> courseBatchDetails = new HashMap<>();
+        courseBatchDetails.put(Constants.CURRENT_BATCH_SIZE, 50);
+        courseBatchDetails.put(Constants.BATCH_NAME, "Batch Name");
+        courseBatchDetails.put(Constants.START_DATE, new Date());
+
+        when(contentReadService.getServiceNameDetails(any())).thenReturn("");
+        when(wfStatusRepo.findByApplicationId(any())).thenReturn(new ArrayList<>());
+        when(configuration.getBpBatchEnrolLimitBufferSize()).thenReturn(20);
+        when(mapper.writeValueAsString(any())).thenReturn("updateFieldValue");
+        when(configuration.getWorkflowApplicationTopic()).thenReturn("wf-topic");
+
+        // Set up enrolment batch lookup response
+        when(cassandraOperation.getRecordsByProperties(
+                eq(Constants.KEYSPACE_SUNBIRD_COURSES),
+                eq(Constants.TABLE_ENROLMENT_BATCH_LOOKUP),
+                anyMap(),
+                anyList()))
+                .thenReturn(List.of(Map.of("active", true)));
+
+        // Set up user enrolment details and course batch details (no conflict)
+        when(cassandraOperation.getRecordsByProperties(
+                eq(Constants.KEYSPACE_SUNBIRD_COURSES),
+                eq(Constants.USER_ENROLMENTS),
+                anyMap(),
+                anyList()))
+                .thenReturn(List.of(Map.of(
+                        Constants.COURSE_ID, "course1",
+                        Constants.BATCH_ID, "batch1",
+                        Constants.ACTIVE, true
+                )));
+        Map<String, Object> batchAttributesMap = new HashMap<>();
+        batchAttributesMap.put(Constants.CURRENT_BATCH_SIZE, "50");
+
+        ObjectMapper mapperNew = new ObjectMapper();
+        String batchAttributesJson = mapperNew.writeValueAsString(batchAttributesMap);
+
+        // Prepare courseBatch map
+        Map<String, Object> courseBatch = new HashMap<>();
+        courseBatch.put(Constants.BATCH_ATTRIBUTES, batchAttributesJson);
+        courseBatch.put(Constants.ENROLMENT_END_DATE, Instant.now());
+        courseBatch.put(Constants.START_DATE, Instant.now());
+        courseBatch.put(Constants.NAME, "Test Batch");
+
+        // Cassandra mock response
+        List<Map<String, Object>> mockResponseMap = Collections.singletonList(courseBatch);
+
+        when(cassandraOperation.getRecordsByProperties(
+                eq(Constants.KEYSPACE_SUNBIRD_COURSES),
+                eq(Constants.TABLE_COURSE_BATCH),
+                anyMap(),
+                anyList()
+        )).thenReturn(mockResponseMap);
+
+        Response response = bpWorkFlowService.enrolBPWorkFlow("rootOrg", "org", wfRequest);
+
+        assertEquals(HttpStatus.OK, response.get(Constants.STATUS));
+        assertEquals("Application status changed to ENROLL_IS_IN_PROGRESS", response.get(Constants.MESSAGE));
+        verify(producer).push(eq("wf-topic"), any());
+    }
+
+    @Test
     void enrolBPWorkFlow_shouldReturnBadRequest_ifBatchIsFull() {
         wfRequest = getRequest();
         // Empty course batch details to simulate batch full
@@ -320,6 +384,30 @@ class BPWorkFlowServiceImplTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, response.get(Constants.STATUS));
         assertEquals("Batch already started", response.get(Constants.ERROR_MESSAGE));
+    }
+
+    @Test
+    void testUpdateBPWorkFlowBatchSizeError() {
+        wfRequest = new WfRequest();
+        wfRequest.setApplicationId("batch123");
+        wfRequest.setCourseId("course456");
+        wfRequest.setAction("ENROLL");
+        wfRequest.setUserId("user-1");
+        wfRequest.setAction("ACTION"); // Not in exclude states
+
+        Map<String, Object> courseBatch = new HashMap<>();
+        courseBatch.put(Constants.BATCH_ATTRIBUTES, "{\"currentBatch\":\"10\"}");
+        courseBatch.put(Constants.START_DATE, Instant.now().plus(1, ChronoUnit.DAYS));
+        courseBatch.put(Constants.NAME, "Batch A");
+
+        when(configuration.getBpBatchFullValidationExcludeStates()).thenReturn(Collections.singletonList("NONE"));
+        when(cassandraOperation.getRecordsByProperties(
+                anyString(), anyString(), anyMap(), anyList()
+        )).thenReturn(List.of(courseBatch));
+
+        Response response = bpWorkFlowService.updateBPWorkFlow("root", "org", wfRequest, "userId", "role");
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.get(Constants.STATUS));
     }
 
     @Test
@@ -680,6 +768,29 @@ class BPWorkFlowServiceImplTest {
         bpWorkFlowService.processWFRequest(wfRequest);
 
         verify(wfStatusRepo).findByWfId("wf1");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            Constants.ENROLL_IS_IN_PROGRESS,
+            Constants.ONE_STEP_MDO_APPROVAL,
+            Constants.ADMIN_ENROLL_IS_IN_PROGRESS
+    })
+    void testProcessWFRequest_1_byStatus(String status) {
+        wfRequest = new WfRequest();
+        wfRequest.setWfId("wf1");
+
+        WfStatusEntity wfStatusEntity = new WfStatusEntity();
+        wfStatusEntity.setCurrentStatus(status);
+
+        when(wfStatusRepo.findByWfId("wf1")).thenReturn(wfStatusEntity);
+
+        ApplicationException exception = assertThrows(
+                ApplicationException.class,
+                () -> bpWorkFlowService.processWFRequest(wfRequest),
+                "Expected processWFRequest to throw, but it didn't"
+        );
+        assertTrue(exception.getMessage().contains("Workflow parsing error occurred!"));
     }
 
     @Test
