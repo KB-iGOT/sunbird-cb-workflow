@@ -1,5 +1,6 @@
 package org.sunbird.workflow.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -242,7 +243,7 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
         }
     }
 
-    private Map<String, String> changeStatus(String rootOrg, String org, WfRequest wfRequest, String userId, String role) {
+    private Map<String, String> changeStatus(String rootOrg, String org, WfRequest wfRequest, String modifiedBy, String role) {
         String wfId = wfRequest.getWfId();
         String nextState = null;
         Map<String, String> data = new HashMap<>();
@@ -278,7 +279,7 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
             }
 
             // Update workflow status entity
-            updateApplicationStatus(applicationStatus, wfRequest, nextState, userId, role, workFlowModel);
+            updateApplicationStatus(applicationStatus, wfRequest, nextState, modifiedBy, role, workFlowModel);
             // Handle specific fields if applicable
             handleSpecialFields(wfRequest);
 
@@ -315,31 +316,88 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
     }
 
     private void updateApplicationStatus(WfStatusEntity applicationStatus, WfRequest wfRequest, String nextState,
-                                         String userId, String role, WorkFlowModel workFlowModel) throws IOException {
+                                         String modifiedBy, String role, WorkFlowModel workFlowModel) throws IOException {
         WfStatus nextWfStatus = getWfStatus(nextState, workFlowModel);
-        Boolean inWorkflow = nextWfStatus.getIsLastState() ? false : true;
+        boolean inWorkflow = !nextWfStatus.getIsLastState();
+        Date currentTime = new Date();
 
-        applicationStatus.setLastUpdatedOn(new Date());
+        applicationStatus.setLastUpdatedOn(currentTime);
         applicationStatus.setCurrentStatus(nextState);
         applicationStatus.setActorUUID(wfRequest.getActorUserId());
         applicationStatus.setUpdateFieldValues(mapper.writeValueAsString(wfRequest.getUpdateFieldValues()));
-        applicationStatus.setInWorkflow(!nextWfStatus.getIsLastState());
+        applicationStatus.setInWorkflow(inWorkflow);
         applicationStatus.setDeptName(wfRequest.getDeptName());
         applicationStatus.setComment(wfRequest.getComment());
-        addModificationEntry(applicationStatus, userId, wfRequest.getAction(), role);
-
+        addModificationEntry(applicationStatus, modifiedBy, wfRequest.getAction(), role);
         WfStatusEntity savedEntity = wfStatusRepo.save(applicationStatus);
-        if (Constants.ORG_TRANSFER_REQUEST.equalsIgnoreCase(applicationStatus.getRequestType())) {
-            logger.info("Entering transfer request handling for userId: {}", applicationStatus.getUserId());
-            List<WfStatusEntity> listEntities = wfStatusRepo.findByUserIdAndCurrentStatus(savedEntity.getUserId(), Constants.SEND_FOR_APPROVAL, Boolean.TRUE);
-            Map<String, WfStatusEntity> entityMap = listEntities.stream()
-                    .collect(Collectors.toMap(WfStatusEntity::getWfId, Function.identity()));
-            Map<String, Object> payload = new HashMap<>();
-            payload.put(Constants.ORG_TRANSFER_STATE, nextState);
-            payload.put(Constants.inWorkflow, inWorkflow);
-            payload.put(Constants.GROUP_DESGINATION_ENTITIES, new ArrayList<>(entityMap.values()));
-            producer.push(configuration.getTransferRequestStatusChangeTopic(), payload);
-            logger.info(" Transfer status change message sent successfully for userId: {}", savedEntity.getUserId());
+        String userId = savedEntity.getUserId();
+
+        if (Constants.ORG_TRANSFER_REQUEST.equalsIgnoreCase(applicationStatus.getRequestType()) && nextWfStatus.getIsLastState()) {
+            logger.info("Auto {} Group-Designation post Transfer Approval for userId: {}", nextState, applicationStatus.getUserId());
+
+            List<WfStatusEntity> wfStatusEntities = wfStatusRepo.findByUserIdAndCurrentStatus(userId, Constants.SEND_FOR_APPROVAL, Boolean.TRUE);
+            if (wfStatusEntities == null || wfStatusEntities.isEmpty()) {
+                logger.warn("No pending Group-Designation request found for userId: {}",
+                        savedEntity.getUserId());
+                return;
+            }
+
+            List<WfStatusEntity> validEntities = new ArrayList<>();
+            List<Object> wfRequestsForEvent = new ArrayList<>();
+            for (WfStatusEntity wfStatusEntity : wfStatusEntities) {
+                try {
+                    String fieldValues = wfStatusEntity.getUpdateFieldValues();
+                    if (fieldValues == null || fieldValues.trim().isEmpty()) {
+                        logger.warn("Empty updateFieldValues | wfId={}, userId={}", wfStatusEntity.getWfId(), wfStatusEntity.getUserId());
+                        continue;
+                    }
+
+                    List<HashMap<String, Object>> updateFieldValues = mapper.readValue(fieldValues, new TypeReference<List<HashMap<String, Object>>>() {});
+
+                    // Build workflow request object
+                    WfRequest wfRequestGD = new WfRequest();
+                    wfRequestGD.setWfId(wfStatusEntity.getWfId());
+                    wfRequestGD.setUserId(wfStatusEntity.getUserId());
+                    wfRequestGD.setApplicationId(wfStatusEntity.getApplicationId());
+                    wfRequestGD.setActorUserId(wfStatusEntity.getActorUUID());
+                    wfRequestGD.setComment(wfRequest.getComment());
+                    wfRequestGD.setServiceName(wfStatusEntity.getServiceName());
+                    wfRequestGD.setRequestType(wfStatusEntity.getRequestType());
+                    wfRequestGD.setDeptName(wfStatusEntity.getDeptName());
+                    wfRequestGD.setState(wfStatusEntity.getCurrentStatus());
+                    wfRequestGD.setAction(wfRequest.getAction());
+                    wfRequestGD.setUpdateFieldValues(updateFieldValues);
+                    wfRequestsForEvent.add(wfRequestGD);
+
+                    // Update entity fields only if parsing succeeded
+                    wfStatusEntity.setCurrentStatus(nextState);
+                    wfStatusEntity.setInWorkflow(inWorkflow);
+                    wfStatusEntity.setLastUpdatedOn(currentTime);
+                    validEntities.add(wfStatusEntity);
+
+                } catch (JsonProcessingException e) {
+                    logger.error("Failed to parse updateFieldValues | wfId={}, userId={}, error={}", wfStatusEntity.getWfId(), wfStatusEntity.getUserId(), e.getMessage(), e);
+                }
+            }
+
+            // Save only valid entities
+            if (!validEntities.isEmpty()) {
+                wfStatusRepo.saveAll(validEntities);
+            } else {
+                logger.warn("No valid workflow entities to save for userId: {}", userId);
+            }
+
+            // Push workflow events
+            if (!wfRequestsForEvent.isEmpty()) {
+                try {
+                    pushWorkflowEvents(Constants.PROFILE_SERVICE_NAME, userId, wfRequestsForEvent);
+                    logger.info("Pushed {} workflow events for userId: {}", wfRequestsForEvent.size(), userId);
+                } catch (Exception e) {
+                    logger.error("Failed to push workflow events for userId: {}, error={}", userId, e.getMessage(), e);
+                }
+            } else {
+                logger.warn("No valid workflow requests for userId: {}", userId);
+            }
         }
     }
 
