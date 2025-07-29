@@ -7,6 +7,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -29,6 +32,7 @@ import org.sunbird.workflow.utils.CassandraOperation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.stream.Stream;
 
 class WorkFlowServiceImplV2PrivateMethodTest {
 
@@ -173,10 +177,6 @@ class WorkFlowServiceImplV2PrivateMethodTest {
         WfRequest wfRequest = createWfRequest();
         Map<String, Object> responseData = new HashMap<>();
 
-        Map<String, Object> existResponse = new HashMap<>();
-        existResponse.put(Constants.IS_WF_REQUEST_EXIST, false);
-        existResponse.put(Constants.WF_ID_CONSTANT, "wfId123");
-
         Method handleProfileServiceWorkflow = WorkFlowServiceImplV2.class
                 .getDeclaredMethod("handleProfileServiceWorkflow", WfRequest.class, Map.class);
         handleProfileServiceWorkflow.setAccessible(true);
@@ -272,10 +272,10 @@ class WorkFlowServiceImplV2PrivateMethodTest {
         assertTrue(thrown.getCause() instanceof Exception);
     }
 
-
-    @Test
-    void testAddRequestType_group() throws Exception {
-        WfRequest wfRequest = createWfRequestWithKey("group");
+    @ParameterizedTest
+    @MethodSource("requestTypeProvider")
+    void testAddRequestTypeParameterized(String inputKey, String expectedRequestType) throws Exception {
+        WfRequest wfRequest = createWfRequestWithKey(inputKey);
 
         Method method = WorkFlowServiceImplV2.class
                 .getDeclaredMethod("addRequestTypeInProfileWF", WfRequest.class);
@@ -283,46 +283,32 @@ class WorkFlowServiceImplV2PrivateMethodTest {
 
         method.invoke(workFlowService, wfRequest);
 
-        assertEquals("GROUP_CHANGE", wfRequest.getRequestType());
+        assertEquals(expectedRequestType, wfRequest.getRequestType());
     }
 
-    @Test
-    void testAddRequestType_designation() throws Exception {
-        WfRequest wfRequest = createWfRequestWithKey("designation");
-
-        Method method = WorkFlowServiceImplV2.class
-                .getDeclaredMethod("addRequestTypeInProfileWF", WfRequest.class);
-        method.setAccessible(true);
-
-        method.invoke(workFlowService, wfRequest);
-
-        assertEquals("DESIGNATION_CHANGE", wfRequest.getRequestType());
+    private static Stream<Arguments> requestTypeProvider() {
+        return Stream.of(
+                Arguments.of("group", "GROUP_CHANGE"),
+                Arguments.of("designation", "DESIGNATION_CHANGE"),
+                Arguments.of("name", "ORG_TRANSFER"),
+                Arguments.of("otherKey", "otherKey")
+        );
     }
 
-    @Test
-    void testAddRequestType_name() throws Exception {
-        WfRequest wfRequest = createWfRequestWithKey("name");
+    private WfRequest createWfRequestWithKey(String key) {
+        WfRequest request = new WfRequest();
+        Map<String, Object> toValue = new HashMap<>();
+        toValue.put(key, "dummyValue");
 
-        Method method = WorkFlowServiceImplV2.class
-                .getDeclaredMethod("addRequestTypeInProfileWF", WfRequest.class);
-        method.setAccessible(true);
+        HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.TO_VALUE, toValue);
 
-        method.invoke(workFlowService, wfRequest);
+        List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
+        updateFieldValues.add(updateField);
 
-        assertEquals("ORG_TRANSFER", wfRequest.getRequestType());
-    }
+        request.setUpdateFieldValues(updateFieldValues);
 
-    @Test
-    void testAddRequestType_default() throws Exception {
-        WfRequest wfRequest = createWfRequestWithKey("otherKey");
-
-        Method method = WorkFlowServiceImplV2.class
-                .getDeclaredMethod("addRequestTypeInProfileWF", WfRequest.class);
-        method.setAccessible(true);
-
-        method.invoke(workFlowService, wfRequest);
-
-        assertEquals("otherKey", wfRequest.getRequestType());
+        return request;
     }
 
     @Test
@@ -793,25 +779,6 @@ class WorkFlowServiceImplV2PrivateMethodTest {
         wfRequest.setUpdateFieldValues(List.of(new java.util.HashMap<>()));
         return wfRequest;
     }
-
-
-    private WfRequest createWfRequestWithKey(String key) {
-        WfRequest wfRequest = new WfRequest();
-
-        Map<String, Object> toValue = new HashMap<>();
-        toValue.put(key, "dummyValue");
-
-        HashMap<String, Object> updateField = new HashMap<>();
-        updateField.put(Constants.TO_VALUE, toValue);
-
-        List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
-        updateFieldValues.add(updateField);
-
-        wfRequest.setUpdateFieldValues(updateFieldValues);
-
-        return wfRequest;
-    }
-
 
     private WfRequest createWfRequest() {
         WfRequest wfRequest = new WfRequest();

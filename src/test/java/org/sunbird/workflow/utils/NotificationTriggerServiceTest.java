@@ -10,6 +10,7 @@ import org.springframework.web.client.RestTemplate;
 import java.lang.reflect.Field;
 import java.util.*;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.*;
 
 
@@ -47,28 +48,28 @@ class NotificationTriggerServiceTest {
         ResponseEntity<Map> mockResponse = new ResponseEntity<>(new HashMap<>(), HttpStatus.OK);
         when(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(Map.class))).thenReturn(mockResponse);
 
-        notificationTriggerService.sendNotification("subCat", "subType", List.of("user1"), message);
+        assertDoesNotThrow(()-> notificationTriggerService.sendNotification("subCat", "subType", List.of("user1"), message));
 
     }
 
     @Test
     void testSendNotification_invalidSubCategory() {
-        notificationTriggerService.sendNotification("", "subType", List.of("user1"), Map.of("key", "value"));
+        assertDoesNotThrow(()-> notificationTriggerService.sendNotification("", "subType", List.of("user1"), Map.of("key", "value")));
     }
 
     @Test
     void testSendNotification_invalidSubType() {
-        notificationTriggerService.sendNotification("subCat", "", List.of("user1"), Map.of("key", "value"));
+        assertDoesNotThrow(()-> notificationTriggerService.sendNotification("subCat", "", List.of("user1"), Map.of("key", "value")));
     }
 
     @Test
     void testSendNotification_emptyUserIds() {
-        notificationTriggerService.sendNotification("subCat", "subType", Collections.emptyList(), Map.of("key", "value"));
+        assertDoesNotThrow(()-> notificationTriggerService.sendNotification("subCat", "subType", Collections.emptyList(), Map.of("key", "value")));
     }
 
     @Test
     void testSendNotification_nullMessage() {
-        notificationTriggerService.sendNotification("subCat", "subType", List.of("user1"), null);
+        assertDoesNotThrow(()-> notificationTriggerService.sendNotification("subCat", "subType", List.of("user1"), null));
     }
 
     @Test
@@ -76,7 +77,7 @@ class NotificationTriggerServiceTest {
         when(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(Map.class)))
                 .thenThrow(new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Bad request"));
 
-        notificationTriggerService.sendNotification("subCat", "subType", List.of("user1"), Map.of("key", "value"));
+        assertDoesNotThrow(()-> notificationTriggerService.sendNotification("subCat", "subType", List.of("user1"), Map.of("key", "value")));
     }
 
     @Test
@@ -84,7 +85,7 @@ class NotificationTriggerServiceTest {
         when(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(Map.class)))
                 .thenThrow(new RuntimeException("Something went wrong"));
 
-        notificationTriggerService.sendNotification("subCat", "subType", List.of("user1"), Map.of("key", "value"));
+        assertDoesNotThrow(()-> notificationTriggerService.sendNotification("subCat", "subType", List.of("user1"), Map.of("key", "value")));
     }
 
     @Test
@@ -92,7 +93,7 @@ class NotificationTriggerServiceTest {
         Map<String, Object> data = Map.of("dataKey", "dataValue");
         Map<String, Object> placeholders = Map.of("placeKey", "placeValue");
 
-        notificationTriggerService.triggerNotification("cat", "type", List.of("user1"), data, placeholders);
+        assertDoesNotThrow(()-> notificationTriggerService.triggerNotification("cat", "type", List.of("user1"), data, placeholders));
     }
 
     @Test
@@ -103,6 +104,6 @@ class NotificationTriggerServiceTest {
         Map<String, Object> data = Map.of("dataKey", "dataValue");
         Map<String, Object> placeholders = Map.of("placeKey", "placeValue");
 
-        notificationTriggerService.triggerNotification("cat", "type", List.of("user1"), data, placeholders);
+        assertDoesNotThrow(()-> notificationTriggerService.triggerNotification("cat", "type", List.of("user1"), data, placeholders));
     }
 }

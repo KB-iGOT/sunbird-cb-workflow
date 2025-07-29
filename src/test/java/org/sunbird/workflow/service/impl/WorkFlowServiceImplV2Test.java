@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.*;
-import org.slf4j.Logger;
 import org.springframework.http.HttpStatus;
 import org.sunbird.workflow.config.Configuration;
 import org.sunbird.workflow.config.Constants;
@@ -16,8 +15,6 @@ import org.sunbird.workflow.exception.ApplicationException;
 import org.sunbird.workflow.exception.BadRequestException;
 import org.sunbird.workflow.models.*;
 import org.sunbird.workflow.postgres.repo.WfStatusRepo;
-import org.sunbird.workflow.producer.Producer;
-import org.sunbird.workflow.utils.CassandraOperation;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -34,13 +31,9 @@ class WorkFlowServiceImplV2Test {
 
     @Mock private WfStatusRepo wfStatusRepo;
     @Mock private ObjectMapper mapper;
-    @Mock private CassandraOperation cassandraOperation;
     @Mock private Configuration configuration;
     @Mock private RequestServiceImpl requestServiceImpl;
-    @Mock private Producer producer;
     @Mock private RedisCacheMgr redisCacheMgr;
-    @Mock
-    private Logger logger;
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
@@ -448,6 +441,8 @@ class WorkFlowServiceImplV2Test {
                 break;
             case Constants.TWO_STEP_PC_AND_MDO_APPROVAL:
                 when(configuration.getMultilevelBPEnrolEndPoint()).thenReturn("/multi/");
+                break;
+            default:
                 break;
         }
     }

@@ -1123,105 +1123,31 @@ class BPWorkFlowServiceImplTest {
         assertEquals("Batch full", response.get(Constants.ERROR_MESSAGE));
     }
 
-    @Test
-    void testGetWorkFlowConfig_oneStepPcApproval() throws Exception {
-        String serviceName = "oneStepPCApproval";
-
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "oneStepPCApproval",
+            "oneStepMDOApproval",
+            "twoStepMDOAndPCApproval",
+            "twoStepPCAndMDOApproval"
+    })
+    void testGetWorkFlowConfigParameterized(String serviceName) throws Exception {
         // Mock response structure
-        Map<String, Object> mockResponseMap = new HashMap<>();
         Map<String, Object> response = new HashMap<>();
         response.put("value", "{\"name\":\"workflowModel\"}");
+        Map<String, Object> mockResponseMap = new HashMap<>();
         mockResponseMap.put("response", response);
         Map<String, Object> result = new HashMap<>();
         result.put("result", mockResponseMap);
 
+        // Mocks
         when(requestServiceImpl.fetchResultUsingGet(any())).thenReturn(result);
         when(mapper.readValue(anyString(), eq(Map.class))).thenReturn(Map.of("name", "workflowModel"));
         when(mapper.convertValue(any(), ArgumentMatchers.<TypeReference<WorkFlowModel>>any())).thenReturn(new WorkFlowModel());
 
+        // Execute
         WorkFlowModel wfModel = bpWorkFlowService.getWorkFlowConfig(serviceName);
 
-        assertNotNull(wfModel);
-    }
-
-    @Test
-    void testGetWorkFlowConfig_oneStepMDOApproval() throws Exception {
-        String serviceName = "oneStepPCApproval";
-        Map<String, Object> mockResponseMap = new HashMap<>();
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("value", "{\"name\":\"workflowModel\"}");
-        mockResponseMap.put("response", response);
-        Map<String, Object> result = new HashMap<>();
-        result.put("result", mockResponseMap);
-
-        when(requestServiceImpl.fetchResultUsingGet(any())).thenReturn(result);
-        when(mapper.readValue(anyString(), eq(Map.class))).thenReturn(Map.of("name", "workflowModel"));
-        when(mapper.convertValue(any(), ArgumentMatchers.<TypeReference<WorkFlowModel>>any())).thenReturn(new WorkFlowModel());
-
-        WorkFlowModel wfModel = bpWorkFlowService.getWorkFlowConfig(serviceName);
-
-        assertNotNull(wfModel);
-    }
-
-    @Test
-    void testGetWorkFlowConfig_oneStepMdoApproval() throws Exception {
-        String serviceName = "oneStepMDOApproval";
-        Map<String, Object> mockResponseMap = new HashMap<>();
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("value", "{\"name\":\"workflowModel\"}");
-        mockResponseMap.put("response", response);
-        Map<String, Object> result = new HashMap<>();
-        result.put("result", mockResponseMap);
-
-        when(requestServiceImpl.fetchResultUsingGet(any())).thenReturn(result);
-        when(mapper.readValue(anyString(), eq(Map.class))).thenReturn(Map.of("name", "workflowModel"));
-        when(mapper.convertValue(any(), ArgumentMatchers.<TypeReference<WorkFlowModel>>any())).thenReturn(new WorkFlowModel());
-
-        WorkFlowModel wfModel = bpWorkFlowService.getWorkFlowConfig(serviceName);
-
-        assertNotNull(wfModel);
-    }
-
-    @Test
-    void testGetWorkFlowConfig_twoStepMDOAndPCApproval() throws Exception {
-        String serviceName = "twoStepMDOAndPCApproval";
-        Map<String, Object> mockResponseMap = new HashMap<>();
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("value", "{\"name\":\"workflowModel\"}");
-        mockResponseMap.put("response", response);
-        Map<String, Object> result = new HashMap<>();
-        result.put("result", mockResponseMap);
-
-        when(requestServiceImpl.fetchResultUsingGet(any())).thenReturn(result);
-        when(mapper.readValue(anyString(), eq(Map.class))).thenReturn(Map.of("name", "workflowModel"));
-        when(mapper.convertValue(any(), ArgumentMatchers.<TypeReference<WorkFlowModel>>any())).thenReturn(new WorkFlowModel());
-
-        WorkFlowModel wfModel = bpWorkFlowService.getWorkFlowConfig(serviceName);
-
-        assertNotNull(wfModel);
-    }
-
-
-    @Test
-    void testGetWorkFlowConfig_twoStepPCAndMDOApproval() throws Exception {
-        String serviceName = "twoStepPCAndMDOApproval";
-        Map<String, Object> mockResponseMap = new HashMap<>();
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("value", "{\"name\":\"workflowModel\"}");
-        mockResponseMap.put("response", response);
-        Map<String, Object> result = new HashMap<>();
-        result.put("result", mockResponseMap);
-
-        when(requestServiceImpl.fetchResultUsingGet(any())).thenReturn(result);
-        when(mapper.readValue(anyString(), eq(Map.class))).thenReturn(Map.of("name", "workflowModel"));
-        when(mapper.convertValue(any(), ArgumentMatchers.<TypeReference<WorkFlowModel>>any())).thenReturn(new WorkFlowModel());
-
-        WorkFlowModel wfModel = bpWorkFlowService.getWorkFlowConfig(serviceName);
-
+        // Assert
         assertNotNull(wfModel);
     }
 

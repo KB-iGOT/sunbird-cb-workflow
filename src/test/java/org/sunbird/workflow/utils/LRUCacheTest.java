@@ -34,12 +34,6 @@ class LRUCacheTest {
     }
 
     @Test
-    void testGetAfterTTLExpires() {
-        cache.put("key1", "value1");
-        assertEquals("value1", cache.get("key1")); // should return null after expiry
-    }
-
-    @Test
     void testRemoveEldestEntry_MaxSizeExceeded() {
         cache.put("key1", "value1");
         cache.put("key2", "value2");
@@ -73,11 +67,6 @@ class LRUCacheTest {
         assertFalse(invokeIsEntryExpired("key1"));
     }
 
-    @Test
-    void testIsEntryExpired_WhenKeyIsNotExpired() {
-        cache.put("key1", "value1");
-        assertFalse(invokeIsEntryExpired("key1"));
-    }
 
     // Helper method to invoke private isEntryExpired
     private boolean invokeIsEntryExpired(String key) {

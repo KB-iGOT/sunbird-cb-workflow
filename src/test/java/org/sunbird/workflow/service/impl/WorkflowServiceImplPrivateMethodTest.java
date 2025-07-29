@@ -6,6 +6,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.function.Executable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -30,6 +34,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -149,7 +154,7 @@ class WorkflowServiceImplPrivateMethodTest {
         WfStatus wfStatus = new WfStatus();
         wfStatus.setStartState(false);
 
-        WfStatusEntity applicationStatus = null;
+        applicationStatus = null;
 
         ApplicationException ex = assertThrows(ApplicationException.class, () ->
                 ReflectionTestUtils.invokeMethod(workflowService,
@@ -167,7 +172,7 @@ class WorkflowServiceImplPrivateMethodTest {
         WfStatus wfStatus = new WfStatus();
         wfStatus.setStartState(true);
 
-        WfStatusEntity applicationStatus = new WfStatusEntity();
+        applicationStatus = new WfStatusEntity();
         applicationStatus.setCurrentStatus("REJECTED");
 
         BadRequestException ex = assertThrows(BadRequestException.class, () ->
@@ -186,7 +191,7 @@ class WorkflowServiceImplPrivateMethodTest {
         WfStatus wfStatus = new WfStatus();
         wfStatus.setStartState(true);
 
-        WfStatusEntity applicationStatus = null;
+        applicationStatus = null;
 
         assertDoesNotThrow(() ->
                 ReflectionTestUtils.invokeMethod(workflowService,
@@ -264,20 +269,27 @@ class WorkflowServiceImplPrivateMethodTest {
 
     @Test
     void testValidateRoles_actorRolesEmpty_throwsApplicationException() {
-        ApplicationException ex = assertThrows(ApplicationException.class, () ->
-                ReflectionTestUtils.invokeMethod(workflowService, "validateRoles", List.of(), List.of("role1"))
-        );
+        List<String> actorRoles = List.of();
+        List<String> allowedRoles = List.of("role1");
+
+        Executable executable = () -> ReflectionTestUtils.invokeMethod(workflowService, "validateRoles", actorRoles, allowedRoles);
+
+        ApplicationException ex = assertThrows(ApplicationException.class, executable);
         assertEquals(Constants.WORKFLOW_ROLE_ERROR, ex.getMessage());
     }
 
+
     @Test
     void testValidateRoles_rolesDoNotMatch_throwsBadRequestException() {
-        BadRequestException ex = assertThrows(BadRequestException.class, () ->
-                ReflectionTestUtils.invokeMethod(workflowService, "validateRoles",
-                        List.of("actor1"), List.of("role1", "role2"))
-        );
+        List<String> actors = List.of("actor1");
+        List<String> roles = List.of("role1", "role2");
+
+        Executable executable = () -> ReflectionTestUtils.invokeMethod(workflowService, "validateRoles", actors, roles);
+
+        BadRequestException ex = assertThrows(BadRequestException.class, executable);
         assertEquals(Constants.WORKFLOW_ROLE_CHECK_ERROR, ex.getMessage());
     }
+
 
     @Test
     void testValidateRoles_rolesMatch_ok() {
@@ -810,40 +822,32 @@ void testHandleProfileServiceWorkflow_requestExists() {
         assertFalse(result);
     }
 
-    @Test
-    void testAddRequestTypeInProfileWF_group() {
-        WfRequest wfRequest = buildWfRequest("group");
+    @ParameterizedTest
+    @MethodSource("requestTypeProvider")
+    void testAddRequestTypeInProfileWF(String fieldKey, String expectedRequestType) {
+        WfRequest wfRequest = buildWfRequest(fieldKey);
 
         ReflectionTestUtils.invokeMethod(workflowService, "addRequestTypeInProfileWF", wfRequest);
 
-        assertEquals("GROUP_CHANGE", wfRequest.getRequestType());
+        assertEquals(expectedRequestType, wfRequest.getRequestType());
     }
 
-    @Test
-    void testAddRequestTypeInProfileWF_designation() {
-        WfRequest wfRequest = buildWfRequest("designation");
-
-        ReflectionTestUtils.invokeMethod(workflowService, "addRequestTypeInProfileWF", wfRequest);
-
-        assertEquals("DESIGNATION_CHANGE", wfRequest.getRequestType());
+    private static Stream<Arguments> requestTypeProvider() {
+        return Stream.of(
+                Arguments.of("group", "GROUP_CHANGE"),
+                Arguments.of("designation", "DESIGNATION_CHANGE"),
+                Arguments.of("name", "ORG_TRANSFER"),
+                Arguments.of("otherKey", "otherKey")
+        );
     }
 
-    @Test
-    void testAddRequestTypeInProfileWF_name() {
-        WfRequest wfRequest = buildWfRequest("name");
-
-        ReflectionTestUtils.invokeMethod(workflowService, "addRequestTypeInProfileWF", wfRequest);
-
-        assertEquals("ORG_TRANSFER", wfRequest.getRequestType());
-    }
-
-    @Test
-    void testAddRequestTypeInProfileWF_default() {
-        WfRequest wfRequest = buildWfRequest("otherKey");
-
-        ReflectionTestUtils.invokeMethod(workflowService, "addRequestTypeInProfileWF", wfRequest);
-
-        assertEquals("otherKey", wfRequest.getRequestType());
+    private WfRequest buildWfRequest(String fieldKey) {
+        WfRequest request = new WfRequest();
+        request.setUserId("user1");
+        request.setUpdateFieldValues(
+                List.of(new HashMap<>(Map.of(Constants.TO_VALUE, Map.of(fieldKey, "val1"))))
+        );
+        return request;
     }
 
     @Test
@@ -955,8 +959,8 @@ void testHandleProfileServiceWorkflow_requestExists() {
         wfRequest.setUserId("user1");
         wfRequest.setRootOrgId("rootOrg1");
 
-        ReflectionTestUtils.invokeMethod(workflowService, "sendNotification", "other", "dept", wfRequest);
-        // no exception
+        assertDoesNotThrow(()->ReflectionTestUtils.invokeMethod(workflowService, "sendNotification", "other", "dept", wfRequest));
+
     }
 
     @Test
@@ -1026,15 +1030,6 @@ void testHandleProfileServiceWorkflow_requestExists() {
         assertNull(result);
     }
 
-    // helper
-    private WfRequest buildWfRequest(String key) {
-        WfRequest wfRequest = new WfRequest();
-        wfRequest.setUserId("user1");
-        wfRequest.setUpdateFieldValues(
-                List.of(new HashMap<>(Map.of(Constants.TO_VALUE, Map.of(key, "val1"))))
-        );
-        return wfRequest;
-    }
     private WfRequest buildValidRequest() {
         WfRequest wfRequest = new WfRequest();
         wfRequest.setState("state");

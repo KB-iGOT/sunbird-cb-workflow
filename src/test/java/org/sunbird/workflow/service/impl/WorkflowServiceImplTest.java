@@ -267,6 +267,193 @@ class WorkflowServiceImplTest {
         verify(producer, atLeastOnce()).push(any(), any());
     }
 
+    @Test
+    void workflowTransition_withGroupKey() throws Exception {
+        String rootOrg = "rootOrg";
+        String org = "org";
+        String userId = "userId";
+        String role = "role";
+
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setWfId(null);
+        wfRequest.setApplicationId("appId");
+        wfRequest.setUserId(userId);
+        wfRequest.setActorUserId("actorId");
+        wfRequest.setAction("APPROVE");
+        wfRequest.setServiceName("profile");
+        wfRequest.setState("PENDING");
+
+        Map<String, Object> toValue = new HashMap<>();
+        toValue.put("group", "group");
+        Map<String, Object> fieldChange = new HashMap<>();
+        fieldChange.put("toValue", toValue);
+        wfRequest.setUpdateFieldValues(List.of((HashMap<String, Object>) fieldChange));
+
+        when(configuration.getMultipleWfCreationEnable()).thenReturn(false);
+        when(configuration.getLmsServiceHost()).thenReturn("http://lms/");
+        when(configuration.getLmsUserSearchEndPoint()).thenReturn("/search");
+        when(configuration.getWorkFlowNotificationTopic()).thenReturn("topic1");
+        when(configuration.getWorkflowApplicationTopic()).thenReturn("topic2");
+        when(configuration.getUserProfileReadEndPoint()).thenReturn("endpoint/${userId}");
+
+        // mock WfStatusEntity
+        WfStatusEntity wfStatusEntity = new WfStatusEntity();
+        wfStatusEntity.setCreatedOn(new Date());
+        wfStatusEntity.setCurrentStatus("PENDING");
+        wfStatusEntity.setRequestType(Constants.ORG_TRANSFER_REQUEST);
+        when(wfStatusRepo.findByRootOrgAndOrgAndApplicationIdAndWfId(any(), any(), any(), any())).thenReturn(wfStatusEntity);
+
+        when(mapper.writeValueAsString(any())).thenReturn("{}");
+
+        Map<String, Object> wfConfig = new HashMap<>();
+        Map<String, Object> result = new HashMap<>();
+        Map<String, Object> mResponse = new HashMap<>();
+        String valueJson = "{\"state1\": \"data\"}"; // whatever your JSON string is
+
+        wfConfig.put(Constants.RESULT, result);
+        result.put(Constants.RESPONSE, mResponse);
+        mResponse.put(Constants.VALUE, valueJson);
+
+        when(requestServiceImpl.fetchResultUsingGet(any())).thenReturn(wfConfig);
+        Map<String, Object> wfStatesMap = Map.of("state1", "data");
+        WorkFlowModel model = new WorkFlowModel();
+
+        WfStatus status = new WfStatus();
+        status.setState("PENDING");
+        status.setStartState(true);
+        status.setIsLastState(true);
+        status.setActions(List.of());
+
+        WfAction action1 = new WfAction();
+        action1.setAction("APPROVE");
+        action1.setNextState("PENDING");
+
+        WfAction action2 = new WfAction();
+        action2.setAction("APPROVED");
+        action2.setNextState("APPROVED");
+
+        status.setActions(List.of(action1, action2));
+
+        model.setWfstates(List.of(status));
+
+        when(mapper.readValue(valueJson, Map.class)).thenReturn(wfStatesMap);
+        when(mapper.convertValue(eq(wfStatesMap), any(TypeReference.class))).thenReturn(model);
+
+        when(wfStatusRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        when(requestServiceImpl.fetchResultUsingPost(any(), any(), eq(Map.class), any())).thenReturn(Map.of("responseCode", "OK"));
+
+
+        String allowedActions = "CREATE,UPDATE,DELETE";
+
+        // mock configuration to return allowedActions
+        Mockito.when(configuration.getModificationRecordAllowActions()).thenReturn(allowedActions);
+        Map<String, Object> fakeMap = new HashMap<>();
+        fakeMap.put("result", "this-is-a-string-not-a-map"); // not a Map, will trigger the condition
+
+        when(mapper.convertValue(any(), eq(Map.class))).thenReturn(fakeMap);
+        // Act
+        Response response = workflowServiceImpl.workflowTransition(rootOrg, org, wfRequest, userId, role);
+
+        // Assert
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.get(Constants.STATUS));
+        verify(producer, atLeastOnce()).push(any(), any());
+    }
+
+    @Test
+    void workflowTransition_withDesignationKey() throws Exception {
+        String rootOrg = "rootOrg";
+        String org = "org";
+        String userId = "userId";
+        String role = "role";
+
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setWfId(null);
+        wfRequest.setApplicationId("appId");
+        wfRequest.setUserId(userId);
+        wfRequest.setActorUserId("actorId");
+        wfRequest.setAction("APPROVE");
+        wfRequest.setServiceName("profile");
+        wfRequest.setState("PENDING");
+
+        Map<String, Object> toValue = new HashMap<>();
+        toValue.put(Constants.DESIGNATION, "group");
+        Map<String, Object> fieldChange = new HashMap<>();
+        fieldChange.put("toValue", toValue);
+        wfRequest.setUpdateFieldValues(List.of((HashMap<String, Object>) fieldChange));
+
+        when(configuration.getMultipleWfCreationEnable()).thenReturn(false);
+        when(configuration.getLmsServiceHost()).thenReturn("http://lms/");
+        when(configuration.getLmsUserSearchEndPoint()).thenReturn("/search");
+        when(configuration.getWorkFlowNotificationTopic()).thenReturn("topic1");
+        when(configuration.getWorkflowApplicationTopic()).thenReturn("topic2");
+        when(configuration.getUserProfileReadEndPoint()).thenReturn("endpoint/${userId}");
+
+        // mock WfStatusEntity
+        WfStatusEntity wfStatusEntity = new WfStatusEntity();
+        wfStatusEntity.setCreatedOn(new Date());
+        wfStatusEntity.setCurrentStatus("PENDING");
+        wfStatusEntity.setRequestType(Constants.ORG_TRANSFER_REQUEST);
+        when(wfStatusRepo.findByRootOrgAndOrgAndApplicationIdAndWfId(any(), any(), any(), any())).thenReturn(wfStatusEntity);
+
+        when(mapper.writeValueAsString(any())).thenReturn("{}");
+
+        Map<String, Object> wfConfig = new HashMap<>();
+        Map<String, Object> result = new HashMap<>();
+        Map<String, Object> mResponse = new HashMap<>();
+        String valueJson = "{\"state1\": \"data\"}"; // whatever your JSON string is
+
+        wfConfig.put(Constants.RESULT, result);
+        result.put(Constants.RESPONSE, mResponse);
+        mResponse.put(Constants.VALUE, valueJson);
+
+        when(requestServiceImpl.fetchResultUsingGet(any())).thenReturn(wfConfig);
+        Map<String, Object> wfStatesMap = Map.of("state1", "data");
+        WorkFlowModel model = new WorkFlowModel();
+
+        WfStatus status = new WfStatus();
+        status.setState("PENDING");
+        status.setStartState(true);
+        status.setIsLastState(true);
+        status.setActions(List.of());
+
+        WfAction action1 = new WfAction();
+        action1.setAction("APPROVE");
+        action1.setNextState("PENDING");
+
+        WfAction action2 = new WfAction();
+        action2.setAction("APPROVED");
+        action2.setNextState("APPROVED");
+
+        status.setActions(List.of(action1, action2));
+
+        model.setWfstates(List.of(status));
+
+        when(mapper.readValue(valueJson, Map.class)).thenReturn(wfStatesMap);
+        when(mapper.convertValue(eq(wfStatesMap), any(TypeReference.class))).thenReturn(model);
+
+        when(wfStatusRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        when(requestServiceImpl.fetchResultUsingPost(any(), any(), eq(Map.class), any())).thenReturn(Map.of("responseCode", "OK"));
+
+
+        String allowedActions = "CREATE,UPDATE,DELETE";
+
+        // mock configuration to return allowedActions
+        Mockito.when(configuration.getModificationRecordAllowActions()).thenReturn(allowedActions);
+        Map<String, Object> fakeMap = new HashMap<>();
+        fakeMap.put("result", "this-is-a-string-not-a-map"); // not a Map, will trigger the condition
+
+        when(mapper.convertValue(any(), eq(Map.class))).thenReturn(fakeMap);
+        // Act
+        Response response = workflowServiceImpl.workflowTransition(rootOrg, org, wfRequest, userId, role);
+
+        // Assert
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.get(Constants.STATUS));
+        verify(producer, atLeastOnce()).push(any(), any());
+    }
 
     @Test
     void testAppsPCSearchV2_whenNoDeptName_thenSuccess() {
@@ -1772,10 +1959,10 @@ class WorkflowServiceImplTest {
             case Constants.BLENDED_PROGRAM_SERVICE_NAME:
                 when(configuration.getBlendedProgramServicePath()).thenReturn("/blended/config");
                 break;
-            case Constants.ONE_STEP_PC_APPROVAL:
-            case Constants.ONE_STEP_MDO_APPROVAL:
-            case Constants.TWO_STEP_MDO_AND_PC_APPROVAL:
-            case Constants.TWO_STEP_PC_AND_MDO_APPROVAL:
+            case Constants.ONE_STEP_PC_APPROVAL,
+                 Constants.ONE_STEP_MDO_APPROVAL,
+                 Constants.TWO_STEP_MDO_AND_PC_APPROVAL,
+                 Constants.TWO_STEP_PC_AND_MDO_APPROVAL:
                 when(configuration.getMultilevelBPEnrolEndPoint()).thenReturn("/mlbp/config/");
                 break;
             default:
