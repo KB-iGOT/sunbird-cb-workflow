@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.function.Executable;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.*;
@@ -33,9 +34,6 @@ class RequestServiceImplTest {
 
     @Mock
     Configuration configuration;
-
-    @Captor
-    ArgumentCaptor<HttpEntity<Object>> entityCaptor;
 
     StringBuilder uri;
 
@@ -94,7 +92,7 @@ class RequestServiceImplTest {
     }
 
     @Test
-    void testFetchResultUsingPost_WithHeaders_HappyPath() throws Exception {
+    void testFetchResultUsingPost_WithHeaders_HappyPath() {
         when(configuration.getHubRootOrg()).thenReturn("hub");
         when(restTemplate.postForObject(anyString(), any(HttpEntity.class), any())).thenReturn(new Object());
 
@@ -107,7 +105,7 @@ class RequestServiceImplTest {
     }
 
     @Test
-    void testFetchResultUsingPost_WithEmptyHeaders_HappyPath() throws Exception {
+    void testFetchResultUsingPost_WithEmptyHeaders_HappyPath() {
         when(configuration.getHubRootOrg()).thenReturn("hub");
         when(restTemplate.postForObject(anyString(), any(HttpEntity.class), any())).thenReturn(new Object());
 
@@ -117,7 +115,7 @@ class RequestServiceImplTest {
     }
 
     @Test
-    void testFetchResultUsingPost_HttpClientErrorException() throws Exception {
+    void testFetchResultUsingPost_HttpClientErrorException() {
         when(configuration.getHubRootOrg()).thenReturn("hub");
         when(restTemplate.postForObject(anyString(), any(HttpEntity.class), any()))
                 .thenThrow(new HttpClientErrorException(HttpStatus.BAD_REQUEST));
@@ -126,7 +124,7 @@ class RequestServiceImplTest {
     }
 
     @Test
-    void testFetchResultUsingPost_GenericException() throws Exception {
+    void testFetchResultUsingPost_GenericException() {
         when(configuration.getHubRootOrg()).thenReturn("hub");
         when(restTemplate.postForObject(anyString(), any(HttpEntity.class), any()))
                 .thenThrow(new RuntimeException("fail"));
@@ -135,7 +133,7 @@ class RequestServiceImplTest {
     }
 
     @Test
-    void testFetchResultUsingPatch_HappyPath() throws Exception {
+    void testFetchResultUsingPatch_HappyPath() {
 
         Map<String, Object> dummyResponse = new HashMap<>();
         when(restTemplate.patchForObject(anyString(), any(HttpEntity.class), eq(Map.class))).thenReturn(dummyResponse);
@@ -149,7 +147,7 @@ class RequestServiceImplTest {
     }
 
     @Test
-    void testFetchResultUsingPatch_HttpClientErrorException() throws Exception {
+    void testFetchResultUsingPatch_HttpClientErrorException() {
         String responseBody = "{\"key\":\"value\"}";
         HttpClientErrorException ex =
                 HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "Bad Request", HttpHeaders.EMPTY,
@@ -173,30 +171,43 @@ class RequestServiceImplTest {
     }
 
     @Test
-    void testFetchResultUsingPostUnhandled_HttpClientErrorException() throws Exception {
+    void testFetchResultUsingPostUnhandled_HttpClientErrorException() {
         when(configuration.getHubRootOrg()).thenReturn("hub");
 
-        HttpClientErrorException ex =
-                HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "Bad Request", HttpHeaders.EMPTY,
-                        new byte[0], null);
+        HttpClientErrorException ex = HttpClientErrorException.create(
+                HttpStatus.BAD_REQUEST,
+                "Bad Request",
+                HttpHeaders.EMPTY,
+                new byte[0],
+                null
+        );
 
         when(restTemplate.postForObject(anyString(), any(HttpEntity.class), any())).thenThrow(ex);
 
-        HttpClientErrorException exception = assertThrows(HttpClientErrorException.class,
-                () -> service.fetchResultUsingPostUnhandled(uri, new Object(), Object.class, null));
+        Object requestBody = new Object();
+        Class<?> responseType = Object.class;
+
+        Executable executable = () -> service.fetchResultUsingPostUnhandled(uri, requestBody, responseType, null);
+
+        HttpClientErrorException exception = assertThrows(HttpClientErrorException.class, executable);
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
         assertTrue(exception.getMessage().contains("Bad Request"));
-
     }
+
 
     @Test
-    void testFetchResultUsingPostUnhandled_GenericException() throws Exception {
+    void testFetchResultUsingPostUnhandled_GenericException() {
         when(configuration.getHubRootOrg()).thenReturn("hub");
+        when(restTemplate.postForObject(anyString(), any(HttpEntity.class), any()))
+                .thenThrow(new RuntimeException("fail"));
 
-        when(restTemplate.postForObject(anyString(), any(HttpEntity.class), any())).thenThrow(new RuntimeException("fail"));
+        Object requestBody = new Object();
+        Class<?> responseType = Object.class;
 
-        assertThrows(RuntimeException.class,
-                () -> service.fetchResultUsingPostUnhandled(uri, new Object(), Object.class, null));
+        Executable executable = () -> service.fetchResultUsingPostUnhandled(uri, requestBody, responseType, null);
+
+        assertThrows(RuntimeException.class, executable);
     }
+
 }

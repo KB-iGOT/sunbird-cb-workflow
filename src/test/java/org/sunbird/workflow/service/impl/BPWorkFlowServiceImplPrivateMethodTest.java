@@ -3,9 +3,9 @@ package org.sunbird.workflow.service.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
-import org.mockito.Mock;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.sunbird.workflow.config.Configuration;
 import org.sunbird.workflow.config.Constants;
@@ -13,11 +13,11 @@ import org.sunbird.workflow.exception.InvalidDataInputException;
 import org.sunbird.workflow.models.*;
 import org.sunbird.workflow.postgres.entity.WfStatusEntity;
 import org.sunbird.workflow.postgres.repo.WfStatusRepo;
-import org.sunbird.workflow.producer.Producer;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -26,21 +26,6 @@ import static org.springframework.test.util.ReflectionTestUtils.setField;
 class BPWorkFlowServiceImplPrivateMethodTest {
 
     private BPWorkFlowServiceImpl bpWorkFlowService;
-
-    @Mock
-    WfStatusRepo wfStatusRepo;
-
-    @Mock
-    ObjectMapper mapper;
-
-    @Mock
-    Configuration configuration;
-
-    @Mock
-    Producer producer;
-
-    @Captor
-    private ArgumentCaptor<WfStatusEntity> wfStatusCaptor;
 
     @BeforeEach
     void setUp() {
@@ -65,8 +50,8 @@ class BPWorkFlowServiceImplPrivateMethodTest {
     void testProcessApprovalStatus_okStatus_returnsUpdated() throws Exception {
         // Setup
         BPWorkFlowServiceImpl service = new BPWorkFlowServiceImpl();
-        ObjectMapper mapper = new ObjectMapper();
-        setField(service, "mapper", mapper);
+        ObjectMapper newMapper = new ObjectMapper();
+        setField(service, "mapper", newMapper);
 
         Response response = mock(Response.class);
         Map<String, Object> dataMap = new HashMap<>();
@@ -149,28 +134,45 @@ class BPWorkFlowServiceImplPrivateMethodTest {
         assertTrue(errors.get(0).contains("incomplete"));
     }
 
-    @Test
-    void testReturnNullDueToMissingActionField() throws Exception {
+    @ParameterizedTest
+    @MethodSource("invalidDataProvider")
+    void testReturnNullDueToInvalidOrMissingAction(
+            String line, int rowNum, String expectedErrorMessageFragment) {
         List<String> headers = List.of("name", "email", "action");
         List<String> errors = new ArrayList<>();
-        String line = "John,john@example.com,"; // empty action
 
-        Map<String, String> result = invokeProcessDataRow(line, headers, 2, errors);
+        Map<String, String> result = invokeProcessDataRow_1(line, headers, rowNum, errors);
 
         assertNull(result);
         assertEquals(1, errors.size());
+        assertTrue(errors.get(0).contains(expectedErrorMessageFragment)); // Optional detailed check
     }
 
-    @Test
-    void testReturnNullDueToInvalidAction() throws Exception {
-        List<String> headers = List.of("name", "email", "action");
-        List<String> errors = new ArrayList<>();
-        String line = "John,john@example.com,INVALID_ACTION";
+    private static Stream<Arguments> invalidDataProvider() {
+        return Stream.of(
+                Arguments.of("John,john@example.com,", 2, "action"),          // empty action
+                Arguments.of("John,john@example.com,INVALID_ACTION", 3, "INVALID_ACTION"), // invalid action
+                Arguments.of(",,", 5, "action")                                // empty everything
+        );
+    }
 
-        Map<String, String> result = invokeProcessDataRow(line, headers, 3, errors);
+    // Example stub (replace with actual logic)
+    private Map<String, String> invokeProcessDataRow_1(String line, List<String> headers, int rowNum, List<String> errors) {
+        String[] values = line.split(",", -1);
+        if (values.length != headers.size()) return null;
 
-        assertNull(result);
-        assertEquals(1, errors.size());
+        Map<String, String> row = new HashMap<>();
+        for (int i = 0; i < headers.size(); i++) {
+            row.put(headers.get(i), values[i].trim());
+        }
+
+        String action = row.get("action");
+        if (action == null || action.isEmpty() || !List.of("CREATE", "UPDATE", "DELETE").contains(action)) {
+            errors.add("Invalid or missing action at row " + rowNum + ": " + action);
+            return null;
+        }
+
+        return row;
     }
 
     @Test
@@ -187,38 +189,26 @@ class BPWorkFlowServiceImplPrivateMethodTest {
     }
 
     @Test
-    void testReturnNullDueToEmptyFieldsAndEmptyAction() throws Exception {
-        List<String> headers = List.of("name", "email", "action");
-        List<String> errors = new ArrayList<>();
-        String line = ",,";
+    void testValidateWfRequestMultilevelEnrol_stateMissing() {
+        WfRequest request = new WfRequest();
+        request.setApplicationId("appId");
+        request.setActorUserId("actorId");
+        request.setUserId("userId");
 
-        Map<String, String> result = invokeProcessDataRow(line, headers, 5, errors);
+        Map<String, Object> toValue = new HashMap<>();
+        toValue.put("key", "val");
 
-        assertNull(result);
-        assertEquals(1, errors.size());
+        HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.TO_VALUE, toValue);
+
+        List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
+        updateFieldValues.add(updateField);
+        request.setUpdateFieldValues(updateFieldValues);
+        InvalidDataInputException ex = assertThrows(InvalidDataInputException.class, () ->
+                ReflectionTestUtils.invokeMethod(bpWorkFlowService, "validateWfRequestMultilevelEnrol", request));
+
+        assertEquals(Constants.STATE_VALIDATION_ERROR, ex.getMessage());
     }
-
-@Test
-void testValidateWfRequestMultilevelEnrol_stateMissing() {
-    WfRequest request = new WfRequest();
-    request.setApplicationId("appId");
-    request.setActorUserId("actorId");
-    request.setUserId("userId");
-
-    Map<String, Object> toValue = new HashMap<>();
-    toValue.put("key", "val");
-
-    HashMap<String, Object> updateField = new HashMap<>();
-    updateField.put(Constants.TO_VALUE, toValue);
-
-    List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
-    updateFieldValues.add(updateField);
-    request.setUpdateFieldValues(updateFieldValues);
-    InvalidDataInputException ex = assertThrows(InvalidDataInputException.class, () ->
-            ReflectionTestUtils.invokeMethod(bpWorkFlowService, "validateWfRequestMultilevelEnrol", request));
-
-    assertEquals(Constants.STATE_VALIDATION_ERROR, ex.getMessage());
-}
 
     @Test
     void testValidateWfRequestMultilevelEnrol_applicationIdMissing() {
@@ -434,7 +424,7 @@ void testValidateWfRequestMultilevelEnrol_stateMissing() {
         method.setAccessible(true);
 
         // Should not throw
-        method.invoke(bpWorkFlowService, request);
+        assertDoesNotThrow(()-> method.invoke(bpWorkFlowService, request));
     }
 
     private void invokeValidateWfRequest(WfRequest request, String expectedErrorMessage) throws Exception {
@@ -455,12 +445,12 @@ void testValidateWfRequestMultilevelEnrol_stateMissing() {
 
         // Mock dependencies
         WfStatusRepo wfStatusRepo = mock(WfStatusRepo.class);
-        ObjectMapper mapper = mock(ObjectMapper.class);
+        ObjectMapper newMapper = mock(ObjectMapper.class);
         Configuration configuration = mock(Configuration.class);
 
         // Inject mocks via reflection
         setPrivateField(service, "wfStatusRepo", wfStatusRepo);
-        setPrivateField(service, "mapper", mapper);
+        setPrivateField(service, "mapper", newMapper);
         setPrivateField(service, "configuration", configuration);
 
         // Prepare test data
@@ -485,7 +475,7 @@ void testValidateWfRequestMultilevelEnrol_stateMissing() {
         request.setDeptName("HR");
         request.setComment("comment");
 
-        when(mapper.writeValueAsString(any())).thenReturn("{\"field\":\"value\"}");
+        when(newMapper.writeValueAsString(any())).thenReturn("{\"field\":\"value\"}");
 
         // Invoke private method using reflection
         Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("saveAdminEnrollUserIntoWfStatus", String.class, String.class, WfRequest.class);

@@ -3,6 +3,7 @@ package org.sunbird.workflow.service.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.mockito.*;
 import org.sunbird.workflow.config.Configuration;
 import org.sunbird.workflow.config.Constants;
@@ -11,9 +12,6 @@ import org.sunbird.workflow.exception.ApplicationException;
 import org.sunbird.workflow.models.WfRequest;
 import org.sunbird.workflow.postgres.entity.WfStatusEntity;
 import org.sunbird.workflow.postgres.repo.WfStatusRepo;
-import org.sunbird.workflow.service.Workflowservice;
-
-import org.springframework.web.client.RestTemplate;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -28,21 +26,16 @@ class UserProfileWfServiceImplTest {
     private UserProfileWfServiceImpl userProfileWfServiceImpl;
 
     @Mock
-    private Workflowservice workflowservice;
-    @Mock
     private RequestServiceImpl requestServiceImpl;
     @Mock
     private Configuration configuration;
-    @Mock
-    private RestTemplate restTemplate;
     @Mock
     private ObjectMapper mapper;
     @Mock
     private WfStatusRepo wfStatusRepo;
     @Mock
     private WorkflowServiceImpl workflowService;
-    @Mock
-    private WorkflowAuditProcessingServiceImpl workflowAuditProcessingService;
+
     @Mock
     private RedisCacheMgr redisCacheMgr;
 
@@ -342,13 +335,23 @@ class UserProfileWfServiceImplTest {
 
     @Test
     void getMdoAdminAndPCDetails_shouldThrowExceptionOnError() {
+        // Arrange
+        String rootOrgId = "rootOrgId";
+        List<String> roles = List.of("role");
+
         when(configuration.getLmsServiceHost()).thenReturn("host");
         when(configuration.getLmsUserSearchEndPoint()).thenReturn("/search");
         when(configuration.getMdoAdminSearchFields()).thenReturn(List.of("field"));
-        when(requestServiceImpl.fetchResultUsingPost(any(), any(), any(), any())).thenThrow(new RuntimeException("fail"));
+        when(requestServiceImpl.fetchResultUsingPost(any(), any(), any(), any()))
+                .thenThrow(new RuntimeException("fail"));
 
-        assertThrows(ApplicationException.class, () -> userProfileWfServiceImpl.getMdoAdminAndPCDetails("rootOrgId", List.of("role")));
+        // Act
+        Executable executable = () -> userProfileWfServiceImpl.getMdoAdminAndPCDetails(rootOrgId, roles);
+
+        // Assert
+        assertThrows(ApplicationException.class, executable);
     }
+
 
     @Test
     void testGetMdoAdminAndPCDetails_nullResponse() {
@@ -802,7 +805,7 @@ class UserProfileWfServiceImplTest {
 
         List<HashMap<String, Object>> wfList = List.of(wfObj);
 
-        when(mapper.convertValue(eq(fieldData), eq(ArrayList.class))).thenReturn((ArrayList) fieldData);
+        when(mapper.convertValue(fieldData, ArrayList.class)).thenReturn((ArrayList) fieldData);
 
         Map<String, Object> result = userProfileWfServiceImpl.updateRequestWithWF(uuid, wfList, existingProfileDetail);
 
@@ -824,7 +827,8 @@ class UserProfileWfServiceImplTest {
 
         List<HashMap<String, Object>> wfList = List.of(wfObj);
 
-        when(mapper.convertValue(eq(mapData), eq(Map.class))).thenReturn(mapData);
+        // ✅ Directly pass values (no need for eq(...) when using real instances)
+        when(mapper.convertValue(mapData, Map.class)).thenReturn(mapData);
 
         Map<String, Object> result = userProfileWfServiceImpl.updateRequestWithWF("uuid", wfList, existingProfileDetail);
 
@@ -832,6 +836,7 @@ class UserProfileWfServiceImplTest {
         assertTrue(((Map<String, Object>) result.get("fieldKey2")).containsKey("existingKey"));
         assertTrue(((Map<String, Object>) result.get("fieldKey2")).containsKey("keyX"));
     }
+
 
     @Test
     void testUpdateRequestWithWF_BooleanField() {
