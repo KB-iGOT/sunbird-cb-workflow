@@ -336,7 +336,7 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
             logger.info("Auto {} Group-Designation post Transfer Approval for userId: {}", nextState, applicationStatus.getUserId());
 
             List<WfStatusEntity> wfStatusEntities = wfStatusRepo.findByUserIdAndCurrentStatus(userId, Constants.SEND_FOR_APPROVAL, Boolean.TRUE);
-            if (wfStatusEntities == null || wfStatusEntities.isEmpty()) {
+            if (CollectionUtils.isEmpty(wfStatusEntities)) {
                 logger.warn("No pending Group-Designation request found for userId: {}",
                         savedEntity.getUserId());
                 return;
@@ -347,7 +347,7 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
             for (WfStatusEntity wfStatusEntity : wfStatusEntities) {
                 try {
                     String fieldValues = wfStatusEntity.getUpdateFieldValues();
-                    if (fieldValues == null || fieldValues.trim().isEmpty()) {
+                    if (StringUtils.isEmpty(fieldValues.trim().isEmpty())) {
                         logger.warn("Empty updateFieldValues | wfId={}, userId={}", wfStatusEntity.getWfId(), wfStatusEntity.getUserId());
                         continue;
                     }
@@ -381,14 +381,14 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
             }
 
             // Save only valid entities
-            if (!validEntities.isEmpty()) {
+            if (!CollectionUtils.isEmpty(validEntities)) {
                 wfStatusRepo.saveAll(validEntities);
             } else {
                 logger.warn("No valid workflow entities to save for userId: {}", userId);
             }
 
             // Push workflow events
-            if (!wfRequestsForEvent.isEmpty()) {
+            if (!CollectionUtils.isEmpty(wfRequestsForEvent)) {
                 try {
                     pushWorkflowEvents(Constants.PROFILE_SERVICE_NAME, userId, wfRequestsForEvent);
                     logger.info("Pushed {} workflow events for userId: {}", wfRequestsForEvent.size(), userId);
