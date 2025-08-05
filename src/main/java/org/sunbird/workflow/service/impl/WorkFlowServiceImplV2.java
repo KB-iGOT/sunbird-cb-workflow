@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.commons.collections.MapUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ import org.sunbird.workflow.postgres.repo.WfStatusRepo;
 import org.sunbird.workflow.producer.Producer;
 import org.sunbird.workflow.service.WorkFlowServiceV2;
 import org.sunbird.workflow.utils.CassandraOperation;
+import org.sunbird.workflow.utils.NotificationTriggerService;
 
 import java.io.IOException;
 import java.util.*;
@@ -59,6 +61,9 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
 
     @Autowired
     private RedisCacheMgr redisCacheMgr;
+
+    @Autowired
+    private NotificationTriggerService notificationTriggerService;
 
     @Override
     public Response workflowTransition(String rootOrg, String org, Map<String, Object> requestBody) {
@@ -111,6 +116,7 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
                                     responseData.put(Constants.WF_ID_CONSTANT, changeStatusResponse.get(Constants.WF_ID_CONSTANT));
                                 }
                                 wfRequestsForEvent.add(wfRequest);
+                                handlePostWorkflowNotification(wfRequest);
                             } catch (Exception e) {
                                 logger.error("Error processing workflow request ID: {}", wfRequest.getWfId(), e);
                                 responseData.put(Constants.STATUS, Constants.FAILED);
@@ -138,6 +144,68 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
             handleProcessingError(data, response);
         }
         return response;
+    }
+
+    private void handlePostWorkflowNotification(WfRequest wfRequest) {
+        if (Constants.PROFILE_SERVICE_NAME.equalsIgnoreCase(wfRequest.getServiceName())
+                && !Constants.WITHDRAW.equalsIgnoreCase(wfRequest.getAction())) {
+            sendNotification(wfRequest);
+        }
+    }
+
+    private void sendNotification(WfRequest wfRequest) {
+        if (Objects.isNull(wfRequest) || CollectionUtils.isEmpty(wfRequest.getUpdateFieldValues())) {
+            logger.info("wfRequest or updateFieldValues is null or empty.");
+            return;
+        }
+
+        Object toValueObj = wfRequest.getUpdateFieldValues().get(0).get(Constants.TO_VALUE);
+        if (!(toValueObj instanceof Map)) {
+            logger.info("toValue is not a Map or is null.");
+            return;
+        }
+
+        Map<String, Object> toValueMap = (Map<String, Object>) toValueObj;
+        if (MapUtils.isEmpty(toValueMap)) {
+            logger.info("toValue map is empty.");
+            return;
+        }
+
+        String requestKey = toValueMap.keySet().iterator().next();
+
+        switch (requestKey) {
+            case Constants.GROUP:
+            case Constants.DESIGNATION:
+                sendProfileUpdateNotification(wfRequest);
+                break;
+            case Constants.NAME:
+                sendOrgTransferUpdateNotification(wfRequest);
+                break;
+            default:
+                logger.info("No specific notification to send for request key: {}", requestKey);
+        }
+    }
+
+
+
+    private void sendOrgTransferUpdateNotification(WfRequest wfRequest) {
+        logger.info("Sending org transfer update notification for user: {}", wfRequest.getUserId());
+        Map<String, Object> placeholder = new HashMap<>();
+        String userId = wfRequest.getUserId();
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", wfRequest.getUserId());
+        notificationTriggerService.triggerNotification(Constants.TRANSFER_UPDATE, Constants.ALERT,
+                List.of(userId), data, placeholder);
+    }
+
+    private void sendProfileUpdateNotification(WfRequest wfRequest) {
+        logger.info("Sending profile update verification notification for user: {}", wfRequest.getUserId());
+        Map<String, Object> placeholder = new HashMap<>();
+        String userId = wfRequest.getUserId();
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", wfRequest.getUserId());
+        notificationTriggerService.triggerNotification(Constants.PROFILE_UPDATE, Constants.ALERT,
+                List.of(userId),data,placeholder);
     }
 
     private void handleProcessingError(List<Object> data, Response response) {
