@@ -154,19 +154,40 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
     }
 
     private void sendNotification(WfRequest wfRequest) {
-        String requestKey = ((Map<String, Object>) wfRequest.getUpdateFieldValues().get(0).get(Constants.TO_VALUE)).keySet().iterator().next();
+        if (Objects.isNull(wfRequest) || CollectionUtils.isEmpty(wfRequest.getUpdateFieldValues())) {
+            logger.info("wfRequest or updateFieldValues is null or empty.");
+            return;
+        }
+
+        Object toValueObj = wfRequest.getUpdateFieldValues().get(0).get(Constants.TO_VALUE);
+        if (!(toValueObj instanceof Map)) {
+            logger.info("toValue is not a Map or is null.");
+            return;
+        }
+
+        Map<String, Object> toValueMap = (Map<String, Object>) toValueObj;
+        if (MapUtils.isEmpty(toValueMap)) {
+            logger.info("toValue map is empty.");
+            return;
+        }
+
+        String requestKey = toValueMap.keySet().iterator().next();
+
         switch (requestKey) {
-            case "group":
-            case "designation":
+            case Constants.GROUP:
+            case Constants.DESIGNATION:
                 sendProfileUpdateNotification(wfRequest);
                 break;
-            case "name":
+            case Constants.NAME:
                 sendOrgTransferUpdateNotification(wfRequest);
                 break;
             default:
                 logger.info("No specific notification to send for request key: {}", requestKey);
         }
     }
+
+
+
     private void sendOrgTransferUpdateNotification(WfRequest wfRequest) {
         logger.info("Sending org transfer update notification for user: {}", wfRequest.getUserId());
         Map<String, Object> placeholder = new HashMap<>();
