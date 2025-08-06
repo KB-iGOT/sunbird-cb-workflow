@@ -116,7 +116,9 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
                                     responseData.put(Constants.WF_ID_CONSTANT, changeStatusResponse.get(Constants.WF_ID_CONSTANT));
                                 }
                                 wfRequestsForEvent.add(wfRequest);
+
                                 logger.info("sending notification request from here v2:{}",wfRequest);
+
                                 handlePostWorkflowNotification(wfRequest);
                             } catch (Exception e) {
                                 logger.error("Error processing workflow request ID: {}", wfRequest.getWfId(), e);
