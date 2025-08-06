@@ -53,6 +53,8 @@ import java.util.stream.Stream;
 @Service
 public class WorkflowServiceImpl implements Workflowservice {
 
+	Logger logger = LogManager.getLogger(WorkflowServiceImpl.class);
+
 	@Autowired
 	private WfStatusRepo wfStatusRepo;
 
@@ -154,6 +156,10 @@ public class WorkflowServiceImpl implements Workflowservice {
 			wfIds.add(changeStatusResponse.get(Constants.WF_ID_CONSTANT));
 			changedStatus = changeStatusResponse.get(Constants.STATUS);
 		}
+		logger.info("updateNotification trigeer here v1:{}",requestKey,wfRequest);
+		if (wfRequest.getServiceName().equalsIgnoreCase(Constants.PROFILE_SERVICE_NAME) && (wfRequest.getAction().equalsIgnoreCase(Constants.APPROVE_STATE) || wfRequest.getAction().equalsIgnoreCase(Constants.REJECT))) {
+			sendUpdateNotification(requestKey,wfRequest);
+		}
 		if (wfRequest.getServiceName().equalsIgnoreCase(Constants.PROFILE_SERVICE_NAME) && !wfRequest.getAction().equalsIgnoreCase(Constants.WITHDRAW)) {
 			sendNotification(requestKey, doptName, wfRequest);
 		}
@@ -163,6 +169,40 @@ public class WorkflowServiceImpl implements Workflowservice {
 		response.put(Constants.DATA, data);
 		response.put(Constants.STATUS, HttpStatus.OK);
 		return response;
+	}
+
+	private void sendUpdateNotification(String requestKey,WfRequest wfRequest) {
+		switch (requestKey) {
+			case Constants.GROUP:
+			case Constants.DESIGNATION:
+				sendProfileUpdateNotification(wfRequest);
+				break;
+			case Constants.NAME:
+				sendOrgTransferUpdateNotification(wfRequest);
+				break;
+			default:
+				logger.info("No specific notification to send for request key: {}", requestKey);
+		}
+	}
+
+	private void sendOrgTransferUpdateNotification(WfRequest wfRequest) {
+		logger.info("Sending org transfer update notification for user: {}", wfRequest.getUserId());
+		Map<String, Object> placeholder = new HashMap<>();
+		String userId = wfRequest.getUserId();
+		Map<String, Object> data = new HashMap<>();
+		data.put("id", wfRequest.getUserId());
+		notificationTriggerService.triggerNotification(Constants.TRANSFER_UPDATE, Constants.ALERT,
+				List.of(userId), data, placeholder);
+	}
+
+	private void sendProfileUpdateNotification(WfRequest wfRequest) {
+		logger.info("Sending profile update verification notification for user: {}", wfRequest.getUserId());
+		Map<String, Object> placeholder = new HashMap<>();
+		String userId = wfRequest.getUserId();
+		Map<String, Object> data = new HashMap<>();
+		data.put("id", wfRequest.getUserId());
+		notificationTriggerService.triggerNotification(Constants.PROFILE_UPDATE, Constants.ALERT,
+				List.of(userId),data,placeholder);
 	}
 
 	public Response workflowTransition(String rootOrg, String org, WfRequest wfRequest) {
