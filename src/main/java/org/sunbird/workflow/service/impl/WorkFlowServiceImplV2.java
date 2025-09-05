@@ -197,7 +197,7 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
         String userId = wfRequest.getUserId();
         Map<String, Object> data = new HashMap<>();
         data.put("id", wfRequest.getUserId());
-        notificationTriggerService.triggerNotification(Constants.TRANSFER_UPDATE, Constants.ALERT,
+        notificationTriggerService.triggerNotification(Constants.TRANSFER_UPDATE, Constants.UPDATE,
                 List.of(userId), data, placeholder);
     }
 
@@ -207,7 +207,7 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
         String userId = wfRequest.getUserId();
         Map<String, Object> data = new HashMap<>();
         data.put("id", wfRequest.getUserId());
-        notificationTriggerService.triggerNotification(Constants.PROFILE_UPDATE, Constants.ALERT,
+        notificationTriggerService.triggerNotification(Constants.PROFILE_UPDATE, Constants.UPDATE,
                 List.of(userId),data,placeholder);
     }
 
