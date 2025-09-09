@@ -1801,7 +1801,7 @@ public class WorkflowServiceImpl implements Workflowservice {
                     userIds, data, placeholder);
         } else if (wfRequest.getAction().equalsIgnoreCase(Constants.REJECT)) {
             String userId = wfRequest.getUserId();
-            notificationTriggerService.triggerNotification(Constants.TRANSFER_UPDATE, Constants.ALERT,
+            notificationTriggerService.triggerNotification(Constants.TRANSFER_UPDATE, Constants.UPDATE,
                     List.of(userId), data, placeholder);
         }
 	}
