@@ -1796,10 +1796,14 @@ public class WorkflowServiceImpl implements Workflowservice {
 		}
 		Map<String, Object> data = new HashMap<>();
 		data.put("id", wfRequest.getUserId());
-		if (!wfRequest.getAction().equalsIgnoreCase(Constants.REJECT)) {
-			notificationTriggerService.triggerNotification(Constants.USER_TRANSFER, Constants.ALERT,
-					userIds, data, placeholder);
-		}
+        if (!wfRequest.getAction().equalsIgnoreCase(Constants.REJECT)) {
+            notificationTriggerService.triggerNotification(Constants.USER_TRANSFER, Constants.ALERT,
+                    userIds, data, placeholder);
+        } else if (wfRequest.getAction().equalsIgnoreCase(Constants.REJECT)) {
+            String userId = wfRequest.getUserId();
+            notificationTriggerService.triggerNotification(Constants.TRANSFER_UPDATE, Constants.ALERT,
+                    List.of(userId), data, placeholder);
+        }
 	}
 
 	private void sendProfileVerificationNotification(WfRequest wfRequest, String rootOrgId) {
