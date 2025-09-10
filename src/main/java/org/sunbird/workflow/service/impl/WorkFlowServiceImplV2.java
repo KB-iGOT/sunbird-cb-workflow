@@ -119,7 +119,6 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
 
                                 logger.info("sending notification request from here v2:{}",wfRequest);
 
-                                handlePostWorkflowNotification(wfRequest);
                             } catch (Exception e) {
                                 logger.error("Error processing workflow request ID: {}", wfRequest.getWfId(), e);
                                 responseData.put(Constants.STATUS, Constants.FAILED);
@@ -133,6 +132,7 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
                         }
                         logger.info("Completed workflowTransition successfully for userId: {}", userId);
                     }
+                    handlePostWorkflowNotification(wfRequestList.get(0));
                     response.put(Constants.MESSAGE, Constants.SUCCESS);
                     response.put(Constants.DATA, data);
                     response.put(Constants.STATUS, HttpStatus.OK);
