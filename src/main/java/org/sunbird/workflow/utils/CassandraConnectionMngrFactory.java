@@ -2,7 +2,6 @@ package org.sunbird.workflow.utils;
 
 public class CassandraConnectionMngrFactory {
 
-    @SuppressWarnings("squid:S3077")
     private static volatile CassandraConnectionManager instance;
 
     public static CassandraConnectionManager getInstance() {
