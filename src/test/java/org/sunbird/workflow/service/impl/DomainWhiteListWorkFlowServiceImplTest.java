@@ -9,6 +9,7 @@ import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
 import org.sunbird.workflow.config.Configuration;
 import org.sunbird.workflow.config.Constants;
+import org.sunbird.workflow.exception.BadRequestException;
 import org.sunbird.workflow.models.*;
 import org.sunbird.workflow.postgres.entity.*;
 import org.sunbird.workflow.postgres.repo.*;
@@ -265,5 +266,151 @@ class DomainWhiteListWorkFlowServiceImplTest {
         assertNotNull(response);
         assertEquals(HttpStatus.OK, response.getResult().get(Constants.STATUS));
     }
+
+    @Test
+    void testCreateDomainWorkFlow_exceptionCase() {
+        WfRequest wfRequest = new WfRequest();
+        HashMap<String, Object> updateFieldValues = new HashMap<>();
+        HashMap<String, String> toValue = new HashMap<>();
+        toValue.put("domain", "example.com");
+        updateFieldValues.put("toValue", toValue);
+        wfRequest.setUpdateFieldValues(List.of(updateFieldValues));
+
+        // Force exception in repo call
+        when(configuration.getDomainValidationRegex()).thenReturn(".*");
+        when(wfDomainUserInfoRepo.findByDomainNameAndEmailAndMobile(any(), any(), any()))
+                .thenThrow(new RuntimeException("DB down"));
+
+        Response resp = service.createDomainWorkFlow("root", "org", wfRequest);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, resp.getResponseCode());
+    }
+
+    @Test
+    void testCreateDomainWorkFlow_rejectedDomain() throws Exception {
+        when(configuration.getDomainValidationRegex()).thenReturn(".*");
+
+        WfRequest wfRequest = new WfRequest();
+        HashMap<String, Object> updateFieldValues = new HashMap<>();
+        HashMap<String, String> toValue = new HashMap<>();
+        toValue.put("domain", "example.com");
+        updateFieldValues.put("toValue", toValue);
+        updateFieldValues.put("email", "a@b.com");
+        updateFieldValues.put("mobile", "1234567890");
+        updateFieldValues.put("firstName", "X");
+        wfRequest.setUpdateFieldValues(List.of(updateFieldValues));
+
+        WfDomainLookup lookup = new WfDomainLookup();
+        lookup.setWfId("wfId");
+
+        WfStatusEntity entity = new WfStatusEntity();
+        entity.setCurrentStatus(Constants.REJECTED);
+
+        when(wfDomainUserInfoRepo.findByDomainNameAndEmailAndMobile(any(), any(), any()))
+                .thenReturn(List.of(new WfDomainUserInfo()));
+        when(wfDomainLookupRepo.findByDomainName(any())).thenReturn(List.of(lookup));
+        when(wfStatusRepo.findByWfId(any())).thenReturn(entity);
+
+        Response resp = service.createDomainWorkFlow("root", "org", wfRequest);
+        assertEquals(HttpStatus.OK, resp.getResult().get(Constants.STATUS));
+    }
+
+    @Test
+    void testUpdateDomainWorkFlow_delegatesProperly() {
+        Response r = new Response();
+        r.put(Constants.STATUS, HttpStatus.OK);
+        when(workflowService.workflowTransition(any(), any(), any())).thenReturn(r);
+
+        Response res = service.updateDomainWorkFlow("root", "org", new WfRequest());
+        assertEquals(HttpStatus.OK, res.getResult().get(Constants.STATUS));
+    }
+
+    @Test
+    void testReadDomainWFApplication_delegatesProperly() {
+        Response r = new Response();
+        r.put(Constants.STATUS, HttpStatus.OK);
+        when(workflowService.getWfApplication(any(), any(), any(), any())).thenReturn(r);
+
+        Response res = service.readDomainWFApplication("root", "org", "wfId", "appId");
+        assertEquals(HttpStatus.OK, res.getResult().get(Constants.STATUS));
+    }
+
+    @Test
+    void testApplicationSearchOnApplicationIdGroup_BadRequest() {
+        SearchCriteria criteria = new SearchCriteria(); // empty triggers bad request
+        assertThrows(BadRequestException.class,
+                () -> service.domainSearch("root", "org", criteria));
+    }
+
+    @Test
+    void testGetPageReqForApplicationSearch_CustomLimitsOffsets() throws Exception {
+        SearchCriteria criteria = new SearchCriteria();
+        criteria.setLimit(5);
+        criteria.setOffset(1);
+        criteria.setServiceName("svc");
+        criteria.setApplicationStatus("st");
+        criteria.setDeptName("d");
+
+        lenient().when(configuration.getDefaultLimit()).thenReturn(10);
+        lenient().when(configuration.getDefaultOffset()).thenReturn(0);
+        lenient().when(configuration.getMaxLimit()).thenReturn(50);
+
+        java.lang.reflect.Method m = DomainWhiteListWorkFlowServiceImpl.class
+                .getDeclaredMethod("getPageReqForApplicationSearch", SearchCriteria.class);
+        m.setAccessible(true);
+        Object pageable = m.invoke(service, criteria);
+
+        assertNotNull(pageable);
+    }
+
+
+    @Test
+    void testProcessDomainRequest_nonApproveAction() {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setAction("REJECT");
+        assertDoesNotThrow(() -> service.processDomainRequest(wfRequest));
+    }
+
+    @Test
+    void testProcessDomainRequest_alreadyApprovedDomain() {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setAction(Constants.APPROVE_STATE);
+        HashMap<String, Object> updateFieldValues = new HashMap<>();
+        HashMap<String, Object> toValue = new HashMap<>();
+        toValue.put(Constants.DOMAIN, "approved.com");
+        updateFieldValues.put(Constants.TO_VALUE, toValue);
+        wfRequest.setUpdateFieldValues(List.of(updateFieldValues));
+
+        when(cassandraOperation.getRecordsByProperties(any(), any(), any(), any()))
+                .thenReturn(List.of(Map.of()));
+
+        // Should not insert again
+        service.processDomainRequest(wfRequest);
+        verify(cassandraOperation, never()).insertRecord(any(), any(), any());
+    }
+
+    @Test
+    void testIsValidDomain_falseCase() throws Exception {
+        when(configuration.getDomainValidationRegex()).thenReturn("^invalid$");
+        java.lang.reflect.Method m = DomainWhiteListWorkFlowServiceImpl.class
+                .getDeclaredMethod("isValidDomain", String.class);
+        m.setAccessible(true);
+        boolean result = (boolean) m.invoke(service, "wrong.com");
+        assertFalse(result);
+    }
+
+    @Test
+    void testIsAlreadyApprovedDomains_trueCase() throws Exception {
+        java.lang.reflect.Method m = DomainWhiteListWorkFlowServiceImpl.class
+                .getDeclaredMethod("isAlreadyApprovedDomains", String.class);
+        m.setAccessible(true);
+
+        when(cassandraOperation.getRecordsByProperties(any(), any(), any(), any()))
+                .thenReturn(List.of(Map.of()));
+
+        boolean result = (boolean) m.invoke(service, "x.com");
+        assertTrue(result);
+    }
+
 
 }

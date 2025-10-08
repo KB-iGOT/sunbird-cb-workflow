@@ -14,6 +14,7 @@ import org.sunbird.workflow.models.*;
 import org.sunbird.workflow.postgres.entity.WfStatusEntity;
 import org.sunbird.workflow.postgres.repo.WfStatusRepo;
 
+import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
@@ -499,4 +500,95 @@ class BPWorkFlowServiceImplPrivateMethodTest {
         field.setAccessible(true);
         field.set(target, value);
     }
+
+    @Test
+    void testEscapeSpecialCharacters_withCommaAndQuotes() throws Exception {
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("escapeSpecialCharacters", String.class);
+        method.setAccessible(true);
+
+        String result = (String) method.invoke(bpWorkFlowService, "John,\"Doe\"");
+        assertTrue(result.startsWith("\""));
+        assertTrue(result.endsWith("\""));
+    }
+
+    @Test
+    void testEscapeSpecialCharacters_withEmptyValue_logsError() throws Exception {
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("escapeSpecialCharacters", String.class);
+        method.setAccessible(true);
+
+        String result = (String) method.invoke(bpWorkFlowService, "");
+        assertEquals("", result);
+    }
+
+    @Test
+    void testIsWithinRange_trueAndFalseCases() {
+        Date start = new Date();
+        Date mid = new Date(start.getTime() + 1000);
+        Date end = new Date(start.getTime() + 2000);
+
+        assertTrue(BPWorkFlowServiceImpl.isWithinRange(mid, start, end));
+        assertFalse(BPWorkFlowServiceImpl.isWithinRange(
+                new Date(start.getTime() - 5000), start, end));
+    }
+
+    @Test
+    void testBuildRow_containsAllColumns() throws Exception {
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod(
+                "buildRow", String.class, String.class, String.class, String.class);
+        method.setAccessible(true);
+
+        LinkedHashMap<String, String> row = (LinkedHashMap<String, String>)
+                method.invoke(bpWorkFlowService, "a@b.com", "John", "wf1", "u1");
+
+        assertEquals(5, row.size());
+        assertTrue(row.containsKey(Constants.ACTION_APPROVE_REJECT));
+    }
+
+    @Test
+    void testIsValidFileFormat_trueAndFalse() throws Exception {
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("isValidFileFormat", String.class);
+        method.setAccessible(true);
+
+        assertTrue((boolean) method.invoke(bpWorkFlowService, "file.csv"));
+        assertFalse((boolean) method.invoke(bpWorkFlowService, "file.txt"));
+
+        // Correct way to invoke with null argument
+        assertFalse((boolean) method.invoke(bpWorkFlowService, new Object[]{null}));
+    }
+
+    @Test
+    void testDeleteTempFile_existingFile_deleted() throws Exception {
+        File temp = File.createTempFile("testfile", ".csv");
+        assertTrue(temp.exists());
+
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("deleteTempFile", File.class);
+        method.setAccessible(true);
+        method.invoke(bpWorkFlowService, temp);
+
+        assertFalse(temp.exists()); // Should be deleted
+    }
+
+    @Test
+    void testDeleteTempFile_nullOrNonExistent() throws Exception {
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("deleteTempFile", File.class);
+        method.setAccessible(true);
+        assertDoesNotThrow(() -> method.invoke(bpWorkFlowService, (Object) null));
+    }
+
+    @Test
+    void testAddFailureToResponse_addsFailureDetails() throws Exception {
+        SBApiResponse response = new SBApiResponse();
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod(
+                "addFailureToResponse", SBApiResponse.class, String.class, String.class);
+        method.setAccessible(true);
+
+        method.invoke(bpWorkFlowService, response, "wf123", "someError");
+
+        List<Map<String, String>> failures =
+                (List<Map<String, String>>) response.getResult().get("updateFailures");
+
+        assertEquals(1, failures.size());
+        assertEquals("wf123", failures.get(0).get(Constants.WF_ID_CONSTANT));
+    }
+
 }
