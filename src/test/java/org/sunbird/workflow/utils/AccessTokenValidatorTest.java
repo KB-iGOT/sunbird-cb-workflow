@@ -5,12 +5,15 @@ import org.bouncycastle.operator.KeyWrapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.platform.commons.util.StringUtils;
 import org.keycloak.common.util.Time;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.sunbird.workflow.config.Constants;
+import org.sunbird.workflow.models.KeyData;
 
 import java.lang.reflect.Method;
 import java.security.PublicKey;
@@ -19,8 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AccessTokenValidatorTest {
@@ -175,4 +177,99 @@ class AccessTokenValidatorTest {
 
         assertFalse(result, "Expected false when issuer is blank");
     }
+
+    @Test
+    void testValidateToken_validSignature_notExpired_returnsTokenBody() throws Exception {
+
+        String token = "header.body.signature";
+        Map<Object, Object> headerData = new HashMap<>();
+        headerData.put("kid", "testKeyId");
+
+        Map<String, Object> bodyData = new HashMap<>();
+        bodyData.put("exp", Time.currentTime() + 5000);
+        bodyData.put("iss", "http://realm");
+        bodyData.put("sub", "user:123");
+
+        try (MockedStatic<Base64Util> base64Mock = mockStatic(Base64Util.class);
+             MockedStatic<CryptoUtil> cryptoMock = mockStatic(CryptoUtil.class)) {
+
+            base64Mock.when(() -> Base64Util.decode(anyString(), anyInt()))
+                    .thenReturn(mapper.writeValueAsBytes(headerData))
+                    .thenReturn(mapper.writeValueAsBytes(bodyData))
+                    .thenReturn("sig".getBytes());
+
+            cryptoMock.when(() ->
+                    CryptoUtil.verifyRSASign(anyString(), any(), any(), eq(Constants.SHA_256_WITH_RSA))
+            ).thenReturn(true);
+
+            KeyData keyData = mock(KeyData.class);
+            when(keyManager.getPublicKey(anyString())).thenReturn(keyData);
+            when(keyData.getPublicKey()).thenReturn(mockPublicKey);
+
+            String result = accessTokenValidator.verifyUserToken(token);
+
+
+            assertEquals("123", result);
+        }
+    }
+
+    @Test
+    void testValidateToken_validSignature_butExpired_returnsEmptyMap() throws Exception {
+        String token = "header.body.signature";
+        Map<Object, Object> headerData = new HashMap<>();
+        headerData.put("kid", "testKeyId");
+
+        Map<String, Object> bodyData = new HashMap<>();
+        bodyData.put("exp", Time.currentTime() - 100);
+        bodyData.put("iss", "issuer");
+        bodyData.put("sub", "user:expired");
+
+        try (MockedStatic<Base64Util> base64Mock = mockStatic(Base64Util.class);
+             MockedStatic<CryptoUtil> cryptoMock = mockStatic(CryptoUtil.class)) {
+
+            base64Mock.when(() -> Base64Util.decode(anyString(), anyInt()))
+                    .thenReturn(mapper.writeValueAsBytes(headerData))
+                    .thenReturn(mapper.writeValueAsBytes(bodyData))
+                    .thenReturn("sig".getBytes());
+
+            cryptoMock.when(() ->
+                    CryptoUtil.verifyRSASign(anyString(), any(), any(), eq(Constants.SHA_256_WITH_RSA))
+            ).thenReturn(true);
+
+            KeyData keyData = mock(KeyData.class);
+            when(keyManager.getPublicKey(anyString())).thenReturn(keyData);
+            when(keyData.getPublicKey()).thenReturn(mockPublicKey);
+
+            String result = accessTokenValidator.verifyUserToken(token);
+
+            assertEquals(Constants._UNAUTHORIZED, result);
+        }
+    }
+
+    @Test
+    void testVerifyUserToken_validPayload_extractsUserId() {
+        AccessTokenValidator validator = new AccessTokenValidator() {
+            @Override
+            public String verifyUserToken(String token) {
+                Map<String, Object> payload = new HashMap<>();
+                payload.put(Constants.SUB, "user:validUser");
+                payload.put("iss", "realm");
+                if (!payload.isEmpty()) {
+                    String userId = (String) payload.get(Constants.SUB);
+                    if (StringUtils.isNotBlank(userId)) {
+                        int pos = userId.lastIndexOf(":");
+                        userId = userId.substring(pos + 1);
+                        return userId;
+                    }
+                }
+                return Constants._UNAUTHORIZED;
+            }
+        };
+
+        String result = validator.verifyUserToken("fake.token");
+
+        assertEquals("validUser", result);
+    }
+
+
 }

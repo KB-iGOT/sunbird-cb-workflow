@@ -55,6 +55,7 @@ public class ApplicationProcessingServiceImpl {
 				break;
 			case Constants.DOMAIN:
 				domainWhiteListWorkFlowService.processDomainRequest(wfRequest);
+                // fall through intentionally
 			case Constants.BLENDED_PROGRAM_SERVICE_NAME:
 			case Constants.ONE_STEP_MDO_APPROVAL:
 			case Constants.ONE_STEP_PC_APPROVAL:

@@ -59,7 +59,7 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 	private WfStatusRepo wfStatusRepo;
 
 	@Autowired
-	WorkflowServiceImpl workflowService;
+	WorkflowServiceImpl workflowServiceImpl;
 
 	@Autowired
 	private WorkflowAuditProcessingServiceImpl workflowAuditProcessingService;
@@ -378,7 +378,7 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 				requestBody.put(Constants.USER_ID, wfRequest.getApplicationId());
 				requestBody.put(Constants.DEPARTMENT_NAME, updatedDeptName);
 				request.put(Constants.REQUEST, requestBody);
-				workflowService.updatePendingRequestsToNewMDO(request);
+                workflowServiceImpl.updatePendingRequestsToNewMDO(request);
 			}
 		}
 		return updatedDeptName;
@@ -633,7 +633,7 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 			requestBody.put(Constants.DEPARTMENT_NAME, updatedDeptName);
 			request.put(Constants.REQUEST, requestBody);
 
-			workflowService.updatePendingRequestsToNewMDO(request);
+            workflowServiceImpl.updatePendingRequestsToNewMDO(request);
 		} catch (Exception e) {
 			logger.error("Error updating pending requests for wfRequest: {}", wfRequest.getApplicationId(), e);
 		}

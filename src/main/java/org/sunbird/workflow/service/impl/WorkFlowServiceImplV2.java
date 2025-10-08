@@ -418,7 +418,7 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
             for (WfStatusEntity wfStatusEntity : wfStatusEntities) {
                 try {
                     String fieldValues = wfStatusEntity.getUpdateFieldValues();
-                    if (StringUtils.isEmpty(fieldValues.trim().isEmpty())) {
+                    if (StringUtils.isEmpty(fieldValues)) {
                         logger.warn("Empty updateFieldValues | wfId={}, userId={}", wfStatusEntity.getWfId(), wfStatusEntity.getUserId());
                         continue;
                     }

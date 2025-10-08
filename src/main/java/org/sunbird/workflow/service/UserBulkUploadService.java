@@ -715,9 +715,6 @@ public class UserBulkUploadService {
     public void processBulkUploadV1(HashMap<String, String> inputDataMap) throws IOException {
         File file = null;
         BufferedReader reader = null;
-        CSVPrinter csvPrinter = null;
-        BufferedWriter bufferedWriter = null;
-        FileWriter fileWriter = null;
         int totalRecordsCount = 0;
         int noOfSuccessfulRecords = 0;
         int failedRecordsCount = 0;
@@ -1087,11 +1084,15 @@ public class UserBulkUploadService {
                     logger.info("UserBulkUploadService:: Record Completed. Time taken: {} milli-seconds", duration);
                     updatedRecords.add(csvValues);
                 }
-                    // Write back updated records to the same CSV file
-                    fileWriter = new FileWriter(file);
-                    bufferedWriter = new BufferedWriter(fileWriter);
-                    csvPrinter = new CSVPrinter(bufferedWriter,CSVFormat.newFormat(csvDelimiter).withHeader(headers.toArray(new String[0])).withRecordSeparator(System.lineSeparator()));
-
+                // Write back updated records to the same CSV file
+                try (FileWriter fileWriter = new FileWriter(file);
+                     BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
+                     CSVPrinter csvPrinter = new CSVPrinter(
+                             bufferedWriter,
+                             CSVFormat.newFormat(csvDelimiter)
+                                     .withHeader(headers.toArray(new String[0]))
+                                     .withRecordSeparator(System.lineSeparator())
+                     )) {
 
                 for (Map<String, Object> record : updatedRecords) {
                     List<String> recordValues = new ArrayList<>();
@@ -1120,6 +1121,7 @@ public class UserBulkUploadService {
                 updateUserBulkUploadStatus(inputDataMap.get(Constants.ROOT_ORG_ID), inputDataMap.get(Constants.IDENTIFIER),
                         status, totalRecordsCount, noOfSuccessfulRecords, failedRecordsCount);
 
+                }
             } else {
                 logger.error("File does not exist or is empty.");
                 status = Constants.FAILED_UPPERCASE;
@@ -1131,12 +1133,6 @@ public class UserBulkUploadService {
         } finally {
             if (csvParser != null)
                 csvParser.close();
-            if (csvPrinter != null)
-                csvPrinter.close();
-            if (bufferedWriter != null)
-                bufferedWriter.close();
-            if (fileWriter != null)
-                fileWriter.close();
             if (file != null)
                 file.delete();
         }

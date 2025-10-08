@@ -88,8 +88,6 @@ public class NotificationServiceImpl {
 
 	private static final String BATCH_NAME_TAG = "#batch_name";
 
-	private static final String Role_TAG = "#role";
-
 	private static final String ACT_TAG = "#action";
 
 	private static final String BATCH_START_DATE_TAG = "#batch_start_date";
@@ -154,12 +152,12 @@ public class NotificationServiceImpl {
 							.replace(BATCH_START_DATE_TAG, wfRequest.getBatchStartDate().toString());
 					switch (wfStatusEntity.getCurrentStatus()){
 						case Constants.SEND_FOR_PC_APPROVAL:
-							subjectLine = BP_MDO_PC_SUBJECT_LINE.replace(Role_TAG,Constants.PROGRAM_COORDINATOR.replace("_"," "));
-							body = forwardedMailBody.replace(Role_TAG,Constants.PROGRAM_COORDINATOR.replace("_"," "));
+							subjectLine = BP_MDO_PC_SUBJECT_LINE.replace(ROLE_TAG,Constants.PROGRAM_COORDINATOR.replace("_"," "));
+							body = forwardedMailBody.replace(ROLE_TAG,Constants.PROGRAM_COORDINATOR.replace("_"," "));
 							break;
 						case Constants.SEND_FOR_MDO_APPROVAL:
-							subjectLine = BP_MDO_PC_SUBJECT_LINE.replace(Role_TAG,Constants.MDO_ADMIN.split("_")[0]);
-							body = forwardedMailBody.replace(Role_TAG,Constants.MDO_ADMIN.split("_")[0]);
+							subjectLine = BP_MDO_PC_SUBJECT_LINE.replace(ROLE_TAG,Constants.MDO_ADMIN.split("_")[0]);
+							body = forwardedMailBody.replace(ROLE_TAG,Constants.MDO_ADMIN.split("_")[0]);
 							break;
 						case Constants.APPROVED:
 							subjectLine = ENROLMENT_ACTION_SUBJECT.replace(ACT_TAG, wfStatusEntity.getCurrentStatus());

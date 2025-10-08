@@ -55,9 +55,9 @@ public class StorageServiceImpl implements StorageService {
         try {
             file = new File(System.currentTimeMillis() + "_" + mFile.getOriginalFilename());
             file.createNewFile();
-            FileOutputStream fos = new FileOutputStream(file);
-            fos.write(mFile.getBytes());
-            fos.close();
+            try (FileOutputStream fos = new FileOutputStream(file)) {
+                fos.write(mFile.getBytes());
+            }
             return uploadFile(file, cloudFolderName, containerName);
         } catch (Exception e) {
             logger.error("Failed to Upload File Exception", e);
