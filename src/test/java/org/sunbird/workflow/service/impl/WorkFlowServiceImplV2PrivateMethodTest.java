@@ -686,9 +686,10 @@ class WorkFlowServiceImplV2PrivateMethodTest {
         wfRequest.setDeptName("IT");
         wfRequest.setComment("Approved");
         wfRequest.setAction("APPROVE");
+        wfRequest.setServiceName("PROFILE_SERVICE");
 
         Map<String, Object> toValue = new HashMap<>();
-        toValue.put("key1", "value");
+        toValue.put("name", "Finance");
 
         HashMap<String, Object> updateField = new HashMap<>();
         updateField.put(Constants.TO_VALUE, toValue);
@@ -708,7 +709,7 @@ class WorkFlowServiceImplV2PrivateMethodTest {
         WorkFlowModel workFlowModel = new WorkFlowModel();
         workFlowModel.setWfstates(List.of(wfStatus));
 
-        when(mapper.writeValueAsString(any())).thenReturn("{\"key\":\"value\"}");
+        when(mapper.writeValueAsString(any())).thenReturn("[{\"toValue\":{\"name\":\"Finance\"}}]");
 
         WfStatusEntity savedEntity = new WfStatusEntity();
         savedEntity.setUserId("user-1");
@@ -720,6 +721,7 @@ class WorkFlowServiceImplV2PrivateMethodTest {
         WfStatusEntity entity1 = new WfStatusEntity();
         entity1.setUserId("user-1");
         entity1.setWfId("wf-123");
+        entity1.setUpdateFieldValues("[{\"toValue\":{\"group\":\"HR\"}}]"); // ✅ ensure non-null valid JSON
         List<WfStatusEntity> transferList = List.of(entity1);
         when(wfStatusRepo.findByUserIdAndCurrentStatus("user-1", "SEND_FOR_APPROVAL", true))
                 .thenReturn(transferList);

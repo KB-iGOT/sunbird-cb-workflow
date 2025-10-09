@@ -418,5 +418,9 @@ public class Constants {
 	public static final String PROFILE_UPDATE = "PROFILE_UPDATE";
 	public static final String TRANSFER_UPDATE = "TRANSFER_UPDATE";
     public static final String UPDATE = "UPDATE";
+    public static final String MINISTRYORSTATEID = "ministryOrStateId";
+    public static final String MINISTRYORSTATEORGNAME = "ministryOrStateOrgName";
+    public static final String MINISTRYORSTATENAME = "ministryOrStateName";
+
 
 }

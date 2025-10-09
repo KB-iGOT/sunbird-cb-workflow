@@ -429,6 +429,11 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 				}
 			}
 		}
+        Map<String, Object> orgDetails = fetchOrgDetails(wfRequest.getDeptName());
+        if(MapUtils.isNotEmpty(orgDetails)){
+            updateRequest.put(Constants.MINISTRYORSTATEID, orgDetails.get(Constants.MINISTRYORSTATEID));
+            updateRequest.put(Constants.MINISTRYORSTATEORGNAME, orgDetails.get(Constants.MINISTRYORSTATENAME));
+        }
 		requestWrapper.put(Constants.USER_ID, wfRequest.getApplicationId());
 		requestWrapper.put(Constants.PROFILE_DETAILS, updateRequest);
 		requestObject.put(Constants.REQUEST, requestWrapper);
@@ -671,4 +676,36 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 			}
 		}
 	}
+
+    private Map<String, Object> fetchOrgDetails(String deptName) {
+        if (StringUtils.isNotEmpty(deptName)) {
+            Map<String, Object> reqMap = new HashMap<>();
+            reqMap.put(Constants.FILTERS, Collections.singletonMap(Constants.CHANNEL, deptName));
+            Map<String, Object> requestObj = new HashMap<>();
+            requestObj.put(Constants.REQUEST, reqMap);
+            HashMap<String, String> headersValue = new HashMap<>();
+            headersValue.put(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON);
+            try {
+                StringBuilder builder = new StringBuilder(configuration.getLmsServiceHost());
+                builder.append(configuration.getLmsOrgSearchEndPoint());
+                Map<String, Object> orgDetails = (Map<String, Object>) requestServiceImpl
+                        .fetchResultUsingPost(builder, requestObj, Map.class, headersValue);
+                if (MapUtils.isNotEmpty(orgDetails) && Constants.OK.equalsIgnoreCase((String)orgDetails.get(Constants.RESPONSE_CODE))) {
+                    Map<String, Object> result = (Map<String, Object>) orgDetails.get(Constants.RESULT);
+                    if (MapUtils.isNotEmpty(result) && result.get(Constants.RESPONSE) instanceof Map) {
+                        Map<String, Object> response = (Map<String, Object>) result.get(Constants.RESPONSE);
+                        if (MapUtils.isNotEmpty(response) && response.get(Constants.CONTENT) instanceof List) {
+                            List<Map<String, Object>> contentList = (List<Map<String, Object>>) response.get(Constants.CONTENT);
+                            if (CollectionUtils.isNotEmpty(contentList)) {
+                                return contentList.get(0);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                logger.error("There is a error occured while searching for the Org details : {}",e.getMessage());
+            }
+        }
+        return Map.of();
+    }
 }
