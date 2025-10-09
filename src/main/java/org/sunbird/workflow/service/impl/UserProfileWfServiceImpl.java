@@ -697,8 +697,7 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
                         if (responseObj.get(Constants.CONTENT) instanceof List) {
                             List<Map<String, Object>> contentList = (List<Map<String, Object>>) responseObj.get(Constants.CONTENT);
                             if (!contentList.isEmpty()) {
-                                Map<String, Object> firstOrg = contentList.get(0);
-                                return firstOrg;
+                                return contentList.get(0);
                             }
                         }
                     }
