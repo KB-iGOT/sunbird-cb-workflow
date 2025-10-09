@@ -7,10 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.platform.commons.util.StringUtils;
 import org.keycloak.common.util.Time;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.MockedStatic;
-import org.mockito.Spy;
+import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.sunbird.workflow.config.Constants;
 import org.sunbird.workflow.models.KeyData;
@@ -44,41 +41,16 @@ class AccessTokenValidatorTest {
 
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    String validToken;
     private String expiredToken;
     private String invalidSignatureToken;
     private String invalidIssuerToken;
 
-    AccessTokenValidator validator;
-
-
     @BeforeEach
     void setUp() throws Exception {
-        // Mock PropertiesCache.getInstance().getProperty(...) if needed
-        // Generate tokens for different scenarios
-        validToken = generateToken("validUserId", Time.currentTime() + 1000, "expectedIssuer");
         expiredToken = generateToken("expiredUserId", Time.currentTime() - 1000, "expectedIssuer");
         invalidSignatureToken = generateToken("invalidSignatureUserId", Time.currentTime() + 1000, "expectedIssuer");
         invalidIssuerToken = generateToken("invalidIssuerUserId", Time.currentTime() + 1000, "invalidIssuer");
 
-    }
-
-    @Test
-    void testVerifyUserToken_ExpiredToken() {
-        String userId = accessTokenValidator.verifyUserToken(expiredToken);
-        assertEquals(Constants._UNAUTHORIZED, userId);
-    }
-
-    @Test
-    void testVerifyUserToken_InvalidSignature() {
-        String userId = accessTokenValidator.verifyUserToken(invalidSignatureToken);
-        assertEquals(Constants._UNAUTHORIZED, userId);
-    }
-
-    @Test
-    void testVerifyUserToken_InvalidIssuer() {
-        String userId = accessTokenValidator.verifyUserToken(invalidIssuerToken);
-        assertEquals(Constants._UNAUTHORIZED, userId);
     }
 
     @Test
@@ -87,7 +59,6 @@ class AccessTokenValidatorTest {
         assertNull(userId);
     }
 
-    // Helper method to generate tokens
     private String generateToken(String userId, int exp, String issuer) throws Exception {
         Map<String, Object> header = new HashMap<>();
         header.put("alg", "RS256");
@@ -106,8 +77,6 @@ class AccessTokenValidatorTest {
         String encodedBody = Base64.getUrlEncoder().withoutPadding().encodeToString(bodyJson.getBytes());
 
         String unsignedToken = encodedHeader + "." + encodedBody;
-
-        // For simplicity, we're not signing the token here
         String signature = "testSignature";
 
         return unsignedToken + "." + signature;
@@ -155,120 +124,100 @@ class AccessTokenValidatorTest {
     }
 
     @Test
-    void testCheckIss_invalidIssuer_returnsFalse() throws Exception {
-        validator = new AccessTokenValidator();
-
-        Method method = AccessTokenValidator.class.getDeclaredMethod("checkIss", String.class);
-        method.setAccessible(true);
-
-        boolean result = (boolean) method.invoke(validator, "invalid-issuer");
-
-        assertFalse(result, "Expected false when issuer does not match REALM_URL");
+    void validateToken_invalidTokenFormat_returnsNullUserId() {
+        String userId = accessTokenValidator.fetchUserIdFromAccessToken("invalid.token");
+        assertNull(userId);
     }
 
     @Test
-    void testCheckIss_blankIssuer_returnsFalse() throws Exception {
-        validator = new AccessTokenValidator();
-
-        Method method = AccessTokenValidator.class.getDeclaredMethod("checkIss", String.class);
-        method.setAccessible(true);
-
-        boolean result = (boolean) method.invoke(validator, "");
-
-        assertFalse(result, "Expected false when issuer is blank");
-    }
-
-    @Test
-    void testValidateToken_validSignature_notExpired_returnsTokenBody() throws Exception {
-
-        String token = "header.body.signature";
-        Map<Object, Object> headerData = new HashMap<>();
-        headerData.put("kid", "testKeyId");
-
-        Map<String, Object> bodyData = new HashMap<>();
-        bodyData.put("exp", Time.currentTime() + 5000);
-        bodyData.put("iss", "http://realm");
-        bodyData.put("sub", "user:123");
-
-        try (MockedStatic<Base64Util> base64Mock = mockStatic(Base64Util.class);
-             MockedStatic<CryptoUtil> cryptoMock = mockStatic(CryptoUtil.class)) {
-
-            base64Mock.when(() -> Base64Util.decode(anyString(), anyInt()))
-                    .thenReturn(mapper.writeValueAsBytes(headerData))
-                    .thenReturn(mapper.writeValueAsBytes(bodyData))
-                    .thenReturn("sig".getBytes());
-
-            cryptoMock.when(() ->
-                    CryptoUtil.verifyRSASign(anyString(), any(), any(), eq(Constants.SHA_256_WITH_RSA))
-            ).thenReturn(true);
-
-            KeyData keyData = mock(KeyData.class);
-            when(keyManager.getPublicKey(anyString())).thenReturn(keyData);
-            when(keyData.getPublicKey()).thenReturn(mockPublicKey);
-
-            String result = accessTokenValidator.verifyUserToken(token);
-
-
-            assertEquals("123", result);
+    void validateToken_invalidBase64Header_returnsEmptyMap() {
+        String token = "invalidHeader.payload.signature";
+        try (MockedStatic<Base64Util> mockedStatic = mockStatic(Base64Util.class)) {
+            mockedStatic.when(() -> Base64Util.decode(anyString(), anyInt()))
+                    .thenThrow(new RuntimeException("decode error"));
+            String userId = accessTokenValidator.fetchUserIdFromAccessToken(token);
+            assertNull(userId);
         }
     }
 
     @Test
-    void testValidateToken_validSignature_butExpired_returnsEmptyMap() throws Exception {
-        String token = "header.body.signature";
-        Map<Object, Object> headerData = new HashMap<>();
-        headerData.put("kid", "testKeyId");
-
-        Map<String, Object> bodyData = new HashMap<>();
-        bodyData.put("exp", Time.currentTime() - 100);
-        bodyData.put("iss", "issuer");
-        bodyData.put("sub", "user:expired");
-
+    void validateToken_validToken_returnsUserId() throws Exception {
+        String userId = "testUserId";
+        int exp = Time.currentTime() + 1000;
+        String issuer = PropertiesCache.getInstance().getProperty(Constants.SSO_URL) + "realms/" + PropertiesCache.getInstance().getProperty(Constants.SSO_REALM);
+        String token = generateToken(userId, exp, issuer);
         try (MockedStatic<Base64Util> base64Mock = mockStatic(Base64Util.class);
              MockedStatic<CryptoUtil> cryptoMock = mockStatic(CryptoUtil.class)) {
-
-            base64Mock.when(() -> Base64Util.decode(anyString(), anyInt()))
-                    .thenReturn(mapper.writeValueAsBytes(headerData))
-                    .thenReturn(mapper.writeValueAsBytes(bodyData))
-                    .thenReturn("sig".getBytes());
-
-            cryptoMock.when(() ->
-                    CryptoUtil.verifyRSASign(anyString(), any(), any(), eq(Constants.SHA_256_WITH_RSA))
-            ).thenReturn(true);
-
-            KeyData keyData = mock(KeyData.class);
-            when(keyManager.getPublicKey(anyString())).thenReturn(keyData);
-            when(keyData.getPublicKey()).thenReturn(mockPublicKey);
-
-            String result = accessTokenValidator.verifyUserToken(token);
-
-            assertEquals(Constants._UNAUTHORIZED, result);
+            String headerJson = "{\"kid\":\"testKeyId\"}";
+            String bodyJson = String.format("{\"sub\":\"user:%s\",\"exp\":%d,\"iss\":\"%s\"}", userId, exp, issuer);
+            base64Mock.when(() -> Base64Util.decode(anyString(), eq(11)))
+                    .thenReturn(headerJson.getBytes())
+                    .thenReturn(bodyJson.getBytes());
+            KeyData mockKeyData = mock(KeyData.class);
+            when(keyManager.getPublicKey("testKeyId")).thenReturn(mockKeyData);
+            when(mockKeyData.getPublicKey()).thenReturn(mockPublicKey);
+            cryptoMock.when(() -> CryptoUtil.verifyRSASign(anyString(), any(), any(), eq(Constants.SHA_256_WITH_RSA)))
+                    .thenReturn(true);
+            String actualUserId = accessTokenValidator.fetchUserIdFromAccessToken(token);
+            assertEquals(userId, actualUserId);
         }
     }
 
     @Test
-    void testVerifyUserToken_validPayload_extractsUserId() {
-        AccessTokenValidator validator = new AccessTokenValidator() {
-            @Override
-            public String verifyUserToken(String token) {
-                Map<String, Object> payload = new HashMap<>();
-                payload.put(Constants.SUB, "user:validUser");
-                payload.put("iss", "realm");
-                if (!payload.isEmpty()) {
-                    String userId = (String) payload.get(Constants.SUB);
-                    if (StringUtils.isNotBlank(userId)) {
-                        int pos = userId.lastIndexOf(":");
-                        userId = userId.substring(pos + 1);
-                        return userId;
-                    }
-                }
-                return Constants._UNAUTHORIZED;
-            }
-        };
+    void validateToken_validSignatureButExpired_returnsUnauthorized() throws Exception {
+        String userId = "expiredUser";
+        int exp = Time.currentTime() - 1000;
+        String issuer = PropertiesCache.getInstance().getProperty(Constants.SSO_URL) + "realms/" + PropertiesCache.getInstance().getProperty(Constants.SSO_REALM);
+        String token = generateToken(userId, exp, issuer);
+        try (MockedStatic<Base64Util> base64Mock = mockStatic(Base64Util.class);
+             MockedStatic<CryptoUtil> cryptoMock = mockStatic(CryptoUtil.class)) {
+            String headerJson = "{\"kid\":\"testKeyId\"}";
+            String bodyJson = String.format("{\"sub\":\"user:%s\",\"exp\":%d,\"iss\":\"%s\"}", userId, exp, issuer);
+            base64Mock.when(() -> Base64Util.decode(anyString(), eq(11)))
+                    .thenReturn(headerJson.getBytes())
+                    .thenReturn(bodyJson.getBytes());
+            KeyData mockKeyData = mock(KeyData.class);
+            when(keyManager.getPublicKey("testKeyId")).thenReturn(mockKeyData);
+            when(mockKeyData.getPublicKey()).thenReturn(mockPublicKey);
+            cryptoMock.when(() -> CryptoUtil.verifyRSASign(anyString(), any(), any(), eq(Constants.SHA_256_WITH_RSA)))
+                    .thenReturn(true);
+            String result = accessTokenValidator.fetchUserIdFromAccessToken(token);
+            assertNull(result);
+        }
+    }
 
-        String result = validator.verifyUserToken("fake.token");
+    @Test
+    void validateToken_invalidJsonHeader_returnsNull() {
+        String token = "invalidHeader.payload.signature";
+        try (MockedStatic<Base64Util> base64Mock = mockStatic(Base64Util.class)) {
+            base64Mock.when(() -> Base64Util.decode(anyString(), eq(11)))
+                    .thenReturn("invalid-json".getBytes());
+            String userId = accessTokenValidator.fetchUserIdFromAccessToken(token);
+            assertNull(userId);
+        }
+    }
 
-        assertEquals("validUser", result);
+    @Test
+    void validateToken_validSignatureButInvalidIssuer_returnsUnauthorized() throws Exception {
+        String userId = "userWithBadIssuer";
+        int exp = Time.currentTime() + 1000;
+        String badIssuer = "https://invalid.issuer.com";
+        String token = generateToken(userId, exp, badIssuer);
+        try (MockedStatic<Base64Util> base64Mock = mockStatic(Base64Util.class);
+             MockedStatic<CryptoUtil> cryptoMock = mockStatic(CryptoUtil.class)) {
+            String headerJson = "{\"kid\":\"testKeyId\"}";
+            String bodyJson = String.format("{\"sub\":\"user:%s\",\"exp\":%d,\"iss\":\"%s\"}", userId, exp, badIssuer);
+            base64Mock.when(() -> Base64Util.decode(anyString(), eq(11)))
+                    .thenReturn(headerJson.getBytes())
+                    .thenReturn(bodyJson.getBytes());
+            KeyData mockKeyData = mock(KeyData.class);
+            when(keyManager.getPublicKey("testKeyId")).thenReturn(mockKeyData);
+            when(mockKeyData.getPublicKey()).thenReturn(mockPublicKey);
+            cryptoMock.when(() -> CryptoUtil.verifyRSASign(anyString(), any(), any(), eq(Constants.SHA_256_WITH_RSA)))
+                    .thenReturn(true);
+            String result = accessTokenValidator.fetchUserIdFromAccessToken(token);
+            assertNull(result);
+        }
     }
 
 

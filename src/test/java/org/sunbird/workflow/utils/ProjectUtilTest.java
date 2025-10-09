@@ -9,6 +9,8 @@ import org.springframework.http.HttpStatus;
 import org.sunbird.workflow.config.Constants;
 import org.sunbird.workflow.models.SBApiResponse;
 
+import java.lang.reflect.Field;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -16,13 +18,19 @@ import static org.mockito.Mockito.*;
 public class ProjectUtilTest {
 
     @Test
-    void testGetConfigValue_withPropertiesCache() {
+    void testGetConfigValue_withPropertiesCache() throws Exception {
         try (MockedStatic<PropertiesCache> propsMock = mockStatic(PropertiesCache.class)) {
             PropertiesCache cache = mock(PropertiesCache.class);
             propsMock.when(PropertiesCache::getInstance).thenReturn(cache);
-            when(cache.readProperty("KEY_TEST")).thenReturn("CACHE_VALUE");
 
-            String result = ProjectUtil.getConfigValue("KEY_TEST");
+            Field field = ProjectUtil.class.getDeclaredField("propertiesCache");
+            field.setAccessible(true);
+            field.set(null, cache);
+
+            String key = "KEY_TEST_" + java.util.UUID.randomUUID();
+            when(cache.readProperty(key)).thenReturn("CACHE_VALUE");
+
+            String result = ProjectUtil.getConfigValue(key);
 
             assertEquals("CACHE_VALUE", result);
         }
