@@ -688,22 +688,22 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
             try {
                 StringBuilder builder = new StringBuilder(configuration.getLmsServiceHost());
                 builder.append(configuration.getLmsOrgSearchEndPoint());
-                Map<String, Object> response = (Map<String, Object>) requestServiceImpl
+                Map<String, Object> orgDetails = (Map<String, Object>) requestServiceImpl
                         .fetchResultUsingPost(builder, requestObj, Map.class, headersValue);
-                if (response != null && Constants.OK.equalsIgnoreCase((String)response.get(Constants.RESPONSE_CODE))) {
-                    Map<String, Object> map = (Map<String, Object>) response.get(Constants.RESULT);
-                    if (map.get(Constants.RESPONSE) != null) {
-                        Map<String, Object> responseObj = (Map<String, Object>) map.get(Constants.RESPONSE);
-                        if (responseObj.get(Constants.CONTENT) instanceof List) {
-                            List<Map<String, Object>> contentList = (List<Map<String, Object>>) responseObj.get(Constants.CONTENT);
-                            if (!contentList.isEmpty()) {
+                if (MapUtils.isNotEmpty(orgDetails) && Constants.OK.equalsIgnoreCase((String)orgDetails.get(Constants.RESPONSE_CODE))) {
+                    Map<String, Object> result = (Map<String, Object>) orgDetails.get(Constants.RESULT);
+                    if (MapUtils.isNotEmpty(result) && result.get(Constants.RESPONSE) instanceof Map) {
+                        Map<String, Object> response = (Map<String, Object>) result.get(Constants.RESPONSE);
+                        if (MapUtils.isNotEmpty(response) && response.get(Constants.CONTENT) instanceof List) {
+                            List<Map<String, Object>> contentList = (List<Map<String, Object>>) response.get(Constants.CONTENT);
+                            if (CollectionUtils.isNotEmpty(contentList)) {
                                 return contentList.get(0);
                             }
                         }
                     }
                 }
             } catch (Exception e) {
-                logger.info("There is a error occured while searching for the Org details : " + e);
+                logger.error("There is a error occured while searching for the Org details : {}",e.getMessage());
             }
         }
         return Map.of();
