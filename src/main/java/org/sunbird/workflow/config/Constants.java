@@ -6,8 +6,6 @@ import java.util.List;
 
 public class Constants {
 
-
-
     private Constants() {
 	}
 
@@ -298,7 +296,7 @@ public class Constants {
 	public static final String SUB = "sub";
 	public static final String SSO_URL = "sso.url";
 	public static final String SSO_REALM = "sso.realm";
-	public static final String ACCESS_TOKEN_PUBLICKEY_BASEPATH = "/home/arpithasureshappa/Downloads/publickey";
+	public static final String ACCESS_TOKEN_PUBLICKEY_BASEPATH = "accesstoken.publickey.basepath";
 	public static final String USER_TABLE = "user";
 	public static final String USER_ROOT_ORG_ID = "rootorgid";
 	public static final String DB_TABLE_NAME = "table";
