@@ -29,7 +29,6 @@ import org.sunbird.workflow.postgres.repo.WfStatusRepo;
 import org.sunbird.workflow.service.UserProfileWfService;
 import org.sunbird.workflow.service.Workflowservice;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -66,6 +65,8 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 
 	@Autowired
 	private RedisCacheMgr redisCacheMgr;
+
+    List<String> stateOrMinistry = Arrays.asList("state", "ministry");
 	/**
 	 * Update user profile based on wf request
 	 *
@@ -430,9 +431,20 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 			}
 		}
         Map<String, Object> orgDetails = fetchOrgDetails(wfRequest.getDeptName());
-        if(MapUtils.isNotEmpty(orgDetails)){
-            updateRequest.put(Constants.MINISTRYORSTATEID, orgDetails.get(Constants.MINISTRYORSTATEID));
-            updateRequest.put(Constants.MINISTRYORSTATEORGNAME, orgDetails.get(Constants.MINISTRYORSTATENAME));
+        if (MapUtils.isNotEmpty(orgDetails)) {
+            Object ministryOrStateTypeObj = orgDetails.get("ministryorstatetype");
+            if (org.apache.commons.lang3.ObjectUtils.isNotEmpty(ministryOrStateTypeObj)) {
+                String ministryorstatetype = ministryOrStateTypeObj.toString();
+                if (stateOrMinistry.contains(ministryorstatetype)) {
+                    updateRequest.put(Constants.MINISTRYORSTATEID, orgDetails.get(Constants.MINISTRYORSTATEID));
+                    updateRequest.put(Constants.MINISTRYORSTATEORGNAME, orgDetails.get(Constants.MINISTRYORSTATENAME));
+                } else if ("SPV".equalsIgnoreCase(ministryorstatetype)) {
+                    String rootOrgId = String.valueOf(orgDetails.get(Constants.ROOT_ORG_ID));
+                    String rootOrgName = String.valueOf(orgDetails.get(Constants.ORG_NAME));
+                    updateRequest.put(Constants.MINISTRYORSTATEID, rootOrgId);
+                    updateRequest.put(Constants.MINISTRYORSTATEORGNAME, rootOrgName);
+                }
+            }
         }
 		requestWrapper.put(Constants.USER_ID, wfRequest.getApplicationId());
 		requestWrapper.put(Constants.PROFILE_DETAILS, updateRequest);
