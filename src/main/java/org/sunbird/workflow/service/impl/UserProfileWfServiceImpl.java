@@ -67,7 +67,7 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 	@Autowired
 	private RedisCacheMgr redisCacheMgr;
 
-    List<String> stateOrMinistry = Arrays.asList("state", "ministry");
+    private final List<String> stateOrMinistry = Arrays.asList("16", "2048");
 	/**
 	 * Update user profile based on wf request
 	 *
@@ -433,13 +433,15 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 		}
         Map<String, Object> orgDetails = fetchOrgDetails(wfRequest.getDeptName());
         if (MapUtils.isNotEmpty(orgDetails)) {
-            Object ministryOrStateTypeObj = orgDetails.get("ministryorstatetype");
-            if (org.apache.commons.lang3.ObjectUtils.isNotEmpty(ministryOrStateTypeObj)) {
-                String ministryorstatetype = ministryOrStateTypeObj.toString();
-                if (stateOrMinistry.contains(ministryorstatetype)) {
+            Object organisationTypeObj = orgDetails.get(Constants.ORGANISATION_TYPE);
+            if (org.apache.commons.lang3.ObjectUtils.isNotEmpty(organisationTypeObj)) {
+                String organisationType = organisationTypeObj.toString();
+                if (stateOrMinistry.contains(organisationType)) {
                     updateRequest.put(Constants.MINISTRYORSTATEID, orgDetails.get(Constants.MINISTRYORSTATEID));
                     updateRequest.put(Constants.MINISTRYORSTATEORGNAME, orgDetails.get(Constants.MINISTRYORSTATENAME));
-                } else if ("SPV".equalsIgnoreCase(ministryorstatetype)) {
+                } else if ("512".equalsIgnoreCase(organisationType)) {
+                    logger.warn("Organisation type is SPV, hence not updating ministry or state details");
+                } else {
                     String rootOrgId = String.valueOf(orgDetails.get(Constants.ROOT_ORG_ID));
                     String rootOrgName = String.valueOf(orgDetails.get(Constants.ORG_NAME));
                     updateRequest.put(Constants.MINISTRYORSTATEID, rootOrgId);

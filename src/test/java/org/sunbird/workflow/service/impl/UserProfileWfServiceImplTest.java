@@ -903,4 +903,107 @@ class UserProfileWfServiceImplTest {
 
         assertNull(result); // logs error and returns null
     }
+
+    @Test
+    void testGetUpdateRequest_withStateType_usingReflection() throws Exception {
+        // Arrange
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setDeptName("EducationDept");
+        wfRequest.setApplicationId("appId");
+
+        // Dummy update field values to avoid NPE
+        Map<String, Object> dummyToValue = new HashMap<>();
+        dummyToValue.put(Constants.FIRSTNAME, "John");
+        HashMap<String, Object> dummyField = new HashMap<>();
+        dummyField.put(Constants.TO_VALUE, dummyToValue);
+        wfRequest.setUpdateFieldValues(List.of(dummyField));
+
+        Map<String, Object> updateRequest = new HashMap<>();
+
+        // Mock configuration & API response for fetchOrgDetails
+        when(configuration.getLmsServiceHost()).thenReturn("http://host/");
+        when(configuration.getLmsOrgSearchEndPoint()).thenReturn("/org/search");
+
+        Map<String, Object> orgDetail = Map.of(
+                "organisationType", "16",
+                Constants.MINISTRYORSTATEID, "STATE01",
+                Constants.MINISTRYORSTATENAME, "Education Department"
+        );
+
+        Map<String, Object> response = Map.of(Constants.CONTENT, List.of(orgDetail));
+        Map<String, Object> result = Map.of(Constants.RESPONSE, response);
+        Map<String, Object> apiResp = Map.of(Constants.RESPONSE_CODE, "OK", Constants.RESULT, result);
+
+        when(requestServiceImpl.fetchResultUsingPost(any(), any(), eq(Map.class), any())).thenReturn(apiResp);
+
+        // Reflection call to private getUpdateRequest
+        Method privateMethod = UserProfileWfServiceImpl.class
+                .getDeclaredMethod("getUpdateRequest", WfRequest.class, Map.class);
+        privateMethod.setAccessible(true);
+
+        // Act
+        @SuppressWarnings("unchecked")
+        Map<String, Object> resultMap =
+                (Map<String, Object>) privateMethod.invoke(userProfileWfServiceImpl, wfRequest, updateRequest);
+
+        // Assert – these lines directly verify the “state” branch logic
+        Map<String, Object> requestWrapper = (Map<String, Object>) resultMap.get(Constants.REQUEST);
+        Map<String, Object> profileDetails = (Map<String, Object>) requestWrapper.get(Constants.PROFILE_DETAILS);
+
+        assertEquals("STATE01", profileDetails.get(Constants.MINISTRYORSTATEID));
+        assertEquals("Education Department", profileDetails.get(Constants.MINISTRYORSTATEORGNAME));
+    }
+
+
+    @Test
+    void testGetUpdateRequest_withSPVType_usingReflection() throws Exception {
+        // Arrange
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setDeptName("SPVDept");
+        wfRequest.setApplicationId("appId");
+
+        // Dummy update field values to avoid NPE
+        Map<String, Object> dummyToValue = new HashMap<>();
+        dummyToValue.put(Constants.FIRSTNAME, "John");
+        HashMap<String, Object> dummyField = new HashMap<>();
+        dummyField.put(Constants.TO_VALUE, dummyToValue);
+        wfRequest.setUpdateFieldValues(List.of(dummyField));
+
+        Map<String, Object> updateRequest = new HashMap<>();
+
+        // Mock configuration & API response for fetchOrgDetails
+        when(configuration.getLmsServiceHost()).thenReturn("http://host/");
+        when(configuration.getLmsOrgSearchEndPoint()).thenReturn("/org/search");
+
+        Map<String, Object> orgDetail = Map.of(
+                "organisationType", "999",
+                Constants.ROOT_ORG_ID, "ROOT01",
+                Constants.ORG_NAME, "Smart Projects Venture"
+        );
+
+        Map<String, Object> response = Map.of(Constants.CONTENT, List.of(orgDetail));
+        Map<String, Object> result = Map.of(Constants.RESPONSE, response);
+        Map<String, Object> apiResp = Map.of(Constants.RESPONSE_CODE, "OK", Constants.RESULT, result);
+
+        when(requestServiceImpl.fetchResultUsingPost(any(), any(), eq(Map.class), any())).thenReturn(apiResp);
+
+        // Reflection call to private getUpdateRequest
+        Method privateMethod = UserProfileWfServiceImpl.class
+                .getDeclaredMethod("getUpdateRequest", WfRequest.class, Map.class);
+        privateMethod.setAccessible(true);
+
+        // Act
+        @SuppressWarnings("unchecked")
+        Map<String, Object> resultMap =
+                (Map<String, Object>) privateMethod.invoke(userProfileWfServiceImpl, wfRequest, updateRequest);
+
+        // Assert – these lines directly verify the “SPV” branch logic
+        Map<String, Object> requestWrapper = (Map<String, Object>) resultMap.get(Constants.REQUEST);
+        Map<String, Object> profileDetails = (Map<String, Object>) requestWrapper.get(Constants.PROFILE_DETAILS);
+
+        assertEquals("ROOT01", profileDetails.get(Constants.MINISTRYORSTATEID));
+        assertEquals("Smart Projects Venture", profileDetails.get(Constants.MINISTRYORSTATEORGNAME));
+    }
+
+
 }
