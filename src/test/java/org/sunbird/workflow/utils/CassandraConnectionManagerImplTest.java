@@ -59,8 +59,11 @@ class CassandraConnectionManagerImplTest {
 
     @Test
     void testShutdownHook() {
-        Thread thread = new CassandraConnectionManagerImpl.ResourceCleanUp();
-        thread.start();
+        assertDoesNotThrow(() -> {
+            Thread thread = new CassandraConnectionManagerImpl.ResourceCleanUp();
+            thread.start();
+            thread.join();
+        }, "Shutdown hook should run without throwing any exception");
     }
 
     private ConsistencyLevel invokeGetConsistencyLevel() {
@@ -89,8 +92,10 @@ class CassandraConnectionManagerImplTest {
 
     @Test
     void testResourceCleanup() {
-        CassandraConnectionManagerImpl.ResourceCleanUp cleanup = new CassandraConnectionManagerImpl.ResourceCleanUp();
-        cleanup.run();
+        assertDoesNotThrow(() -> {
+            CassandraConnectionManagerImpl.ResourceCleanUp cleanup = new CassandraConnectionManagerImpl.ResourceCleanUp();
+            cleanup.run();
+        }, "Resource cleanup should not throw any exception");
     }
 
     @Test

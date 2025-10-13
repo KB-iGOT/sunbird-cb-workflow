@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class PropertiesCache {
 
-    private static PropertiesCache propertiesCache = null;
+    private static volatile PropertiesCache propertiesCache = null;
     public final Map<String, Float> attributePercentageMap = new ConcurrentHashMap<>();
     private final String[] fileName = {
             "cassandra.config.properties",

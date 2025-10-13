@@ -56,7 +56,7 @@ public class AccessTokenValidator {
 
 
     public String verifyUserToken(String token) {
-        String userId = Constants._UNAUTHORIZED;
+        String userId = Constants.CAP_UNAUTHORIZED;
         try {
             Map<String, Object> payload = validateToken(token);
             if (MapUtils.isNotEmpty(payload) && checkIss((String) payload.get("iss"))) {
@@ -92,7 +92,7 @@ public class AccessTokenValidator {
         if (accessToken != null) {
             try {
                 clientAccessTokenId = verifyUserToken(accessToken);
-                if (Constants._UNAUTHORIZED.equalsIgnoreCase(clientAccessTokenId)) {
+                if (Constants.CAP_UNAUTHORIZED.equalsIgnoreCase(clientAccessTokenId)) {
                     clientAccessTokenId = null;
                 }
             } catch (Exception ex) {

@@ -55,7 +55,7 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
 		} catch (Exception e) {
 			logger.error("Error while creating Cassandra connection", e);
 			throw new ProjectCommonException(
-					ResponseCode.internalError.getErrorCode(),
+					ResponseCode.INTERNAL_ERROR.getErrorCode(),
 					e.getMessage(),
 					ResponseCode.SERVER_ERROR.getResponseCode());
 		}
@@ -68,7 +68,7 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
             String cassandraHost = cache.getProperty(Constants.CASSANDRA_CONFIG_HOST);
             if (StringUtils.isBlank(cassandraHost)) {
                 throw new ProjectCommonException(
-                        ResponseCode.internalError.getErrorCode(),
+                        ResponseCode.INTERNAL_ERROR.getErrorCode(),
                         "Cassandra host is not configured",
                         ResponseCode.SERVER_ERROR.getResponseCode());
             }
@@ -126,7 +126,7 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
         } catch (Exception e) {
             logger.error("Error while creating Cassandra connection", e);
             throw new ProjectCommonException(
-                    ResponseCode.internalError.getErrorCode(),
+                    ResponseCode.INTERNAL_ERROR.getErrorCode(),
                     e.getMessage(),
                     ResponseCode.SERVER_ERROR.getResponseCode());
         }
@@ -161,14 +161,14 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
                         .collect(Collectors.toList());
             } else {
                 throw new ProjectCommonException(
-                        ResponseCode.internalError.getErrorCode(),
+                        ResponseCode.INTERNAL_ERROR.getErrorCode(),
                         "Keyspace not found: " + keyspaceName,
                         ResponseCode.SERVER_ERROR.getResponseCode());
             }
         } catch (Exception e) {
             logger.error("Error fetching tables for keyspace: " + keyspaceName, e);
             throw new ProjectCommonException(
-                    ResponseCode.internalError.getErrorCode(),
+                    ResponseCode.INTERNAL_ERROR.getErrorCode(),
                     e.getMessage(),
                     ResponseCode.SERVER_ERROR.getResponseCode());
         }

@@ -252,7 +252,7 @@ class AccessTokenValidatorTest {
 
             String result = accessTokenValidator.verifyUserToken(token);
 
-            assertEquals(Constants._UNAUTHORIZED, result);
+            assertEquals(Constants.CAP_UNAUTHORIZED, result);
         }
     }
 
@@ -272,7 +272,7 @@ class AccessTokenValidatorTest {
                         return userId;
                     }
                 }
-                return Constants._UNAUTHORIZED;
+                return Constants.CAP_UNAUTHORIZED;
             }
         };
 

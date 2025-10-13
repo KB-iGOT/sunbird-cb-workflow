@@ -60,6 +60,7 @@ public class ApplicationProcessingServiceImplV2 {
                 wfRequests.forEach(wfRequest -> {
                     domainWhiteListWorkFlowService.processDomainRequest(wfRequest);
                 });
+                break;
             case Constants.BLENDED_PROGRAM_SERVICE_NAME:
             case Constants.ONE_STEP_MDO_APPROVAL:
             case Constants.ONE_STEP_PC_APPROVAL:

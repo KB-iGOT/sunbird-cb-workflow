@@ -171,9 +171,9 @@ class StorageServiceImplTest {
     }
 
     @Test
-    void testFinalize_whenStorageServiceNull() throws Exception {
+    void testFinalize_whenStorageServiceNull() {
         ReflectionTestUtils.setField(service, "storageService", null);
-        service.finalize();
+        assertDoesNotThrow(() -> service.finalize(), "Finalize should not throw when storageService is null");
     }
 
     @Test

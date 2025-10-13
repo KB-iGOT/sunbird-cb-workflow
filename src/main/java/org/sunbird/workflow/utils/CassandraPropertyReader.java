@@ -14,7 +14,7 @@ public class CassandraPropertyReader {
 
 	private final Properties properties = new Properties();
 	  private static final String file = "cassandratablecolumn.properties";
-	  private static CassandraPropertyReader cassandraPropertyReader = null;
+	  private static volatile CassandraPropertyReader cassandraPropertyReader = null;
 
 	  /** private default constructor 
 	 * @throws IOException */

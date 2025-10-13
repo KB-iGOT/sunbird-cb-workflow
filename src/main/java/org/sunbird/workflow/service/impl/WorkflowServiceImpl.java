@@ -230,7 +230,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 						.collect(Collectors.toMap(WfStatusEntity::getWfId, Function.identity()));
 				Map<String, Object> payload = new HashMap<>();
 				payload.put(Constants.ORG_TRANSFER_STATE, nextState);
-				payload.put(Constants.inWorkflow, inWorkflow);
+				payload.put(Constants.IN_WORKFLOW, inWorkflow);
 				payload.put(Constants.GROUP_DESGINATION_ENTITIES, new ArrayList<>(entityMap.values()));
 				producer.push(configuration.getTransferRequestStatusChangeTopic(), payload);
 				log.info(" Transfer status change message sent successfully for userId: {}", savedEntity.getUserId());
