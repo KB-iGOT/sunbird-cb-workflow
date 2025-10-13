@@ -437,15 +437,13 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
             if (org.apache.commons.lang3.ObjectUtils.isNotEmpty(organisationTypeObj)) {
                 String organisationType = organisationTypeObj.toString();
                 if (stateOrMinistry.contains(organisationType)) {
-                    updateRequest.put(Constants.MINISTRYORSTATEID, orgDetails.get(Constants.MINISTRYORSTATEID));
-                    updateRequest.put(Constants.MINISTRYORSTATEORGNAME, orgDetails.get(Constants.MINISTRYORSTATENAME));
-                } else if ("512".equalsIgnoreCase(organisationType)) {
+                    updateRequest.put(Constants.MINISTRYORSTATEID, String.valueOf(orgDetails.get(Constants.MINISTRYORSTATEID)));
+                    updateRequest.put(Constants.MINISTRYORSTATEORGNAME, String.valueOf(orgDetails.get(Constants.MINISTRYORSTATENAME)));
+                } else if (Constants.SPV_ORGTYPEVALUE.equalsIgnoreCase(organisationType)) {
                     logger.warn("Organisation type is SPV, hence not updating ministry or state details");
                 } else {
-                    String rootOrgId = String.valueOf(orgDetails.get(Constants.ROOT_ORG_ID));
-                    String rootOrgName = String.valueOf(orgDetails.get(Constants.ORG_NAME));
-                    updateRequest.put(Constants.MINISTRYORSTATEID, rootOrgId);
-                    updateRequest.put(Constants.MINISTRYORSTATEORGNAME, rootOrgName);
+                    updateRequest.put(Constants.MINISTRYORSTATEID, String.valueOf(orgDetails.get(Constants.ROOT_ORG_ID)));
+                    updateRequest.put(Constants.MINISTRYORSTATEORGNAME, String.valueOf(orgDetails.get(Constants.ORG_NAME)));
                 }
             }
         }
