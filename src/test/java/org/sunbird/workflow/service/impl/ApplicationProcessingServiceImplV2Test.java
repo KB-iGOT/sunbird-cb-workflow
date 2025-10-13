@@ -72,10 +72,13 @@ class ApplicationProcessingServiceImplV2Test {
     void testProcessWfApplicationRequest_Domain() {
         WfRequest req = mock(WfRequest.class);
         List<WfRequest> requests = List.of(req);
+
         service.processWfApplicationRequest(requests, Constants.DOMAIN, "user1");
+
         verify(domainWhiteListWorkFlowService).processDomainRequest(req);
-        verify(bpWorkFlowService).processWFRequest(req);
+        verifyNoInteractions(bpWorkFlowService);
     }
+
 
     @Test
     void testProcessWfApplicationRequest_BlendedProgram() {
