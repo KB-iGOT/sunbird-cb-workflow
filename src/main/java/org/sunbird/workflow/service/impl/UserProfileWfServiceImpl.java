@@ -437,13 +437,13 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
             if (org.apache.commons.lang3.ObjectUtils.isNotEmpty(organisationTypeObj)) {
                 String organisationType = organisationTypeObj.toString();
                 if (stateOrMinistry.contains(organisationType)) {
-                    updateRequest.put(Constants.MINISTRYORSTATEID, String.valueOf(orgDetails.get(Constants.MINISTRYORSTATEID)));
-                    updateRequest.put(Constants.MINISTRYORSTATEORGNAME, String.valueOf(orgDetails.get(Constants.MINISTRYORSTATENAME)));
+                    updateRequest.put(Constants.MINISTRYORSTATEID, String.valueOf(orgDetails.get(Constants.ROOT_ORG_ID)));
+                    updateRequest.put(Constants.MINISTRYORSTATEORGNAME, String.valueOf(orgDetails.get(Constants.ORG_NAME)));
                 } else if (Constants.SPV_ORGTYPEVALUE.equalsIgnoreCase(organisationType)) {
                     logger.warn("Organisation type is SPV, hence not updating ministry or state details");
                 } else {
-                    updateRequest.put(Constants.MINISTRYORSTATEID, String.valueOf(orgDetails.get(Constants.ROOT_ORG_ID)));
-                    updateRequest.put(Constants.MINISTRYORSTATEORGNAME, String.valueOf(orgDetails.get(Constants.ORG_NAME)));
+                    updateRequest.put(Constants.MINISTRYORSTATEID, String.valueOf(orgDetails.get(Constants.MINISTRYORSTATEID)));
+                    updateRequest.put(Constants.MINISTRYORSTATEORGNAME, String.valueOf(orgDetails.get(Constants.MINISTRYORSTATENAME)));
                 }
             }
         }
