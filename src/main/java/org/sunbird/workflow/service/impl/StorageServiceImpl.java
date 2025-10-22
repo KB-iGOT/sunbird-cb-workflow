@@ -3,6 +3,8 @@ package org.sunbird.workflow.service.impl;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -54,7 +56,10 @@ public class StorageServiceImpl implements StorageService {
         File file = null;
         try {
             file = new File(System.currentTimeMillis() + "_" + mFile.getOriginalFilename());
-            file.createNewFile();
+            boolean created = file.createNewFile();
+            if (!created) {
+                logger.warn("Temporary file already exists or could not be created: {}", file.getAbsolutePath());
+            }
             try (FileOutputStream fos = new FileOutputStream(file)) {
                 fos.write(mFile.getBytes());
             }
@@ -66,8 +71,13 @@ public class StorageServiceImpl implements StorageService {
             response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
             return response;
         } finally {
-            if (file != null) {
-                file.delete();
+            if (file != null && file.exists()) {
+                try {
+                    Files.delete(file.toPath());
+                    logger.debug("Temporary file deleted successfully: {}", file.getAbsolutePath());
+                } catch (NoSuchFileException ex) {
+                    logger.warn("Temporary file not found for deletion: {}", file.getAbsolutePath());
+                }
             }
         }
     }
@@ -107,8 +117,14 @@ public class StorageServiceImpl implements StorageService {
             response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
             return response;
         } finally {
-            if (file != null) {
-                file.delete();
+            if (file != null && file.exists()) {
+                try {
+                    Files.delete(file.toPath());
+                } catch (NoSuchFileException ex) {
+                    logger.warn("Temporary file already deleted or not found: {}", file.getAbsolutePath());
+                } catch (IOException ex) {
+                    logger.error("Failed to delete temporary file: {}", file.getAbsolutePath(), ex);
+                }
             }
         }
     }

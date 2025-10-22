@@ -3,6 +3,7 @@ package org.sunbird.workflow.controller;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -118,7 +119,7 @@ public class WorkFlowController {
 	}
 
 	@GetMapping(path = "/admin/bulkbuplodfile/download/{fileName}")
-	public ResponseEntity<?> downloadBulkuplodFile(@PathVariable("fileName") String fileName) {
+	public ResponseEntity<InputStreamResource> downloadBulkuplodFile(@PathVariable("fileName") String fileName) {
 		return workflowService.downloadBulkUploadFile(fileName);
 	}
 
@@ -131,7 +132,7 @@ public class WorkFlowController {
 
 
 	@GetMapping(path = "/admin/pendingRequest/download")
-	public ResponseEntity<?> downloadPendingRequestFile(@RequestHeader(Constants.X_AUTH_TOKEN) String userAuthToken) {
+	public ResponseEntity<?> downloadPendingRequestFile(@RequestHeader(Constants.X_AUTH_TOKEN) String userAuthToken) { //NOSONAR
 		return workflowService.downloadPendingRequestFile(userAuthToken);
 	}
 

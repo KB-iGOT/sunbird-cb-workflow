@@ -88,12 +88,26 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 		try {
 			String deptNameUpdated = migrationUpdate(wfRequest);
 			Map<String, Object> readData = (Map<String, Object>) userProfileRead(wfRequest.getApplicationId());
-			if (null != readData && !Constants.OK.equals(readData.get(Constants.RESPONSE_CODE))) {
-				logger.error("user not found" + ((Map<String, Object>) readData.get(Constants.PARAMS)).get(Constants.ERROR_MESSAGE));
-				failedCase(wfRequest);
-				return;
-			}
-			Map<String, Object> existingUserResults = (Map<String, Object>) readData.get(Constants.RESULT);
+            if (MapUtils.isEmpty(readData)) {
+                logger.error("User profile read returned null or empty for userId: {}", wfRequest.getApplicationId());
+                failedCase(wfRequest);
+                return;
+            }
+            if (!Constants.OK.equals(readData.get(Constants.RESPONSE_CODE))) {
+                Object paramsObj = readData.get(Constants.PARAMS);
+                String errorMessage = null;
+                if (paramsObj instanceof Map<?, ?> paramsMap) {
+                    Object errorObj = paramsMap.get(Constants.ERROR_MESSAGE);
+                    if (errorObj instanceof String) {
+                        errorMessage = (String) errorObj;
+                    }
+                }
+                logger.error("User not found: {}", errorMessage != null ? errorMessage : "Unknown error");
+                failedCase(wfRequest);
+                return;
+            }
+
+            Map<String, Object> existingUserResults = (Map<String, Object>) readData.get(Constants.RESULT);
 			Map<String, Object> existingUserResponse = (Map<String, Object>) existingUserResults.get(Constants.RESPONSE);
 			Map<String, Object> profileDetails = (Map<String, Object>) existingUserResponse.get(Constants.PROFILE_DETAILS);
 			Map<String, Object> rootOrg = (Map<String, Object>) existingUserResponse.get(Constants.ROOT_ORG_CONSTANT);
@@ -255,7 +269,6 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 	 */
 	public List<Map<String, Object>> enrichUserData(Map<String, List<WfStatusEntity>> wfInfos, String rootOrg) {
 		List<Map<String, Object>> wfDetails = new ArrayList<>();
-		HashMap<String, Object> responseMap;
 		HashMap<String, Object> userResult = null;
 		Set<String> userIds = wfInfos.keySet();
 		if (!CollectionUtils.isEmpty(userIds)) {
@@ -266,10 +279,11 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 			userResult = getUsersResult(userIds);
 		}
 		for (Map.Entry<String, List<WfStatusEntity>> wfStatusEntity : wfInfos.entrySet()) {
-			responseMap = new HashMap<>();
-			responseMap.put("wfInfo", wfStatusEntity.getValue());
-			responseMap.put("userInfo", userResult.get(wfStatusEntity.getKey()));
-			wfDetails.add(responseMap);
+            Map<String, Object> responseMap = new HashMap<>();
+            responseMap.put("wfInfo", wfStatusEntity.getValue());
+            responseMap.put("userInfo",
+                    userResult != null ? userResult.get(wfStatusEntity.getKey()) : null);
+            wfDetails.add(responseMap);
 		}
 		return wfDetails;
 	}
@@ -419,15 +433,18 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 		List<HashMap<String, Object>> valuesToBeUpdate = wfRequest.getUpdateFieldValues();
 		for (Map<String, Object> valueToUpdate : valuesToBeUpdate) {
 			if(valueToUpdate.containsKey(Constants.TO_VALUE)) {
-				Map<String, Object> toValue = (Map<String, Object>) valueToUpdate.get(Constants.TO_VALUE);
-				String keyToUpdate = toValue.keySet().stream().findFirst().get();
-				if (Constants.FIRSTNAME.equalsIgnoreCase(keyToUpdate)) {
-					requestWrapper.put(Constants.FIRST_NAME_CAMEL_CASE, toValue.get(keyToUpdate));
-				}
-				if (Constants.MOBILE.equalsIgnoreCase(keyToUpdate)) {
-					requestWrapper.put(Constants.PHONE, String.valueOf(toValue.get(keyToUpdate)));
-				}
-			}
+                Map<String, Object> toValue = (Map<String, Object>) valueToUpdate.get(Constants.TO_VALUE);
+                Optional<String> keyOptional = toValue.keySet().stream().findFirst();
+                if (keyOptional.isPresent()) {
+                    String keyToUpdate = keyOptional.get();
+                    if (Constants.FIRSTNAME.equalsIgnoreCase(keyToUpdate)) {
+                        requestWrapper.put(Constants.FIRST_NAME_CAMEL_CASE, toValue.get(keyToUpdate));
+                    }
+                    if (Constants.MOBILE.equalsIgnoreCase(keyToUpdate)) {
+                        requestWrapper.put(Constants.PHONE, String.valueOf(toValue.get(keyToUpdate)));
+                    }
+                }
+            }
 		}
 		requestWrapper.put(Constants.USER_ID, wfRequest.getApplicationId());
 		requestWrapper.put(Constants.PROFILE_DETAILS, updateRequest);
@@ -590,40 +607,54 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 		}
 	}
 
-	private void updateUserProfileData(String userId, Map<String, Object> profileDetails, List<WfRequest> wfRequests, Map<String, Object> userDetails) {
-		try {
-			Map<String, Object> profileUpdateRequest = new HashMap<>();
-			profileUpdateRequest.put(Constants.USER_ID, userId);
-			profileUpdateRequest.put(Constants.PROFILE_DETAILS, profileDetails);
+    private void updateUserProfileData(String userId, Map<String, Object> profileDetails, List<WfRequest> wfRequests, Map<String, Object> userDetails) {
+        try {
+            Map<String, Object> profileUpdateRequest = new HashMap<>();
+            profileUpdateRequest.put(Constants.USER_ID, userId);
+            profileUpdateRequest.put(Constants.PROFILE_DETAILS, profileDetails);
 
-			Map<String, Object> profileUpdateRequestBody = new HashMap<>();
-			profileUpdateRequestBody.put(Constants.REQUEST, profileUpdateRequest);
+            Map<String, Object> profileUpdateRequestBody = new HashMap<>();
+            profileUpdateRequestBody.put(Constants.REQUEST, profileUpdateRequest);
 
-			Map<String, Object> updateUserApiResp = requestServiceImpl
-					.fetchResultUsingPatch(configuration.getLmsServiceHost() + configuration.getUserProfileUpdateEndPoint(), profileUpdateRequestBody, getHeaders());
+            Map<String, Object> updateUserApiResp = requestServiceImpl
+                    .fetchResultUsingPatch(configuration.getLmsServiceHost() + configuration.getUserProfileUpdateEndPoint(), profileUpdateRequestBody, getHeaders());
+            if (MapUtils.isEmpty(updateUserApiResp)) {
+                String errorMessage = "User update failed: API returned null response";
+                logger.error(errorMessage);
+                failedCaseProfileUpdate(wfRequests, errorMessage);
+                return;
+            }
 
-			if (updateUserApiResp == null || !Constants.OK.equals(updateUserApiResp.get(Constants.RESPONSE_CODE))) {
-				Map<String, Object> params = (Map<String, Object>) updateUserApiResp.getOrDefault(Constants.PARAMS, Collections.emptyMap());
-				String updateError = (String) params.getOrDefault(Constants.ERROR_MESSAGE, "Unknown error");
-				String errorMessage = "User update failed: " + updateError;
-				logger.error("User update failed: {}", updateError);
-				failedCaseProfileUpdate(wfRequests, errorMessage);
-			} else {
-				logger.info("Caching basic profile data for userId: {}", userId);
-				Map<String, Object> cacheData = new HashMap<>();
-				cacheData.put(Constants.ROOT_ORG_ID, userDetails.getOrDefault(Constants.ROOT_ORG_ID, ""));
-				cacheData.put(Constants.FIRST_NAME_CAMEL_CASE, userDetails.getOrDefault(Constants.FIRST_NAME_CAMEL_CASE, ""));
-				cacheData.put(Constants.ID, userDetails.getOrDefault(Constants.ID, ""));
-				cacheData.put(Constants.PROFILE_DETAILS, profileDetails);
-				cacheData.put(Constants.CHANNEL, userDetails.getOrDefault(Constants.CHANNEL, ""));
-				cacheData.put(Constants.USERNAME_LOWERCASE, userDetails.getOrDefault(Constants.USER_NAME,""));
-				redisCacheMgr.putInBasicProfileCache(Constants.BASIC_PROFILE_KEY+userId, mapper.writeValueAsString(cacheData));
-				logger.info("sucessfully updated user profile for userId: {}", userId);
-			}
-		} catch (Exception e) {
-			logger.error("Error updating user profile for userId: {}", userId, e);
-		}
-	}
+            if (!Constants.OK.equals(updateUserApiResp.get(Constants.RESPONSE_CODE))) {
+                Object paramsObj = updateUserApiResp.get(Constants.PARAMS);
+                String updateError = "Unknown error";
+
+                if (paramsObj instanceof Map<?, ?> paramsMap) {
+                    Object errorObj = paramsMap.get(Constants.ERROR_MESSAGE);
+                    if (errorObj instanceof String) {
+                        updateError = (String) errorObj;
+                    }
+                }
+
+                String errorMessage = "User update failed: " + updateError;
+                logger.error("User update failed: {}", updateError);
+                failedCaseProfileUpdate(wfRequests, errorMessage);
+                return;
+            }
+            logger.info("Caching basic profile data for userId: {}", userId);
+            Map<String, Object> cacheData = new HashMap<>();
+            cacheData.put(Constants.ROOT_ORG_ID, userDetails.getOrDefault(Constants.ROOT_ORG_ID, ""));
+            cacheData.put(Constants.FIRST_NAME_CAMEL_CASE, userDetails.getOrDefault(Constants.FIRST_NAME_CAMEL_CASE, ""));
+            cacheData.put(Constants.ID, userDetails.getOrDefault(Constants.ID, ""));
+            cacheData.put(Constants.PROFILE_DETAILS, profileDetails);
+            cacheData.put(Constants.CHANNEL, userDetails.getOrDefault(Constants.CHANNEL, ""));
+            cacheData.put(Constants.USERNAME_LOWERCASE, userDetails.getOrDefault(Constants.USER_NAME, ""));
+            redisCacheMgr.putInBasicProfileCache(Constants.BASIC_PROFILE_KEY + userId, mapper.writeValueAsString(cacheData));
+            logger.info("sucessfully updated user profile for userId: {}", userId);
+        } catch (Exception e) {
+            logger.error("Error updating user profile for userId: {}", userId, e);
+        }
+    }
 
 	private void handlePendingRequestUpdate(WfRequest wfRequest, String updatedDeptName) {
 		try {

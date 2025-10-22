@@ -148,12 +148,12 @@ public class BPWorkFlowController {
     }
 
     @PostMapping(path = "/getUserApprovalDataInCsv", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> getUserApprovalDataInCsv(@RequestBody SearchCriteria searchCriteria) {
+    public ResponseEntity<?> getUserApprovalDataInCsv(@RequestBody SearchCriteria searchCriteria) { //NOSONAR
         return bPWorkFlowService.generateUserApprovalCsv(searchCriteria);
     }
 
     @PostMapping(value = "/bulkApprovalDataFromCsv/{contentId}", consumes = "multipart/form-data")
-    public ResponseEntity<?> loadApprovalDataFromCsv(
+    public ResponseEntity<?> loadApprovalDataFromCsv( //NOSONAR
             @RequestParam("file") MultipartFile file,
             @PathVariable String contentId) throws IOException {
         return bPWorkFlowService.loadApprovalDataFromCsv(file, contentId);

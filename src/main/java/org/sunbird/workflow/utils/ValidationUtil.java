@@ -10,20 +10,25 @@ public class ValidationUtil {
 
 
 	public static final String DEFAULT_BULK_UPLOAD_VERIFICATION_REGEX = "^[a-zA-Z\\s,]+$";
+    private static final Pattern FULL_NAME_PATTERN =
+            Pattern.compile("^(?!.*\\n)[a-zA-Z]+(?:['\\s][a-zA-Z]+)*(?<!\\.|\\s)$");
+    private static final Pattern EXTERNAL_SYSTEM_ID_PATTERN =
+            Pattern.compile("^(?=.{1,30}$)[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$");
+    private static final Pattern EMAIL_PATTERN = Pattern.compile(
+            "^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@" +
+                    "(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$");
 
-	public static boolean isStringNullOREmpty(String value) {
+
+    public static boolean isStringNullOREmpty(String value) {
 		return (value == null || "".equals(value.trim()));
 	}
 
-	public static Boolean validateEmailPattern(String email) {
-		String emailRegex = "^[a-zA-Z0-9_+&*-]+(?:\\." + "[a-zA-Z0-9_+&*-]+)*@" + "(?:[a-zA-Z0-9-]+\\.)+[a-z"
-				+ "A-Z]{2,7}$";
-		Pattern pat = Pattern.compile(emailRegex);
-		if (pat.matcher(email).matches()) {
-			return Boolean.TRUE;
-		}
-		return Boolean.FALSE;
-	}
+    public static boolean validateEmailPattern(String email) {
+        if (email == null || email.length() > 320) {
+            return false;
+        }
+        return EMAIL_PATTERN.matcher(email).matches();
+    }
 
 	public static Boolean validateContactPattern(String contactNumber) {
 		String contactNumberRegex = "^\\d{10}$";
@@ -50,17 +55,23 @@ public class ValidationUtil {
 		return false;
 	}
 
-	public static Boolean validateExternalSystemId(String externalSystemId) {
-		return externalSystemId.matches("^(?=.{1,30}$)[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$");
-	}
+    public static boolean validateExternalSystemId(String externalSystemId) {
+        if (externalSystemId == null) {
+            return false;
+        }
+        return EXTERNAL_SYSTEM_ID_PATTERN.matcher(externalSystemId).matches();
+    }
 
 	public static Boolean validateExternalSystem(String externalSystem) {
 		return externalSystem.matches("^(?=.*[a-zA-Z .-])[a-zA-Z0-9 .-]{1,255}$"); // Allow only alphanumeric, alphabets and restrict if only numeric character
 	}
 
-	public static Boolean validateFullName(String firstName) {
-		return firstName.matches("^(?!.*\\n)[a-zA-Z]+(?:['\\s][a-zA-Z]+)*(?<!\\.|\\s)$");
-	}
+    public static boolean validateFullName(String firstName) {
+        if (firstName == null) {
+            return false;
+        }
+        return FULL_NAME_PATTERN.matcher(firstName).matches();
+    }
 
 	public static Boolean validateTag(List<String> tags) {
 		String regEx = DEFAULT_BULK_UPLOAD_VERIFICATION_REGEX;

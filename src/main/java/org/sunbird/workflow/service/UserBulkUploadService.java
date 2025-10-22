@@ -1,12 +1,7 @@
 package org.sunbird.workflow.service;
 
-import java.io.*;
-import java.sql.Timestamp;
-import java.text.SimpleDateFormat;
-import java.time.Instant;
-import java.util.*;
-import java.util.regex.Pattern;
-
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVPrinter;
@@ -38,8 +33,12 @@ import org.sunbird.workflow.service.impl.RequestServiceImpl;
 import org.sunbird.workflow.utils.CassandraOperation;
 import org.sunbird.workflow.utils.ValidationUtil;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.util.*;
 
 @Service
 public class UserBulkUploadService {
@@ -712,7 +711,7 @@ public class UserBulkUploadService {
             return !designationsSet.contains(fieldValue);
         }
     }
-    public void processBulkUploadV1(HashMap<String, String> inputDataMap) throws IOException {
+    /*public void processBulkUploadV1(HashMap<String, String> inputDataMap) throws IOException {
         File file = null;
         BufferedReader reader = null;
         int totalRecordsCount = 0;
@@ -1136,7 +1135,230 @@ public class UserBulkUploadService {
             if (file != null)
                 file.delete();
         }
+        }*/
+
+    public void processBulkUploadV1(HashMap<String, String> inputDataMap) throws IOException {
+        File file = null;
+        BufferedReader reader = null;
+        int totalRecordsCount = 0;
+        int noOfSuccessfulRecords = 0;
+        int failedRecordsCount = 0;
+        CSVParser csvParser = null;
+        String status = "";
+
+        try {
+            file = new File(Constants.LOCAL_BASE_PATH + inputDataMap.get(Constants.FILE_NAME));
+            if (file.exists() && file.length() > 0) {
+                reader = new BufferedReader(new FileReader(file));
+                char csvDelimiter = configuration.getCsvDelimiter();
+                String tagsDelimiter = configuration.getTagsDelimiter();
+                csvParser = new CSVParser(reader, CSVFormat.newFormat(csvDelimiter).withFirstRecordAsHeader());
+                List<CSVRecord> csvRecords = csvParser.getRecords();
+                List<Map<String, Object>> updatedRecords = new ArrayList<>();
+                List<String> headers = new ArrayList<>(csvParser.getHeaderNames());
+                headers.replaceAll(header -> header.replaceAll("^\"|\"$", ""));
+
+                if (!headers.contains("Status")) {
+                    headers.add("Status");
+                }
+                if (!headers.contains("Error Details")) {
+                    headers.add("Error Details");
+                }
+
+                // handle CSV record processing
+                int[] counts = processCsvRecords(csvRecords, updatedRecords, headers, tagsDelimiter, inputDataMap);
+                totalRecordsCount = counts[0];
+                noOfSuccessfulRecords = counts[1];
+                failedRecordsCount = counts[2];
+
+                // write updated CSV & upload
+                status = writeAndUploadCsvFile(file, headers, updatedRecords, totalRecordsCount,
+                        noOfSuccessfulRecords, failedRecordsCount, inputDataMap);
+            } else {
+                logger.error("File does not exist or is empty.");
+                status = Constants.FAILED_UPPERCASE;
+            }
+        } catch (Exception e) {
+            logger.error(String.format("Error in Process Bulk Upload %s", e.getMessage()), e);
+            this.updateUserBulkUploadStatus(inputDataMap.get(Constants.ROOT_ORG_ID), inputDataMap.get(Constants.IDENTIFIER),
+                    Constants.FAILED_UPPERCASE, 0, 0, 0);
+        } finally {
+            if (csvParser != null)
+                csvParser.close();
+            if (file != null) {
+                try {
+                    Files.delete(file.toPath());
+                    logger.info("Deleted temporary file: {}", file.getAbsolutePath());
+                } catch (NoSuchFileException e) {
+                    logger.warn("File already deleted or not found: {}", file.getAbsolutePath());
+                }
+            }
         }
+    }
+
+    private int[] processCsvRecords(List<CSVRecord> csvRecords,
+                                    List<Map<String, Object>> updatedRecords,
+                                    List<String> headers,
+                                    String tagsDelimiter,
+                                    Map<String, String> inputDataMap) throws IOException {
+
+        int totalRecordsCount = 0;
+        int noOfSuccessfulRecords = 0;
+        int failedRecordsCount = 0;
+
+        for (CSVRecord record : csvRecords) {
+            Map<String, Object> csvValues = processSingleRecord(record, headers, tagsDelimiter, inputDataMap);
+            updatedRecords.add(csvValues);
+            totalRecordsCount++;
+
+            String statusVal = (String) csvValues.get("Status");
+            if (Constants.SUCCESSFUL_UPERCASE.equals(statusVal)) {
+                noOfSuccessfulRecords++;
+            } else {
+                failedRecordsCount++;
+            }
+        }
+
+        return new int[]{totalRecordsCount, noOfSuccessfulRecords, failedRecordsCount};
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> processSingleRecord(CSVRecord record,
+                                                    List<String> headers,
+                                                    String tagsDelimiter,
+                                                    Map<String, String> inputDataMap) throws IOException {
+
+        logger.info("UserBulkUploadService:: Record {}", record.getRecordNumber());
+        Map<String, Object> csvValues = new HashMap<>(record.toMap());
+        List<String> errList = new ArrayList<>();
+        Map<String, Object> userDetails = null;
+
+        String email = record.size() > 1 && record.get(1) != null ? record.get(1).toLowerCase().trim() : null;
+        String phone = record.size() > 2 && record.get(2) != null ? record.get(2).trim() : null;
+        boolean emailExists = email != null && !email.isEmpty();
+        boolean phoneExists = phone != null && !phone.isEmpty();
+        if (!emailExists && !phoneExists) {
+            errList.add("Email or Phone is missing");
+        }
+
+        Map<String, Object> userDetailsForMobile = null;
+        Map<String, Object> userDetailsForMobileAndEmail = null;
+        Map<String, Object> filters = null;
+        boolean isEmailOrPhoneNumberExist = false;
+        boolean isEmailValid = false;
+        boolean isPhoneNumberValid = false;
+
+        // Validate email
+        if (emailExists) {
+            if (ValidationUtil.validateEmailPattern(email)) {
+                userDetails = new HashMap<>();
+                filters = new HashMap<>();
+                filters.put(Constants.EMAIL, email);
+                isEmailValid = this.verifyUserRecordExists(filters, userDetails);
+            } else {
+                errList.add("Invalid Email format");
+            }
+        }
+
+        // Validate phone
+        if (phoneExists) {
+            if (ValidationUtil.validateContactPattern(phone)) {
+                userDetailsForMobile = new HashMap<>();
+                filters = new HashMap<>();
+                filters.put(Constants.PHONE, phone);
+                isPhoneNumberValid = this.verifyUserRecordExists(filters, userDetailsForMobile);
+            } else {
+                errList.add("Invalid Phone number format");
+            }
+        }
+
+        if (!StringUtils.isEmpty(phone) && isEmailValid) {
+            userDetailsForMobileAndEmail = new HashMap<>();
+            filters = new HashMap<>();
+            filters.put(Constants.EMAIL, email);
+            filters.put(Constants.PHONE, phone);
+            isEmailOrPhoneNumberExist = this.verifyUserRecordExists(filters, userDetailsForMobileAndEmail);
+        }
+
+        if (!CollectionUtils.isEmpty(errList)) {
+            csvValues.put("Error Details", String.join(tagsDelimiter, errList));
+            csvValues.put("Status", Constants.FAILED_UPPERCASE);
+            return csvValues;
+        }
+
+        if (!isEmailValid) {
+            errList.add("User record does not exist with given email");
+        } else if (!isEmailOrPhoneNumberExist && isPhoneNumberValid) {
+            errList.add("Another user record exist with the mobile number");
+        } else {
+            errList.clear();
+            String userRootOrgId = (String) userDetails.get(Constants.ROOT_ORG_ID);
+            String mdoAdminRootOrgId = inputDataMap.get(Constants.ROOT_ORG_ID);
+            if (!mdoAdminRootOrgId.equalsIgnoreCase(userRootOrgId)) {
+                logger.info("The User belongs to a different MDO Organisation");
+                errList.add("The User belongs to a different MDO Organisation");
+                csvValues.put("Error Details", String.join(tagsDelimiter, errList));
+                csvValues.put("Status", Constants.FAILED_UPPERCASE);
+                return csvValues;
+            }
+        }
+
+        if (!CollectionUtils.isEmpty(errList)) {
+            csvValues.put("Error Details", String.join(tagsDelimiter, errList));
+            csvValues.put("Status", Constants.FAILED_UPPERCASE);
+            return csvValues;
+        }
+        return csvValues;
+    }
+
+    private String writeAndUploadCsvFile(File file,
+                                         List<String> headers,
+                                         List<Map<String, Object>> updatedRecords,
+                                         int totalRecordsCount,
+                                         int noOfSuccessfulRecords,
+                                         int failedRecordsCount,
+                                         Map<String, String> inputDataMap) throws IOException {
+        String status = "";
+        char csvDelimiter = configuration.getCsvDelimiter();
+
+        try (FileWriter fileWriter = new FileWriter(file);
+             BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
+             CSVPrinter csvPrinter = new CSVPrinter(
+                     bufferedWriter,
+                     CSVFormat.newFormat(csvDelimiter)
+                             .withHeader(headers.toArray(new String[0]))
+                             .withRecordSeparator(System.lineSeparator())
+             )) {
+
+            for (Map<String, Object> record : updatedRecords) {
+                List<String> recordValues = new ArrayList<>();
+                for (String header : headers) {
+                    recordValues.add((String) record.get(header));
+                }
+                csvPrinter.printRecord(recordValues);
+            }
+
+            if (totalRecordsCount == 0) {
+                List<String> singleRow = new ArrayList<>(Collections.nCopies(headers.size(), ""));
+                singleRow.set(headers.indexOf("Status"), Constants.FAILED_UPPERCASE);
+                singleRow.set(headers.indexOf("Error Details"), Constants.EMPTY_FILE_FAILED);
+                csvPrinter.printRecord(singleRow);
+                status = Constants.FAILED_UPPERCASE;
+            }
+            csvPrinter.flush();
+
+            status = uploadTheUpdatedCSVFile(file);
+
+            status = (failedRecordsCount == 0 && totalRecordsCount == noOfSuccessfulRecords && totalRecordsCount >= 1)
+                    ? Constants.SUCCESSFUL_UPERCASE
+                    : Constants.FAILED_UPPERCASE;
+
+            updateUserBulkUploadStatus(inputDataMap.get(Constants.ROOT_ORG_ID), inputDataMap.get(Constants.IDENTIFIER),
+                    status, totalRecordsCount, noOfSuccessfulRecords, failedRecordsCount);
+
+        }
+        return status;
+    }
 
     private String uploadTheUpdatedCSVFile(File file)
             throws IOException {

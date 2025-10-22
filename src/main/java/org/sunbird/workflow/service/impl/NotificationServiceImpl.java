@@ -270,7 +270,10 @@ public class NotificationServiceImpl {
 			if(!fieldMap.containsKey(Constants.TO_VALUE))
 				continue;
 			Map<String, Object> toValueMap= (Map<String, Object>) fieldMap.get(Constants.TO_VALUE);
-			fieldKey = toValueMap.entrySet().stream().findFirst().get().getKey();
+            Optional<Map.Entry<String, Object>> firstEntry = toValueMap.entrySet().stream().findFirst();
+            if (firstEntry.isPresent()) {
+                fieldKey = firstEntry.get().getKey();
+            }
 
 		}
 		if(Constants.APPROVE_STATE.equalsIgnoreCase(wfRequest.getAction()) && Constants.NAME.equalsIgnoreCase(fieldKey)){

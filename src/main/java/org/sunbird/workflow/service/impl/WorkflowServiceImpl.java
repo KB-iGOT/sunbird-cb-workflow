@@ -239,7 +239,12 @@ public class WorkflowServiceImpl implements Workflowservice {
 			for(Map<String, Object> updatedValue : updatedValueList){
 				if(updatedValue.containsKey(Constants.TO_VALUE)){
 					Map<String, Object> toValue = (Map<String, Object>) updatedValue.get(Constants.TO_VALUE);
-					fieldKey = toValue.entrySet().stream().findFirst().get().getKey();
+                    Optional<Map.Entry<String, Object>> firstEntry = toValue.entrySet().stream().findFirst();
+                    if (firstEntry.isPresent()) {
+                        fieldKey = firstEntry.get().getKey();
+                    } else {
+                        log.debug("Empty TO_VALUE map encountered in workflow update for wfId: {}", wfRequest.getWfId());
+                    }
 				}
 			}
 			if(!StringUtils.isEmpty(fieldKey) && Constants.NAME.equalsIgnoreCase(fieldKey)){
@@ -723,8 +728,14 @@ public class WorkflowServiceImpl implements Workflowservice {
 		applicationStatus.setLastUpdatedOn(new Date());
 		applicationStatus.setCurrentStatus(Constants.APPROVED_STATE);
 		applicationStatus.setActorUUID(wfRequest.getActorUserId());
-		applicationStatus
-				.setDeptName(getDepartmentDetails(wfRequest.getUpdateFieldValues().stream().findFirst().get()));
+        Optional<HashMap<String, Object>> firstUpdate =
+                wfRequest.getUpdateFieldValues().stream().findFirst();
+        if (firstUpdate.isPresent()) {
+            applicationStatus.setDeptName(getDepartmentDetails(firstUpdate.get()));
+        } else {
+            log.warn("No updateFieldValues found for wfRequest with ID: {}", wfRequest.getApplicationId());
+            applicationStatus.setDeptName(null);
+        }
 		wfRequest.setWfId(wfId);
 		wfRequest.setAction(Constants.APPROVE_STATE);
 		wfRequest.setState(Constants.APPROVED_STATE);
@@ -1353,7 +1364,11 @@ public class WorkflowServiceImpl implements Workflowservice {
 				for(Map<String, Object> valueToUpdate : valuesToBeUpdate){
 					if(valueToUpdate.containsKey(Constants.TO_VALUE)){
 						Map<String, Object> updateKeyValue = (Map<String, Object>) valueToUpdate.get(Constants.TO_VALUE);
-						String keyToUpdate = updateKeyValue.keySet().stream().findFirst().get();
+                        Set<String> keys = updateKeyValue.keySet();
+                        if (keys.isEmpty()) {
+                            continue;
+                        }
+                        String keyToUpdate = keys.iterator().next();
 						if(Constants.DESIGNATION.equalsIgnoreCase(keyToUpdate) || Constants.GROUP.equalsIgnoreCase(keyToUpdate)){
 							userIdSet.add(wfStatusEntity.getUserId());
 							if(allPendingRequest.containsKey(wfStatusEntity.getUserId())) {
@@ -1382,7 +1397,11 @@ public class WorkflowServiceImpl implements Workflowservice {
 				return this.getNoPendingRequestAvailableResponse(Constants.NO_PENDING_GROUP_DESIGNATION_REQUEST_AVAILABLE_MESSAGE);
 			}
 			responseEntity = this.preparePendingRequestFileResponse(csvFilePath, allUserDetails.size());
-		} catch (Exception e) {
+		}catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Thread was interrupted while downloading pending requests", e);
+            responseEntity = ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        } catch (Exception e) {
 			log.error("An error occurred while downloading file with pending requests", e);
 			responseEntity =  ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}

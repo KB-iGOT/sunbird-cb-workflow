@@ -25,7 +25,7 @@ public class LRUCache<K, V> extends LinkedHashMap<K, V> {
     @PostConstruct
     public void postConstruct() {
         this.maxSize = conf.getEnrolStatusCountLocalCacheSize();
-        this.maxAgeInMillis = conf.getEnrolStatusCountLocalTimeToLive()*60;
+        this.maxAgeInMillis = (long) conf.getEnrolStatusCountLocalTimeToLive() * 60;
         this.entryTimeMap = new HashMap<>();
     }
     @Override
