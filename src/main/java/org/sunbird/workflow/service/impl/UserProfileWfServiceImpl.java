@@ -446,6 +446,8 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
                     updateRequest.put(Constants.MINISTRYORSTATEORGNAME, String.valueOf(orgDetails.get(Constants.MINISTRYORSTATENAME)));
                 }
             }
+        } else {
+            logger.warn("Organisation details not found for deptName: {}",wfRequest.getDeptName());
         }
 		requestWrapper.put(Constants.USER_ID, wfRequest.getApplicationId());
 		requestWrapper.put(Constants.PROFILE_DETAILS, updateRequest);
