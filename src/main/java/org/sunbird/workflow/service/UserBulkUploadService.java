@@ -1222,7 +1222,7 @@ public class UserBulkUploadService {
         return new int[]{totalRecordsCount, noOfSuccessfulRecords, failedRecordsCount};
     }
 
-    @SuppressWarnings("unchecked")
+
     private Map<String, Object> processSingleRecord(CSVRecord record,
                                                     List<String> headers,
                                                     String tagsDelimiter,

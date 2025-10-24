@@ -280,8 +280,8 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 		}
 		for (Map.Entry<String, List<WfStatusEntity>> wfStatusEntity : wfInfos.entrySet()) {
             Map<String, Object> responseMap = new HashMap<>();
-            responseMap.put("wfInfo", wfStatusEntity.getValue());
-            responseMap.put("userInfo",
+            responseMap.put(Constants.WF_INFO, wfStatusEntity.getValue());
+            responseMap.put(Constants.USER_INFO,
                     userResult != null ? userResult.get(wfStatusEntity.getKey()) : null);
             wfDetails.add(responseMap);
 		}

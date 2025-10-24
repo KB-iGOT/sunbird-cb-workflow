@@ -1,21 +1,23 @@
 package org.sunbird.workflow.controller;
 
-import java.io.IOException;
-import java.util.Map;
-
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.sunbird.workflow.config.Constants;
-import org.sunbird.workflow.models.*;
+import org.sunbird.workflow.models.Response;
+import org.sunbird.workflow.models.SearchCriteria;
+import org.sunbird.workflow.models.SearchCriteriaV2;
+import org.sunbird.workflow.models.WfRequest;
 import org.sunbird.workflow.service.BPWorkFlowService;
 
-import org.sunbird.workflow.service.DomainWhiteListWorkFlowService;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/v1/blendedprogram/workflow")
@@ -148,12 +150,12 @@ public class BPWorkFlowController {
     }
 
     @PostMapping(path = "/getUserApprovalDataInCsv", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> getUserApprovalDataInCsv(@RequestBody SearchCriteria searchCriteria) { //NOSONAR
+    public ResponseEntity<ByteArrayResource> getUserApprovalDataInCsv(@RequestBody SearchCriteria searchCriteria) {
         return bPWorkFlowService.generateUserApprovalCsv(searchCriteria);
     }
 
     @PostMapping(value = "/bulkApprovalDataFromCsv/{contentId}", consumes = "multipart/form-data")
-    public ResponseEntity<?> loadApprovalDataFromCsv( //NOSONAR
+    public ResponseEntity<?> loadApprovalDataFromCsv(
             @RequestParam("file") MultipartFile file,
             @PathVariable String contentId) throws IOException {
         return bPWorkFlowService.loadApprovalDataFromCsv(file, contentId);

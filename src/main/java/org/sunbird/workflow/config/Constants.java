@@ -417,5 +417,7 @@ public class Constants {
 	public static final String PROFILE_UPDATE = "PROFILE_UPDATE";
 	public static final String TRANSFER_UPDATE = "TRANSFER_UPDATE";
     public static final String UPDATE = "UPDATE";
+    public static final String DEFAULT_UPDATED_FILE_NAME = "updated_file.csv";
+
 
 }

@@ -18,7 +18,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-
 import org.springframework.util.ObjectUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.sunbird.workflow.config.Configuration;
@@ -40,10 +39,6 @@ import java.nio.file.Files;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import com.fasterxml.jackson.core.type.TypeReference;
-
-import java.util.UUID;
 @Service
 public class BPWorkFlowServiceImpl implements BPWorkFlowService {
 
@@ -190,18 +185,19 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                 }
                 Map<String, Object> enrolResp = (Map<String, Object>) requestServiceImpl
                         .fetchResultUsingPost(builder, request, Map.class, headersValue);
-                if (enrolResp != null) {
+                if (MapUtils.isNotEmpty(enrolResp)) {
                     String responseCode = (String) enrolResp.get(Constants.RESPONSE_CODE);
-                    if ("OK".equalsIgnoreCase(responseCode)) {
+                    if (Constants.OK.equalsIgnoreCase(responseCode)) {
                         logger.info("User enrolment success");
                     } else {
                         Object paramsObj = enrolResp.get(Constants.PARAMS);
-                        String errorMessage = null;
-                        if (paramsObj instanceof Map) {
-                            errorMessage = (String) ((Map<String, Object>) paramsObj).get(Constants.ERROR_MESSAGE);
-                        }
-                        logger.error("User enrolment failed: {}",
-                                errorMessage != null ? errorMessage : "Unknown error response from enrolment API");
+                        String errorMessage = Optional.ofNullable(paramsObj)
+                                .filter(Map.class::isInstance)
+                                .map(obj -> (Map<String, Object>) obj)
+                                .map(map -> (String) map.get(Constants.ERROR_MESSAGE))
+                                .orElse("Unknown error response from un-enrolment API");
+
+                        logger.error("User un-enrollment failed: {}", errorMessage);
                     }
                 } else {
                     logger.error("User enrolment failed: enrolResp is null");
@@ -817,24 +813,20 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                 builder.append(configuration.getAdminUnEnrolEndPoint());
                 Map<String, Object> enrolResp = (Map<String, Object>) requestServiceImpl
                         .fetchResultUsingPost(builder, request, Map.class, headersValue);
-                if (enrolResp != null
+                if (MapUtils.isNotEmpty(enrolResp)
                         && "OK".equalsIgnoreCase((String) enrolResp.get(Constants.RESPONSE_CODE))) {
                     logger.info("User un-enrollment success");
                 } else {
-                    String errorMessage = null;
-                    if (enrolResp != null) {
-                        Object paramsObj = enrolResp.get(Constants.PARAMS);
-                        if (paramsObj instanceof Map<?, ?> paramsMap) {
-                            Object errorObj = paramsMap.get(Constants.ERROR_MESSAGE);
-                            if (errorObj instanceof String) {
-                                errorMessage = (String) errorObj;
-                            }
-                        }
-                    }
-                    logger.error("User un-enrollment failed: {}",
-                            errorMessage != null ? errorMessage : "");
-                }
+                    Object paramsObj = enrolResp.get(Constants.PARAMS);
 
+                    String errorMessage = Optional.ofNullable(paramsObj)
+                            .filter(Map.class::isInstance)
+                            .map(obj -> (Map<String, Object>) obj)
+                            .map(map -> (String) map.get(Constants.ERROR_MESSAGE))
+                            .orElse("Unknown error response from un-enrolment API");
+
+                    logger.error("User un-enrollment failed: {}", errorMessage);
+                }
             } catch (Exception e) {
                 logger.error("Exception while un-enrol user");
             }
@@ -1350,7 +1342,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         String originalFileName = originalFile.getOriginalFilename();
         if (StringUtils.isEmpty(originalFileName)) {
             logger.warn("Original filename is null or empty. Using default name 'updated_file.csv'");
-            originalFileName = "updated_file.csv";
+            originalFileName = Constants.DEFAULT_UPDATED_FILE_NAME;
         }
 
         String updatedFileName = originalFileName.replace(".csv", "_updated.csv");
