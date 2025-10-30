@@ -99,7 +99,7 @@ public class DomainWhiteListWorkFlowServiceImpl implements DomainWhiteListWorkFl
                 if (CollectionUtils.isNotEmpty(domainLookup)) {
                     WfStatusEntity wfStatusEntity = wfStatusRepo.findByWfId(domainLookup.get(0).getWfId());
                     if (Constants.REJECTED.equalsIgnoreCase(wfStatusEntity.getCurrentStatus())) {
-                        return updateWfRequestAndDomainLookup(response, rootOrg, org, wfRequest, domainValue, 1, domainLookup.get(0));
+                        return updateWfRequestAndDomainLookup(rootOrg, org, wfRequest, domainValue, 1, domainLookup.get(0));
                     } else {
                         updateWfStatusEntity(wfStatusEntity, userDomainInfoCount.intValue());
                         response.put(Constants.MESSAGE, Constants.DOMAIN_NAME_REQUEST_EXIST_MSG + ": " + domainValue);
@@ -108,7 +108,7 @@ public class DomainWhiteListWorkFlowServiceImpl implements DomainWhiteListWorkFl
                     }
                     return response;
                 }
-                response = updateWfRequestAndDomainLookup(response, rootOrg, org, wfRequest, domainValue, 1, new WfDomainLookup());
+                response = updateWfRequestAndDomainLookup(rootOrg, org, wfRequest, domainValue, 1, new WfDomainLookup());
             } else {
                 List<WfDomainLookup> domainLookupInfo = wfDomainLookupRepo.findByDomainName(domainValue);
                 if (CollectionUtils.isNotEmpty(domainLookupInfo)) {
@@ -252,7 +252,7 @@ public class DomainWhiteListWorkFlowServiceImpl implements DomainWhiteListWorkFl
         wfStatusRepo.save(wfStatusEntity);
     }
 
-    private Response updateWfRequestAndDomainLookup(Response response, String rootOrg, String org, WfRequest wfRequest, String domainValue, int updatedCountValueForDomainRequest, WfDomainLookup wfDomainLookup) throws JsonProcessingException {
+    private Response updateWfRequestAndDomainLookup(String rootOrg, String org, WfRequest wfRequest, String domainValue, int updatedCountValueForDomainRequest, WfDomainLookup wfDomainLookup) throws JsonProcessingException {
          Response wfResponse = workflowService.workflowTransition(rootOrg, org, wfRequest);
         if (HttpStatus.OK.compareTo((HttpStatus) wfResponse.getResult().get(Constants.STATUS)) == 0) {
             Map<String, Object> dataObject = (Map<String, Object>) wfResponse.getResult().getOrDefault(Constants.DATA, new HashMap());
