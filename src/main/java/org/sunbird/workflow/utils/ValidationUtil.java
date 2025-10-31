@@ -2,6 +2,7 @@ package org.sunbird.workflow.utils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import org.sunbird.workflow.config.Constants;
 
 import java.text.ParseException;
@@ -24,6 +25,7 @@ public class ValidationUtil {
 
     private static final Pattern EMAIL_PATTERN =
             Pattern.compile(Constants.EMAIL_REGEX);
+
     private static final Logger logger = LoggerFactory.getLogger(ValidationUtil.class);
 
 
