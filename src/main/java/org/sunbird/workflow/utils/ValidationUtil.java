@@ -1,5 +1,7 @@
 package org.sunbird.workflow.utils;
 
+import org.sunbird.workflow.config.Constants;
+
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -11,12 +13,13 @@ public class ValidationUtil {
 
 	public static final String DEFAULT_BULK_UPLOAD_VERIFICATION_REGEX = "^[a-zA-Z\\s,]+$";
     private static final Pattern FULL_NAME_PATTERN =
-            Pattern.compile("^(?!.*\\n)[a-zA-Z]+(?:['\\s][a-zA-Z]+)*(?<!\\.|\\s)$");
+            Pattern.compile(Constants.FULL_NAME_REGEX);
+
     private static final Pattern EXTERNAL_SYSTEM_ID_PATTERN =
-            Pattern.compile("^(?=.{1,30}$)[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$");
-    private static final Pattern EMAIL_PATTERN = Pattern.compile(
-            "^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@" +
-                    "(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$");
+            Pattern.compile(Constants.EXTERNAL_SYSTEM_ID_REGEX);
+
+    private static final Pattern EMAIL_PATTERN =
+            Pattern.compile(Constants.EMAIL_REGEX);
 
 
     public static boolean isStringNullOREmpty(String value) {

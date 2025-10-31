@@ -20,6 +20,7 @@ import org.sunbird.workflow.models.SunbirdApiRespParam;
 public class ProjectUtil {
 
 	static Logger logger = LogManager.getLogger(ProjectUtil.class);
+    private static final Pattern EMAIL_PATTERN = Pattern.compile(Constants.EMAIL_REGEX);
 
 	public static PropertiesCache propertiesCache;
 
@@ -45,12 +46,9 @@ public class ProjectUtil {
 		return response;
 	}
 
-	public static boolean isValidEmail(String email) {
-		String emailRegex = "^[a-zA-Z0-9_+&*-]+(?:\\." + "[a-zA-Z0-9_+&*-]+)*@" + "(?:[a-zA-Z0-9-]+\\.)+[a-z"
-				+ "A-Z]{2,7}$";
-		Pattern pat = Pattern.compile(emailRegex);
-		return pat.matcher(email).matches();
-	}
+    public static boolean isValidEmail(String email) {
+        return email != null && EMAIL_PATTERN.matcher(email).matches();
+    }
 
 	public static Boolean isValidMobileNumber(String mobileNumber) {
 		String contactNumberRegex = "^\\d{10}$";

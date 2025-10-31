@@ -5,6 +5,7 @@ import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
 import com.datastax.oss.driver.internal.core.retry.DefaultRetryPolicy;
 import com.datastax.oss.driver.internal.core.time.AtomicTimestampGenerator;
@@ -20,6 +21,7 @@ import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -156,12 +158,13 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
         try {
             // Fetch the metadata for the keyspace and list tables
             Metadata metadata = session.getMetadata();
-            if (metadata.getKeyspace(keyspaceName).isPresent()) {
+            Optional<KeyspaceMetadata> keyspaceOpt = metadata.getKeyspace(keyspaceName);
+            if (keyspaceOpt.isPresent()) {
                 // Convert the Map<CqlIdentifier, TableMetadata> to a List<String> with table names
-                Map<CqlIdentifier, TableMetadata> tables = metadata.getKeyspace(keyspaceName).get().getTables();
+                Map<CqlIdentifier, TableMetadata> tables = keyspaceOpt.get().getTables();
                 return tables.keySet().stream()
                         .map(CqlIdentifier::toString)
-                        .collect(Collectors.toList());
+                        .toList();
             } else {
                 throw new ProjectCommonException(
                         ResponseCode.INTERNAL_ERROR.getErrorCode(),
@@ -169,10 +172,11 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
                         ResponseCode.SERVER_ERROR.getResponseCode());
             }
         } catch (Exception e) {
-            logger.error("Error fetching tables for keyspace: " + keyspaceName, e);
+            String errMsg = String.format("Error fetching tables for keyspace '%s': %s", keyspaceName, e.getMessage());
+            logger.error(errMsg, e);
             throw new ProjectCommonException(
                     ResponseCode.INTERNAL_ERROR.getErrorCode(),
-                    e.getMessage(),
+                    errMsg,
                     ResponseCode.SERVER_ERROR.getResponseCode());
         }
     }

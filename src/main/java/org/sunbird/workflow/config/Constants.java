@@ -418,6 +418,11 @@ public class Constants {
 	public static final String TRANSFER_UPDATE = "TRANSFER_UPDATE";
     public static final String UPDATE = "UPDATE";
     public static final String DEFAULT_UPDATED_FILE_NAME = "updated_file.csv";
+    public static final String REMOVE_QUOTES_REGEX = "^\"|\"$";
+    public static final String EMAIL_REGEX = "^[a-zA-Z0-9_+&*-]+(?>\\.[a-zA-Z0-9_+&*-]+)*@" + "(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$";
+    public static final String FULL_NAME_REGEX = "^(?!.*\\n)[a-zA-Z]+(?:['\\s][a-zA-Z]+)*(?<!\\.|\\s)$";
+    public static final String EXTERNAL_SYSTEM_ID_REGEX = "^(?=.{1,30}$)[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$";
+
 
 
 }

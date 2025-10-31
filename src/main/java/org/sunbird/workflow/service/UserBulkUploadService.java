@@ -36,6 +36,7 @@ import org.sunbird.workflow.utils.ValidationUtil;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.util.*;
@@ -580,8 +581,15 @@ public class UserBulkUploadService {
                 wb.close();
             if (fis != null)
                 fis.close();
-            if (file != null)
-                file.delete();
+            if (file != null) {
+                Path filePath = file.toPath();
+                try {
+                    Files.delete(filePath);
+                    logger.debug("Successfully deleted temporary file: {}", filePath);
+                } catch (IOException e) {
+                    logger.warn("Failed to delete temporary file: {}", filePath, e);
+                }
+            }
         }
     }
 
@@ -1156,7 +1164,7 @@ public class UserBulkUploadService {
                 List<CSVRecord> csvRecords = csvParser.getRecords();
                 List<Map<String, Object>> updatedRecords = new ArrayList<>();
                 List<String> headers = new ArrayList<>(csvParser.getHeaderNames());
-                headers.replaceAll(header -> header.replaceAll("^\"|\"$", ""));
+                headers.replaceAll(header -> header.replaceAll(Constants.REMOVE_QUOTES_REGEX, ""));
 
                 if (!headers.contains("Status")) {
                     headers.add("Status");
