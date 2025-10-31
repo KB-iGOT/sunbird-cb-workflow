@@ -1,10 +1,14 @@
 package org.sunbird.workflow.utils;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.sunbird.workflow.config.Constants;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
 import java.util.regex.Pattern;
 
 
@@ -20,6 +24,7 @@ public class ValidationUtil {
 
     private static final Pattern EMAIL_PATTERN =
             Pattern.compile(Constants.EMAIL_REGEX);
+    private static final Logger logger = LoggerFactory.getLogger(ValidationUtil.class);
 
 
     public static boolean isStringNullOREmpty(String value) {
@@ -53,7 +58,7 @@ public class ValidationUtil {
 			Date date = dateFormat.parse(dateString);
 			return date.after(pastDate) && (date.before(todaysDate) || date.equals(todaysDate));
 		} catch (ParseException e) {
-			e.printStackTrace();
+            logger.warn("Invalid date format for input '{}': {}", dateString, e.getMessage(), e);
 		}
 		return false;
 	}
