@@ -41,6 +41,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class BPWorkFlowServiceImplTest {
 
+    @Spy
     @InjectMocks
     private BPWorkFlowServiceImpl bpWorkFlowService  ;
 
@@ -1044,10 +1045,12 @@ class BPWorkFlowServiceImplTest {
     void testAdminEnrolBPWorkFlow_scheduleConflictExists() {
         WfRequest req = getSampleRequest();
 
-        // Force empty valid batch and simulate conflict
-        Map<String, Object> batchAttr = Map.of(Constants.BATCH_ATTRIBUTES, "{\"currentBatchSize\":\"10\"}",
-                Constants.START_DATE, Instant.now(), Constants.ENROLMENT_END_DATE, Instant.now().plusSeconds(3600),
-                Constants.NAME, "Test Batch");
+        Map<String, Object> batchAttr = Map.of(
+                Constants.BATCH_ATTRIBUTES, "{\"currentBatchSize\":\"10\"}",
+                Constants.START_DATE, Instant.now(),
+                Constants.ENROLMENT_END_DATE, Instant.now().plusSeconds(3600),
+                Constants.NAME, "Test Batch"
+        );
 
         when(cassandraOperation.getRecordsByProperties(any(), any(), anyMap(), anyList()))
                 .thenReturn(List.of(batchAttr));
@@ -1056,15 +1059,14 @@ class BPWorkFlowServiceImplTest {
         when(wfStatusRepo.findByApplicationId(any())).thenReturn(List.of());
         when(configuration.getBpBatchEnrolLimitBufferSize()).thenReturn(0);
 
-        // Simulate scheduleConflictCheck == true
-        BPWorkFlowServiceImpl spyService = Mockito.spy(bpWorkFlowService);
-        doReturn(true).when(spyService).scheduleConflictCheck(any());
+        doReturn(true).when(bpWorkFlowService).scheduleConflictCheck(any());
 
-        Response response = spyService.adminEnrolBPWorkFlow(ROOT_ORG, ORG, req);
+        Response response = bpWorkFlowService.adminEnrolBPWorkFlow(ROOT_ORG, ORG, req);
 
         assertEquals(HttpStatus.NOT_ACCEPTABLE, response.get(Constants.STATUS));
         assertTrue(response.get(Constants.MESSAGE).toString().contains("schedule conflict"));
     }
+
 
     @Test
     void testAdminEnrolBPWorkFlow_duplicateEnrollment() {
@@ -1159,5 +1161,158 @@ class BPWorkFlowServiceImplTest {
 
         assertTrue(ex.getMessage().contains("Workflow parsing error occurred!"));
     }
+
+    @Test
+    void testRemoveApprovedUserSuccess() throws Exception {
+
+        String userId = "user123";
+        boolean isPc = true;
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setApplicationId("app123");
+        wfRequest.setCourseId("course123");
+
+        WfStatusEntity entity = new WfStatusEntity();
+        entity.setWfId("wf-id-01");
+        entity.setCurrentStatus(Constants.APPROVED);
+        entity.setUpdateFieldValues("[{\"toValue\":{\"name\":\"Test\"}}]");
+        entity.setServiceName("serviceName");
+        entity.setRootOrg("igot");
+        entity.setDeptName("dept");
+        entity.setOrg("org123");
+
+        when(wfStatusRepo.findActiveWorkflow("app123", userId, true))
+                .thenReturn(List.of(entity));
+
+        when(mapper.readValue(anyString(), any(TypeReference.class)))
+                .thenReturn(List.of(Map.of("key", "value")));
+
+        Response updateResponse = new Response();
+        updateResponse.put(Constants.STATUS, HttpStatus.OK);
+
+        doReturn(updateResponse).when(bpWorkFlowService)
+                .updateBPWorkFlow("igot", "org123", wfRequest, userId, Constants.PROGRAM_COORDINATOR);
+
+        Response result = bpWorkFlowService.removeApprovedUser(userId, wfRequest, isPc);
+
+        assertEquals(HttpStatus.OK, result.get(Constants.STATUS));
+    }
+
+    @Test
+    void testRemoveApprovedUser_Fails_When_ApplicationIdMissing() {
+        WfRequest request = new WfRequest(); // no applicationId
+        request.setCourseId("course123");
+
+        Response response = bpWorkFlowService.removeApprovedUser("user123", request, true);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.get(Constants.STATUS));
+        assertEquals("applicationId must not be empty.", response.get(Constants.ERROR_MESSAGE));
+    }
+
+    @Test
+    void testRemoveApprovedUser_Fails_When_UserIdMissing() {
+        WfRequest request = new WfRequest();
+        request.setApplicationId("app123");
+        request.setCourseId("course123");
+
+        Response response = bpWorkFlowService.removeApprovedUser("", request, true);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.get(Constants.STATUS));
+        assertEquals("userId must not be empty.", response.get(Constants.ERROR_MESSAGE));
+    }
+
+    @Test
+    void testRemoveApprovedUser_Fails_When_CourseIdMissing() {
+        WfRequest request = new WfRequest();
+        request.setApplicationId("app123");
+
+        Response response = bpWorkFlowService.removeApprovedUser("user123", request, true);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.get(Constants.STATUS));
+        assertEquals("courseId must not be empty.", response.get(Constants.ERROR_MESSAGE));
+    }
+
+    @Test
+    void testRemoveApprovedUser_NoActiveWorkflow() {
+        WfRequest request = new WfRequest();
+        request.setApplicationId("app123");
+        request.setCourseId("course123");
+
+        when(wfStatusRepo.findActiveWorkflow("app123", "user123", true))
+                .thenReturn(Collections.emptyList());
+
+        Response response = bpWorkFlowService.removeApprovedUser("user123", request, true);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.get(Constants.STATUS));
+        assertEquals("No active workflow found for the given applicationId and userId.",
+                response.get(Constants.ERROR_MESSAGE));
+    }
+
+    @Test
+    void testRemoveApprovedUser_NoApprovedRecord() {
+        WfRequest request = new WfRequest();
+        request.setApplicationId("app123");
+        request.setCourseId("course123");
+
+        WfStatusEntity entity = new WfStatusEntity();
+        entity.setCurrentStatus("PENDING");
+
+        when(wfStatusRepo.findActiveWorkflow("app123", "user123", true))
+                .thenReturn(List.of(entity));
+
+        Response response = bpWorkFlowService.removeApprovedUser("user123", request, true);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.get(Constants.STATUS));
+        assertEquals("User is not currently in APPROVED state.", response.get(Constants.ERROR_MESSAGE));
+    }
+
+    @Test
+    void testRemoveApprovedUser_MultipleApprovedRecords() {
+        WfRequest request = new WfRequest();
+        request.setApplicationId("app123");
+        request.setCourseId("course123");
+
+        WfStatusEntity record1 = new WfStatusEntity();
+        record1.setCurrentStatus(Constants.APPROVED);
+
+        WfStatusEntity record2 = new WfStatusEntity();
+        record2.setCurrentStatus(Constants.APPROVED);
+
+        when(wfStatusRepo.findActiveWorkflow("app123", "user123", true))
+                .thenReturn(List.of(record1, record2));
+
+        Response response = bpWorkFlowService.removeApprovedUser("user123", request, true);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.get(Constants.STATUS));
+        assertEquals("Data inconsistency: Multiple APPROVED workflow records found.", response.get(Constants.ERROR_MESSAGE));
+    }
+
+    @Test
+    void testRemoveApprovedUser_Fails_When_UpdateFieldValuesInvalidJson() throws Exception {
+        WfRequest request = new WfRequest();
+        request.setApplicationId("app123");
+        request.setCourseId("course123");
+
+        WfStatusEntity entity = new WfStatusEntity();
+        entity.setCurrentStatus(Constants.APPROVED);
+        entity.setUpdateFieldValues("invalid-json");
+        entity.setWfId("wf-10");
+        entity.setServiceName("svc");
+        entity.setRootOrg("root");
+        entity.setOrg("org");
+        entity.setDeptName("dept");
+
+        when(wfStatusRepo.findActiveWorkflow("app123", "user123", true))
+                .thenReturn(List.of(entity));
+
+        when(mapper.readValue(anyString(), any(TypeReference.class)))
+                .thenThrow(new RuntimeException("JSON Parsing Failed"));
+
+        Response response = bpWorkFlowService.removeApprovedUser("user123", request, true);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.get(Constants.STATUS));
+        assertEquals("Invalid updateFieldValues format in workflow record.", response.get(Constants.ERROR_MESSAGE));
+    }
+
+
 }
 
