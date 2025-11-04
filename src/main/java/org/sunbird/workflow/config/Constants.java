@@ -423,4 +423,5 @@ public class Constants {
     public static final String MINISTRYORSTATENAME = "ministryOrStateName";
     public static final String ORGANISATION_TYPE = "organisationType";
     public static final String SPV_ORGTYPEVALUE = "512";
+    public static final String REMOVE = "REMOVE";
 }

@@ -40,10 +40,6 @@ import java.nio.file.Files;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import com.fasterxml.jackson.core.type.TypeReference;
-
-import java.util.UUID;
 @Service
 public class BPWorkFlowServiceImpl implements BPWorkFlowService {
 
@@ -1445,5 +1441,108 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         ((List<Map<String, String>>) response.getResult().get("updateFailures")).add(failureDetails);
     }
 
+    @Override
+    public Response removeApprovedUser(String userId, WfRequest wfRequest, boolean isPc) {
+        Response response = new Response();
+        String role = isPc ? Constants.PROGRAM_COORDINATOR : Constants.MDO_ADMIN;
+        logger.info("Initiating workflow REMOVE action by role: {} for user: {}", role, userId);
+        String applicationId = wfRequest.getApplicationId();
+        String courseId = wfRequest.getCourseId();
+        boolean inWorkflow = true;
+        Response validationResponse = validateApprovedUserRemovalRequest(userId, wfRequest, response);
+        if (validationResponse != null) {
+            return validationResponse;
+        }
+        List<WfStatusEntity> wfRecords = wfStatusRepo.findActiveWorkflow(applicationId, userId, inWorkflow);
+        if (CollectionUtils.isEmpty(wfRecords)) {
+            logger.error("No active workflow found for applicationId: {} and userId: {}", applicationId, userId);
+            response.put(Constants.ERROR_MESSAGE, "No active workflow found for the given applicationId and userId.");
+            response.put(Constants.STATUS, HttpStatus.NOT_FOUND);
+            return response;
+        }
+        List<WfStatusEntity> approvedRecords = wfRecords.stream()
+                .filter(wfRecord -> Constants.APPROVED.equalsIgnoreCase(wfRecord.getCurrentStatus()))
+                .toList();
+        if (approvedRecords.isEmpty()) {
+            logger.warn("No APPROVED workflow entry found for user {} in application {}", userId, applicationId);
+            response.put(Constants.ERROR_MESSAGE, "User is not currently in APPROVED state.");
+            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+            return response;
+        }
+
+        if (approvedRecords.size() > 1) {
+            logger.error("Multiple APPROVED workflow records found for user {} in application {} — data inconsistency!", userId, applicationId);
+            response.put(Constants.ERROR_MESSAGE, "Data inconsistency: Multiple APPROVED workflow records found.");
+            response.put(Constants.STATUS, HttpStatus.INTERNAL_SERVER_ERROR);
+            return response;
+        }
+        WfStatusEntity approvedRecord = approvedRecords.get(0);
+        logger.info("Found APPROVED workflow record. wfId: {}", approvedRecord.getWfId());
+        List<HashMap<String, Object>> updateFieldValuesHashMap =
+                extractUpdateFieldValues(approvedRecord.getUpdateFieldValues());
+
+        if (CollectionUtils.isEmpty(updateFieldValuesHashMap)) {
+            response.put(Constants.ERROR_MESSAGE, "Invalid updateFieldValues format in workflow record.");
+            response.put(Constants.STATUS, HttpStatus.INTERNAL_SERVER_ERROR);
+            return response;
+        }
+        wfRequest.setWfId(approvedRecord.getWfId());
+        wfRequest.setUserId(userId);
+        wfRequest.setActorUserId(userId);
+        wfRequest.setAction(Constants.REMOVE);
+        wfRequest.setState(Constants.APPROVED);
+        wfRequest.setServiceName(approvedRecord.getServiceName());
+        wfRequest.setRootOrgId(approvedRecord.getRootOrg());
+        wfRequest.setDeptName(approvedRecord.getDeptName());
+        wfRequest.setCourseId(courseId);
+        wfRequest.setUpdateFieldValues(updateFieldValuesHashMap);
+        return updateBPWorkFlow(
+                wfRequest.getRootOrgId(),
+                approvedRecord.getOrg(),
+                wfRequest,
+                userId,
+                role
+        );
+    }
+
+    private List<HashMap<String, Object>> extractUpdateFieldValues(String updateFieldValuesJson) {
+        try {
+            List<Map<String, Object>> parsedList = mapper.readValue(
+                    updateFieldValuesJson,
+                    new TypeReference<List<Map<String, Object>>>() {
+                    }
+            );
+            return parsedList.stream()
+                    .map(HashMap::new)
+                    .toList();
+
+        } catch (Exception e) {
+            logger.error("Failed to parse update_field_values JSON: {}", updateFieldValuesJson, e);
+            return null;
+        }
+    }
+
+    private Response validateApprovedUserRemovalRequest(String userId, WfRequest wfRequest, Response response) {
+
+        if (StringUtils.isEmpty(wfRequest.getApplicationId())) {
+            logger.error("ApplicationId is missing or empty.");
+            response.put(Constants.ERROR_MESSAGE, "applicationId must not be empty.");
+            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+            return response;
+        }
+        if (StringUtils.isEmpty(userId)) {
+            logger.error(" userId is missing.");
+            response.put(Constants.ERROR_MESSAGE, "userId must not be empty.");
+            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+            return response;
+        }
+        if (StringUtils.isEmpty(wfRequest.getCourseId())) {
+            logger.error(" courseId is missing.");
+            response.put(Constants.ERROR_MESSAGE, "courseId must not be empty.");
+            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+            return response;
+        }
+        return null;
+    }
 
 }
