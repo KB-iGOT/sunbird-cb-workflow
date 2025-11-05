@@ -1204,7 +1204,7 @@ class BPWorkFlowServiceImplTest {
 
     @Test
     void testRemoveApprovedUser_Fails_When_ApplicationIdMissing() {
-        WfRequest request = new WfRequest(); // no applicationId
+        WfRequest request = new WfRequest();
         request.setCourseId("course123");
 
         Response response = bpWorkFlowService.removeApprovedUser(request, true);
@@ -1242,7 +1242,7 @@ class BPWorkFlowServiceImplTest {
         WfRequest request = new WfRequest();
         request.setApplicationId("app123");
         request.setCourseId("course123");
-        request.setUserId("user123"); // ✅ required
+        request.setUserId("user123");
 
         when(wfStatusRepo.findActiveWorkflow("app123", "user123", true))
                 .thenReturn(Collections.emptyList());
@@ -1260,7 +1260,7 @@ class BPWorkFlowServiceImplTest {
         WfRequest request = new WfRequest();
         request.setApplicationId("app123");
         request.setCourseId("course123");
-        request.setUserId("user123"); // ✅ required
+        request.setUserId("user123");
 
         WfStatusEntity entity = new WfStatusEntity();
         entity.setCurrentStatus("PENDING");
@@ -1279,7 +1279,7 @@ class BPWorkFlowServiceImplTest {
         WfRequest request = new WfRequest();
         request.setApplicationId("app123");
         request.setCourseId("course123");
-        request.setUserId("user123"); // ✅ required
+        request.setUserId("user123");
 
         WfStatusEntity record1 = new WfStatusEntity();
         record1.setCurrentStatus(Constants.APPROVED);
@@ -1302,7 +1302,7 @@ class BPWorkFlowServiceImplTest {
         WfRequest request = new WfRequest();
         request.setApplicationId("app123");
         request.setCourseId("course123");
-        request.setUserId("user123"); // ✅ required so validation passes
+        request.setUserId("user123");
 
         WfStatusEntity entity = new WfStatusEntity();
         entity.setCurrentStatus(Constants.APPROVED);
