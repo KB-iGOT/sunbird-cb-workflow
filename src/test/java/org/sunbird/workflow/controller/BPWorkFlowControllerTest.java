@@ -166,17 +166,16 @@ class BPWorkFlowControllerTest {
 
     @Test
     void testBpRemoveApprovedUser() {
-        String userId = "testUser";
         boolean isPc = true;
         WfRequest wfRequest = new WfRequest();
 
-        when(bPWorkFlowService.removeApprovedUser(userId, wfRequest, isPc)).thenReturn(mockResponse);
+        when(bPWorkFlowService.removeApprovedUser(wfRequest, isPc)).thenReturn(mockResponse);
 
-        ResponseEntity<Response> responseEntity = controller.bpRemoveApprovedUser(userId, isPc, wfRequest);
+        ResponseEntity<Response> responseEntity = controller.bpRemoveApprovedUser(isPc, wfRequest);
 
         assertEquals(HttpStatus.OK, responseEntity.getStatusCode());
         assertEquals(mockResponse, responseEntity.getBody());
-        verify(bPWorkFlowService, times(1)).removeApprovedUser(userId, wfRequest, isPc);
+        verify(bPWorkFlowService, times(1)).removeApprovedUser(wfRequest, isPc);
     }
 
 }

@@ -911,7 +911,6 @@ class UserProfileWfServiceImplTest {
         wfRequest.setDeptName("EducationDept");
         wfRequest.setApplicationId("appId");
 
-        // Dummy update field values to avoid NPE
         Map<String, Object> dummyToValue = new HashMap<>();
         dummyToValue.put(Constants.FIRSTNAME, "John");
         HashMap<String, Object> dummyField = new HashMap<>();
@@ -920,14 +919,14 @@ class UserProfileWfServiceImplTest {
 
         Map<String, Object> updateRequest = new HashMap<>();
 
-        // Mock configuration & API response for fetchOrgDetails
         when(configuration.getLmsServiceHost()).thenReturn("http://host/");
         when(configuration.getLmsOrgSearchEndPoint()).thenReturn("/org/search");
 
+        // ✅ keys expected by code for state/ministry types
         Map<String, Object> orgDetail = Map.of(
                 "organisationType", "16",
-                Constants.MINISTRYORSTATEID, "STATE01",
-                Constants.MINISTRYORSTATENAME, "Education Department"
+                Constants.ROOT_ORG_ID, "STATE01",
+                Constants.ORG_NAME, "Education Department"
         );
 
         Map<String, Object> response = Map.of(Constants.CONTENT, List.of(orgDetail));
@@ -936,17 +935,14 @@ class UserProfileWfServiceImplTest {
 
         when(requestServiceImpl.fetchResultUsingPost(any(), any(), eq(Map.class), any())).thenReturn(apiResp);
 
-        // Reflection call to private getUpdateRequest
         Method privateMethod = UserProfileWfServiceImpl.class
                 .getDeclaredMethod("getUpdateRequest", WfRequest.class, Map.class);
         privateMethod.setAccessible(true);
 
-        // Act
         @SuppressWarnings("unchecked")
         Map<String, Object> resultMap =
                 (Map<String, Object>) privateMethod.invoke(userProfileWfServiceImpl, wfRequest, updateRequest);
 
-        // Assert – these lines directly verify the “state” branch logic
         Map<String, Object> requestWrapper = (Map<String, Object>) resultMap.get(Constants.REQUEST);
         Map<String, Object> profileDetails = (Map<String, Object>) requestWrapper.get(Constants.PROFILE_DETAILS);
 
@@ -975,10 +971,11 @@ class UserProfileWfServiceImplTest {
         when(configuration.getLmsServiceHost()).thenReturn("http://host/");
         when(configuration.getLmsOrgSearchEndPoint()).thenReturn("/org/search");
 
+        // ✅ Use keys expected in the "other" branch
         Map<String, Object> orgDetail = Map.of(
                 "organisationType", "999",
-                Constants.ROOT_ORG_ID, "ROOT01",
-                Constants.ORG_NAME, "Smart Projects Venture"
+                Constants.MINISTRYORSTATEID, "ROOT01",
+                Constants.MINISTRYORSTATENAME, "Smart Projects Venture"
         );
 
         Map<String, Object> response = Map.of(Constants.CONTENT, List.of(orgDetail));
@@ -997,13 +994,14 @@ class UserProfileWfServiceImplTest {
         Map<String, Object> resultMap =
                 (Map<String, Object>) privateMethod.invoke(userProfileWfServiceImpl, wfRequest, updateRequest);
 
-        // Assert – these lines directly verify the “SPV” branch logic
+        // Assert
         Map<String, Object> requestWrapper = (Map<String, Object>) resultMap.get(Constants.REQUEST);
         Map<String, Object> profileDetails = (Map<String, Object>) requestWrapper.get(Constants.PROFILE_DETAILS);
 
         assertEquals("ROOT01", profileDetails.get(Constants.MINISTRYORSTATEID));
         assertEquals("Smart Projects Venture", profileDetails.get(Constants.MINISTRYORSTATEORGNAME));
     }
+
 
 
 }

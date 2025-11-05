@@ -68,6 +68,6 @@ public interface BPWorkFlowService {
 
     ResponseEntity<?> loadApprovalDataFromCsv(MultipartFile file, String contentId) throws IOException;
 
-    public Response removeApprovedUser( String userId, WfRequest wfRequest, boolean isPc);
+    public Response removeApprovedUser(WfRequest wfRequest, boolean isPc);
 
 }

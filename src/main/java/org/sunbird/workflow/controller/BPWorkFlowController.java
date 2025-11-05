@@ -160,9 +160,9 @@ public class BPWorkFlowController {
     }
 
     @PostMapping("/remove/approved/user")
-    public ResponseEntity<Response> bpRemoveApprovedUser(@RequestHeader(Constants.X_AUTH_USER_ID) String userId, @RequestHeader boolean isPc,
-                                                             @RequestBody WfRequest wfRequest) {
-        Response response = bPWorkFlowService.removeApprovedUser( userId, wfRequest,  isPc);
+    public ResponseEntity<Response> bpRemoveApprovedUser(@RequestHeader boolean isPc,
+                                                         @RequestBody WfRequest wfRequest) {
+        Response response = bPWorkFlowService.removeApprovedUser(wfRequest, isPc);
         return new ResponseEntity<>(response, (HttpStatus) response.get(Constants.STATUS));
     }
 

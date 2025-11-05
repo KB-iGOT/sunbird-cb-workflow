@@ -1442,9 +1442,10 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
     }
 
     @Override
-    public Response removeApprovedUser(String userId, WfRequest wfRequest, boolean isPc) {
+    public Response removeApprovedUser(WfRequest wfRequest, boolean isPc) {
         Response response = new Response();
         String role = isPc ? Constants.PROGRAM_COORDINATOR : Constants.MDO_ADMIN;
+        String userId = wfRequest.getUserId();
         logger.info("Initiating workflow REMOVE action by role: {} for user: {}", role, userId);
         String applicationId = wfRequest.getApplicationId();
         String courseId = wfRequest.getCourseId();
