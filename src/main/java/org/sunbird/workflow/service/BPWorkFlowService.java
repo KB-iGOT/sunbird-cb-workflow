@@ -70,4 +70,6 @@ public interface BPWorkFlowService {
 
     public Response removeApprovedUser(WfRequest wfRequest, boolean isPc);
 
+    public Response nominateUsers(String rootOrg, String org, String actorUserId, Map<String, Object> requestBody);
+
 }

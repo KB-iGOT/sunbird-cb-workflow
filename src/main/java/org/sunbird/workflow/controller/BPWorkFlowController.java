@@ -166,6 +166,15 @@ public class BPWorkFlowController {
         return new ResponseEntity<>(response, (HttpStatus) response.get(Constants.STATUS));
     }
 
+    @PostMapping("/nominate")
+    public ResponseEntity<Response> nominateUsers(
+            @RequestHeader(Constants.X_AUTH_USER_ID) String actorUserId,
+            @RequestHeader String rootOrg,
+            @RequestHeader String org,
+            @RequestBody Map<String, Object> requestBody) {
 
+        Response response = bPWorkFlowService.nominateUsers(rootOrg, org, actorUserId, requestBody);
+        return new ResponseEntity<>(response, (HttpStatus) response.get(Constants.STATUS));
+    }
 
 }

@@ -1863,7 +1863,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 		return userIds;
 	}
 
-	private Map<String, Object> userProfileRead(String userId) {
+	public Map<String, Object> userProfileRead(String userId) {
 		log.info("WorkflowServiceImpl: userProfileRead for userId: {}", userId);
 		String url = configuration.getLmsServiceHost() +
 				configuration.getUserProfileReadEndPoint().replace(Constants.USER_ID_VALUE, userId);
