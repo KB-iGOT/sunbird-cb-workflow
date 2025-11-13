@@ -34,6 +34,7 @@ import org.sunbird.workflow.service.BPWorkFlowService;
 import org.sunbird.workflow.service.ContentReadService;
 import org.sunbird.workflow.service.Workflowservice;
 import org.sunbird.workflow.utils.CassandraOperation;
+import org.sunbird.workflow.utils.UserUtil;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -46,7 +47,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
     private Logger logger = LoggerFactory.getLogger(BPWorkFlowServiceImpl.class);
 
     @Autowired
-    private WorkflowServiceImpl workflowService;
+    private Workflowservice workflowService;
 
     @Autowired
     private CassandraOperation cassandraOperation;
@@ -68,6 +69,9 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
 
     @Autowired
     private ContentReadService contentReadService;
+
+    @Autowired
+    private UserUtil userUtils;
 
     @Override
     public Response enrolBPWorkFlow(String rootOrg, String org, WfRequest wfRequest) {
@@ -1776,7 +1780,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
     }
 
     private String getFirstName(String userId) {
-        Map<String, Object> userData = workflowService.userProfileRead(userId);
+        Map<String, Object> userData = userUtils.userProfileRead(userId);
 
         if (MapUtils.isNotEmpty(userData)) {
             Object firstName = userData.get(Constants.FIRST_NAME_CAMEL_CASE);
