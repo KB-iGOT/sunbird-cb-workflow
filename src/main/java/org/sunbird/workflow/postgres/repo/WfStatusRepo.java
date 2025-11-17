@@ -135,5 +135,9 @@ public interface WfStatusRepo extends JpaRepository<WfStatusEntity, String> {
     @Query(value = "SELECT * FROM wingspan.wf_status WHERE application_id = ?1 AND userid = ?2 AND in_workflow = ?3", nativeQuery = true)
     List<WfStatusEntity> findActiveWorkflow(String applicationId, String userId, boolean inWorkflow);
 
+    @Query(value = "SELECT * FROM wingspan.wf_status WHERE application_id = ?1 AND userid = ?2",
+            nativeQuery = true)
+    List<WfStatusEntity> findWorkflowByBatchAndUser(String applicationId, String userId);
+
 }
 

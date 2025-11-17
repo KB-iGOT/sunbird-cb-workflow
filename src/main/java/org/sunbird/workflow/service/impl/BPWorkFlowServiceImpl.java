@@ -1596,43 +1596,8 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                 wfRequest.setUserId(userId);
                 wfRequest.setActorUserId(actorUserId);
                 wfRequest.setDeptName(deptName);
-                wfRequest.setServiceName(Constants.BLENDED_PROGRAM_SERVICE_NAME);
+                wfRequest.setServiceName(wfApproveType);
                 wfRequest.setUpdateFieldValues(buildUpdateFieldValuesWithFirstName(userId));
-
-                boolean pcFinalApproval = false;
-                boolean persistAsEnrollStart = false;
-
-                switch (wfApproveType) {
-                    case Constants.ONE_STEP_PC_APPROVAL:
-                        pcFinalApproval = true;
-                        wfRequest.setState(Constants.SEND_FOR_PC_APPROVAL);
-                        wfRequest.setAction(Constants.APPROVE);
-                        break;
-
-                    case Constants.TWO_STEP_PC_AND_MDO_APPROVAL:
-                        pcFinalApproval = true;
-                        wfRequest.setState(Constants.SEND_FOR_PC_APPROVAL);
-                        wfRequest.setAction(Constants.APPROVE);
-                        break;
-
-                    case Constants.ONE_STEP_MDO_APPROVAL:
-                        persistAsEnrollStart = true;
-                        wfRequest.setState(Constants.INITIATE);
-                        wfRequest.setAction(Constants.INITIATE);
-                        break;
-
-                    case Constants.TWO_STEP_MDO_AND_PC_APPROVAL:
-                        persistAsEnrollStart = true;
-                        wfRequest.setState(Constants.INITIATE);
-                        wfRequest.setAction(Constants.INITIATE);
-                        break;
-
-                    default:
-                        logger.warn("Invalid wfApproveType provided: {}", wfApproveType);
-                        userResponse.put(Constants.STATUS, Constants.INVALID_APPROVAL_TYPE);
-                        processedUsers.add(userResponse);
-                        continue;
-                }
 
                 Map<String, Object> batchDetailsMap = new HashMap<>();
                 String validationError = validateBatchUserRequestAccess(wfRequest, batchDetailsMap);
@@ -1659,8 +1624,6 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                     processedUsers.add(userResponse);
                     continue;
                 }
-
-                if (pcFinalApproval) {
                     WfStatusEntity entity = persistApprovedStateDirectly(wfRequest, rootOrg, org);
                     wfRequest.setWfId(entity.getWfId());
                     wfRequest.setCreatedOn(entity.getCreatedOn() != null ? entity.getCreatedOn().toString() : null);
@@ -1672,27 +1635,6 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                     }
                     userResponse.put("status", Constants.APPROVED);
                     userResponse.put("wfId", entity.getWfId());
-                } else if (persistAsEnrollStart) {
-                    WfStatusEntity saved = saveEnrollUserIntoWfStatusForNomination(rootOrg, org, wfRequest);
-                    wfRequest.setWfId(saved.getWfId());
-                    wfRequest.setCreatedOn(saved.getCreatedOn() != null ? saved.getCreatedOn().toString() : null);
-                    try {
-                        producer.push(configuration.getWorkflowApplicationTopic(), wfRequest);
-                    } catch (Exception e) {
-                        logger.error("Error publishing kafka for enrollment start for userId: {}", userId, e);
-                    }
-                    userResponse.put(Constants.STATUS, Constants.IN_WORKFLOW);
-                    userResponse.put(Constants.WF_ID_CONSTANT, saved.getWfId());
-                } else {
-                    try {
-                        Response wfResp = workflowService.workflowTransition(rootOrg, org, wfRequest, actorUserId, Constants.PROGRAM_COORDINATOR);
-                        userResponse.put(Constants.STATUS, (wfResp != null && wfResp.get(Constants.DATA) != null) ? "DONE" : "DONE_WITH_WARNINGS");
-                    } catch (Exception e) {
-                        logger.error("Error calling workflowTransition for userId: {}", userId, e);
-                        userResponse.put(Constants.STATUS, Constants.ERROR);
-                        userResponse.put(Constants.ERROR, e.getMessage());
-                    }
-                }
 
                 processedUsers.add(userResponse);
             }
@@ -1744,34 +1686,8 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         return saved;
     }
 
-    private WfStatusEntity saveEnrollUserIntoWfStatusForNomination(String rootOrg, String org, WfRequest wfRequest) {
-        WfStatusEntity applicationStatus = new WfStatusEntity();
-        String wfId = UUID.randomUUID().toString();
-        applicationStatus.setWfId(wfId);
-        applicationStatus.setApplicationId(wfRequest.getApplicationId());
-        applicationStatus.setUserId(wfRequest.getUserId());
-        applicationStatus.setInWorkflow(true);
-        applicationStatus.setActorUUID(wfRequest.getActorUserId());
-        applicationStatus.setCreatedOn(new Date());
-        applicationStatus.setCurrentStatus(Constants.ENROLL_IS_IN_PROGRESS);
-        applicationStatus.setLastUpdatedOn(new Date());
-        applicationStatus.setOrg(org);
-        applicationStatus.setRootOrg(rootOrg);
-        try {
-            applicationStatus.setUpdateFieldValues(mapper.writeValueAsString(wfRequest.getUpdateFieldValues()));
-        } catch (JsonProcessingException e) {
-            logger.error(String.valueOf(e));
-        }
-        applicationStatus.setDeptName(wfRequest.getDeptName());
-        applicationStatus.setComment(wfRequest.getComment());
-        applicationStatus.setServiceName(wfRequest.getServiceName());
-        wfRequest.setWfId(wfId);
-        WfStatusEntity saved = wfStatusRepo.save(applicationStatus);
-        return saved;
-    }
-
     private boolean isExistingWorkflowPresent(String batchId, String userId) {
-        List<WfStatusEntity> existingRecords = wfStatusRepo.findActiveWorkflow(batchId, userId, Boolean.TRUE);
+        List<WfStatusEntity> existingRecords = wfStatusRepo.findWorkflowByBatchAndUser(batchId, userId);
         boolean exists = CollectionUtils.isNotEmpty(existingRecords);
         if (exists) {
             logger.warn("Active workflow already exists for userId: {} batchId: {}", userId, batchId);
