@@ -1599,6 +1599,35 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                 wfRequest.setServiceName(wfApproveType);
                 wfRequest.setUpdateFieldValues(buildUpdateFieldValuesWithFirstName(userId));
 
+                switch (wfApproveType) {
+                    case Constants.ONE_STEP_PC_APPROVAL:
+                        wfRequest.setState(Constants.SEND_FOR_PC_APPROVAL);
+                        wfRequest.setAction(Constants.APPROVE);
+                        break;
+
+                    case Constants.TWO_STEP_PC_AND_MDO_APPROVAL:
+                        wfRequest.setState(Constants.SEND_FOR_MDO_APPROVAL);
+                        wfRequest.setAction(Constants.APPROVE);
+                        break;
+
+                    case Constants.ONE_STEP_MDO_APPROVAL:
+                        wfRequest.setState(Constants.SEND_FOR_MDO_APPROVAL);
+                        wfRequest.setAction(Constants.APPROVE);
+                        break;
+
+                    case Constants.TWO_STEP_MDO_AND_PC_APPROVAL:
+                        wfRequest.setState(Constants.SEND_FOR_PC_APPROVAL);
+                        wfRequest.setAction(Constants.APPROVE);
+                        break;
+
+                    default:
+                        logger.warn("Invalid wfApproveType provided: {}", wfApproveType);
+                        userResponse.put(Constants.STATUS, Constants.INVALID_APPROVAL_TYPE);
+                        processedUsers.add(userResponse);
+                        continue;
+                }
+
+
                 Map<String, Object> batchDetailsMap = new HashMap<>();
                 String validationError = validateBatchUserRequestAccess(wfRequest, batchDetailsMap);
                 wfRequest.setBatchName((String) batchDetailsMap.get(Constants.BATCH_NAME));
