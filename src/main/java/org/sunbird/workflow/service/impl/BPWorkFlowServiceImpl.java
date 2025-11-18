@@ -1699,7 +1699,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         entity.setServiceName(wfRequest.getServiceName());
         entity.setDeptName(wfRequest.getDeptName());
         entity.setCurrentStatus(Constants.APPROVED);
-        entity.setInWorkflow(true);
+        entity.setInWorkflow(false);
         entity.setCreatedOn(new Date());
         entity.setLastUpdatedOn(new Date());
         entity.setRootOrg(rootOrg);
