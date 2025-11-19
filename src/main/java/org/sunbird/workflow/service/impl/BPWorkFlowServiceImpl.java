@@ -1646,6 +1646,14 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                     continue;
                 }
 
+                List<Map<String, Object>> activeEnrollments = getActiveEnrollmentForUserAndCourse(userId, wfRequest.getCourseId());
+                if (CollectionUtils.isNotEmpty(activeEnrollments)) {
+                    logger.warn("Active enrollment exists for userId: {} and courseId: {}", userId, wfRequest.getCourseId());
+                    userResponse.put(Constants.STATUS, Constants.ALREADY_EXISTS);
+                    processedUsers.add(userResponse);
+                    continue;
+                }
+
                 if (scheduleConflictCheck(wfRequest)) {
                     logger.warn("Schedule conflict for userId: {}", userId);
                     userResponse.put(Constants.STATUS, "SCHEDULE_CONFLICT");
@@ -1734,5 +1742,26 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         }
         return userId;
     }
+
+    public List<Map<String, Object>> getActiveEnrollmentForUserAndCourse(String userId, String courseId) {
+
+        Map<String, Object> propertyMap = new HashMap<>();
+        propertyMap.put(Constants.USER_ID, userId);
+        propertyMap.put(Constants.COURSE_ID, courseId);
+
+        List<Map<String, Object>> allEnrollmentDetails = cassandraOperation.getRecordsByProperties(
+                Constants.KEYSPACE_SUNBIRD_COURSES,
+                Constants.USER_ENROLMENTS_V2,
+                propertyMap,
+                Arrays.asList(Constants.ACTIVE)
+        );
+
+        return allEnrollmentDetails.stream()
+                .filter(e -> e != null
+                        && e.get(Constants.ACTIVE) != null
+                        && (boolean) e.get(Constants.ACTIVE))
+                .collect(Collectors.toList());
+    }
+
 
 }
