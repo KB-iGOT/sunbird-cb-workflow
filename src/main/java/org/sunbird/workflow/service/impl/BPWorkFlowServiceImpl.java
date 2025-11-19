@@ -124,7 +124,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
             response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
             return response;
         }
-        if (scheduleConflictCheck(wfRequest)) {
+        if ( !Constants.REMOVE.equalsIgnoreCase(wfRequest.getAction()) && scheduleConflictCheck(wfRequest)) {
             wfRequest.setAction(Constants.REJECT);
             wfRequest.setComment(configuration.getConflictRejectReason());
             workflowService.workflowTransition(rootOrg, org, wfRequest);
