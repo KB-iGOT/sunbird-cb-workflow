@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.regex.Pattern;
 
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVPrinter;
@@ -22,7 +23,9 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
@@ -307,7 +310,7 @@ public class UserBulkUploadService {
                                 if (!ValidationUtil.validateRegexPatternWithNoSpecialCharacter(designation)) {
                                     errList.add("Invalid Designation: Designation should be added from default list and cannot contain special character");
                                 }
-                                if(this.validateFieldValue("position", designation)){
+                                if(this.validateDesignationFieldValue(designation)){
                                     errList.add("Invalid Value of Designation, please choose a valid value from the default list");
                                 }
                             }
@@ -870,7 +873,7 @@ public class UserBulkUploadService {
                         if (!ValidationUtil.validateRegexPatternWithNoSpecialCharacter(designation)) {
                             errList.add("Invalid Designation: Designation should be added from default list and cannot contain special character");
                         }
-                        if (this.validateFieldValue("position", designation)) {
+                        if (this.validateDesignationFieldValue(designation)) {
                             errList.add("Invalid Value of Designation, please choose a valid value from the default list");
                         }
                     }
@@ -1159,4 +1162,39 @@ public class UserBulkUploadService {
         return lastIndexOfDot == -1 ? "" : fileName.substring(lastIndexOfDot);
     }
 
+    public boolean validateDesignationFieldValue(String designation) {
+        int page = 0;
+        int pageSize = configuration.getSearchDesignationResultSize();
+        StringBuilder url = new StringBuilder(configuration.getCbPoresServiceHost() + configuration.getCbPoresMasterDesignationEndpoint());
+        HashMap<String, String> headersValue = new HashMap<>();
+        headersValue.put(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+        Map<String, Object> searchRequest = new HashMap<>();
+        searchRequest.put(Constants.PAGE_NUMBER, page);
+        searchRequest.put(Constants.PAGE_SIZE, pageSize);
+        searchRequest.put(Constants.REQUEST_FIELDS, new ArrayList<>());
+
+        Map<String, Object> filterCriteria = new HashMap<>();
+        filterCriteria.put(Constants.STATUS, Constants.ACTIVE_TITLE_CASE);
+        filterCriteria.put(Constants.DESIGNATION, designation);
+        searchRequest.put(Constants.FILTER_CRITERIA_MAP, filterCriteria);
+
+        Map<String, Object> response = (Map<String, Object>) requestServiceImpl.fetchResultUsingPost(url, searchRequest, Map.class, headersValue);
+        if (MapUtils.isEmpty(response)) {
+            return false;
+        }
+
+        Map<String, Object> outerResult = (Map<String, Object>) response.get(Constants.RESULT);
+        if (MapUtils.isEmpty(outerResult)) {
+            return false;
+        }
+
+        Map<String, Object> innerResult = (Map<String, Object>) outerResult.get(Constants.RESULT);
+        if (MapUtils.isEmpty(innerResult)) {
+            return false;
+        }
+
+        List<Map<String, Object>> data = (List<Map<String, Object>>) innerResult.get(Constants.DATA);
+
+        return CollectionUtils.isEmpty(data);
+    }
 }

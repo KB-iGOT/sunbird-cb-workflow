@@ -260,6 +260,15 @@ public class Configuration {
     @Value("${kafka.topic.transfer.request.status.change}")
     private String transferRequestStatusChangeTopic;
 
+    @Value("${cb.pores.service.host}")
+    private String cbPoresServiceHost;
+
+    @Value("${cb.pores.master.designation.endpoint}")
+    private String cbPoresMasterDesignationEndpoint;
+
+    @Value("${designation.search.result.size}")
+    private int searchDesignationResultSize;
+
     public String getAdminBlendedProgramEnrolEndPoint() {
         return adminBlendedProgramEnrolEndPoint;
     }
@@ -914,4 +923,17 @@ public class Configuration {
     public String getTransferRequestStatusChangeTopic() {
         return transferRequestStatusChangeTopic;
     }
+
+    public String getCbPoresServiceHost() { return cbPoresServiceHost; }
+
+    public void setCbPoresServiceHost(String cbPoresServiceHost) { this.cbPoresServiceHost = cbPoresServiceHost; }
+
+    public String getCbPoresMasterDesignationEndpoint() { return cbPoresMasterDesignationEndpoint; }
+
+    public void setCbPoresMasterDesignationEndpoint(String cbPoresMasterDesignationEndpoint) { this.cbPoresMasterDesignationEndpoint = cbPoresMasterDesignationEndpoint; }
+
+    public int getSearchDesignationResultSize() { return searchDesignationResultSize; }
+
+    public void setSearchDesignationResultSize(int searchDesignationResultSize) { this.searchDesignationResultSize = searchDesignationResultSize; }
+
 }

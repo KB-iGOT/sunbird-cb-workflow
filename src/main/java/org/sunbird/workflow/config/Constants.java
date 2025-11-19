@@ -423,4 +423,9 @@ public class Constants {
     public static final String MINISTRYORSTATENAME = "ministryOrStateName";
     public static final String ORGANISATION_TYPE = "organisationType";
     public static final String SPV_ORGTYPEVALUE = "512";
+    public static final String PAGE_NUMBER = "pageNumber";
+    public static final String PAGE_SIZE = "pageSize";
+    public static final String REQUEST_FIELDS = "requestedFields";
+    public static final String FILTER_CRITERIA_MAP = "filterCriteriaMap";
+    public static final String ACTIVE_TITLE_CASE = "Active";
 }
