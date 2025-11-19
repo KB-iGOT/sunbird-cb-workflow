@@ -251,7 +251,7 @@ class BPWorkFlowServiceImplTest {
         // Set up user enrolment details and course batch details (no conflict)
         when(cassandraOperation.getRecordsByProperties(
                 eq(Constants.KEYSPACE_SUNBIRD_COURSES),
-                eq(Constants.USER_ENROLMENTS),
+                eq(Constants.USER_ENROLMENTS_V2),
                 anyMap(),
                 anyList()))
                 .thenReturn(List.of(Map.of(
@@ -315,7 +315,7 @@ class BPWorkFlowServiceImplTest {
         // Set up user enrolment details and course batch details (no conflict)
         when(cassandraOperation.getRecordsByProperties(
                 eq(Constants.KEYSPACE_SUNBIRD_COURSES),
-                eq(Constants.USER_ENROLMENTS),
+                eq(Constants.USER_ENROLMENTS_V2),
                 anyMap(),
                 anyList()))
                 .thenReturn(List.of(Map.of(
@@ -1185,7 +1185,7 @@ class BPWorkFlowServiceImplTest {
         entity.setDeptName("dept");
         entity.setOrg("org123");
 
-        when(wfStatusRepo.findActiveWorkflow("app123", userId, true))
+        when(wfStatusRepo.findWorkflowByBatchAndUser("app123", userId))
                 .thenReturn(List.of(entity));
 
         when(mapper.readValue(anyString(), any(TypeReference.class)))
@@ -1247,7 +1247,7 @@ class BPWorkFlowServiceImplTest {
         request.setCourseId("course123");
         request.setUserId("user123");
 
-        when(wfStatusRepo.findActiveWorkflow("app123", "user123", true))
+        when(wfStatusRepo.findWorkflowByBatchAndUser("app123", "user123"))
                 .thenReturn(Collections.emptyList());
 
         Response response = bpWorkFlowService.removeApprovedUser(request, true);
@@ -1268,7 +1268,7 @@ class BPWorkFlowServiceImplTest {
         WfStatusEntity entity = new WfStatusEntity();
         entity.setCurrentStatus("PENDING");
 
-        when(wfStatusRepo.findActiveWorkflow("app123", "user123", true))
+        when(wfStatusRepo.findWorkflowByBatchAndUser("app123", "user123"))
                 .thenReturn(List.of(entity));
 
         Response response = bpWorkFlowService.removeApprovedUser(request, true);
@@ -1290,7 +1290,7 @@ class BPWorkFlowServiceImplTest {
         WfStatusEntity record2 = new WfStatusEntity();
         record2.setCurrentStatus(Constants.APPROVED);
 
-        when(wfStatusRepo.findActiveWorkflow("app123", "user123", true))
+        when(wfStatusRepo.findWorkflowByBatchAndUser("app123", "user123"))
                 .thenReturn(List.of(record1, record2));
 
         Response response = bpWorkFlowService.removeApprovedUser(request, true);
@@ -1316,7 +1316,7 @@ class BPWorkFlowServiceImplTest {
         entity.setOrg("org");
         entity.setDeptName("dept");
 
-        when(wfStatusRepo.findActiveWorkflow("app123", "user123", true))
+        when(wfStatusRepo.findWorkflowByBatchAndUser("app123", "user123"))
                 .thenReturn(List.of(entity));
 
         when(mapper.readValue(anyString(), any(TypeReference.class)))
