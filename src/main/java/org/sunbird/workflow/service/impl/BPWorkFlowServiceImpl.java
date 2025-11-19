@@ -699,7 +699,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         propertyMap.put(Constants.USER_ID, wfRequest.getUserId());
         List<Map<String, Object>> allEnrollmentDetails = cassandraOperation.getRecordsByProperties(
                 Constants.KEYSPACE_SUNBIRD_COURSES,
-                Constants.USER_ENROLMENTS,
+                configuration.getUserEnrolmentsTable(),
                 propertyMap,
                 Arrays.asList(Constants.BATCH_ID, Constants.USER_ID, Constants.COURSE_ID, Constants.ACTIVE)
         );

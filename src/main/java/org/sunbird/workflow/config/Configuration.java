@@ -260,6 +260,9 @@ public class Configuration {
     @Value("${kafka.topic.transfer.request.status.change}")
     private String transferRequestStatusChangeTopic;
 
+    @Value("${user.enrolments.table}")
+    private String userEnrolmentsTable;
+
     public String getAdminBlendedProgramEnrolEndPoint() {
         return adminBlendedProgramEnrolEndPoint;
     }
@@ -913,5 +916,9 @@ public class Configuration {
 
     public String getTransferRequestStatusChangeTopic() {
         return transferRequestStatusChangeTopic;
+    }
+
+    public String getUserEnrolmentsTable() {
+        return userEnrolmentsTable;
     }
 }
