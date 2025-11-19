@@ -699,7 +699,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         propertyMap.put(Constants.USER_ID, wfRequest.getUserId());
         List<Map<String, Object>> allEnrollmentDetails = cassandraOperation.getRecordsByProperties(
                 Constants.KEYSPACE_SUNBIRD_COURSES,
-                configuration.getUserEnrolmentsTable(),
+                Constants.USER_ENROLMENTS_V2,
                 propertyMap,
                 Arrays.asList(Constants.BATCH_ID, Constants.USER_ID, Constants.COURSE_ID, Constants.ACTIVE)
         );
@@ -1453,12 +1453,11 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         logger.info("Initiating workflow REMOVE action by role: {} for user: {}", role, userId);
         String applicationId = wfRequest.getApplicationId();
         String courseId = wfRequest.getCourseId();
-        boolean inWorkflow = true;
         Response validationResponse = validateApprovedUserRemovalRequest(userId, wfRequest, response);
         if (validationResponse != null) {
             return validationResponse;
         }
-        List<WfStatusEntity> wfRecords = wfStatusRepo.findActiveWorkflow(applicationId, userId, inWorkflow);
+        List<WfStatusEntity> wfRecords = wfStatusRepo.findWorkflowByBatchAndUser(applicationId, userId);
         if (CollectionUtils.isEmpty(wfRecords)) {
             logger.error("No active workflow found for applicationId: {} and userId: {}", applicationId, userId);
             response.put(Constants.ERROR_MESSAGE, "No active workflow found for the given applicationId and userId.");
