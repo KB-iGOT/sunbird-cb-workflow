@@ -190,20 +190,14 @@ class UserBulkUploadServiceTest {
         when(configuration.getSearchDesignationResultSize()).thenReturn(10);
         when(configuration.getCbPoresServiceHost()).thenReturn("http://cbp.example.com/");
         when(configuration.getCbPoresMasterDesignationEndpoint()).thenReturn("/designations/search");
-
         Map<String, Object> innerResult = new HashMap<>();
         innerResult.put(Constants.DATA, Collections.emptyList());
-
         Map<String, Object> outerResult = new HashMap<>();
         outerResult.put(Constants.RESULT, innerResult);
-
         Map<String, Object> response = new HashMap<>();
         response.put(Constants.RESULT, outerResult);
-
         when(requestServiceImpl.fetchResultUsingPost(any(), any(), any(), any())).thenReturn(response);
-
         boolean result = userBulkUploadService.validateDesignationFieldValue("NonExistingDesignation");
-
         org.junit.jupiter.api.Assertions.assertTrue(result);
     }
 
@@ -212,25 +206,17 @@ class UserBulkUploadServiceTest {
         when(configuration.getSearchDesignationResultSize()).thenReturn(10);
         when(configuration.getCbPoresServiceHost()).thenReturn("http://cbp.example.com/");
         when(configuration.getCbPoresMasterDesignationEndpoint()).thenReturn("/designations/search");
-
         Map<String, Object> dataItem = new HashMap<>();
         dataItem.put("id", "d1");
-
         List<Map<String, Object>> dataList = Collections.singletonList(dataItem);
-
         Map<String, Object> innerResult = new HashMap<>();
         innerResult.put(Constants.DATA, dataList);
-
         Map<String, Object> outerResult = new HashMap<>();
         outerResult.put(Constants.RESULT, innerResult);
-
         Map<String, Object> response = new HashMap<>();
         response.put(Constants.RESULT, outerResult);
-
         when(requestServiceImpl.fetchResultUsingPost(any(), any(), any(), any())).thenReturn(response);
-
         boolean result = userBulkUploadService.validateDesignationFieldValue("ExistingDesignation");
-
         org.junit.jupiter.api.Assertions.assertFalse(result);
     }
 }
