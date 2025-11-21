@@ -1723,7 +1723,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
     }
 
     private boolean isExistingWorkflowPresent(String batchId, String userId) {
-        List<WfStatusEntity> existingRecords = wfStatusRepo.findWorkflowByBatchAndUser(batchId, userId);
+        List<WfStatusEntity> existingRecords = wfStatusRepo.findActiveWorkflows(batchId, userId, Boolean.TRUE);
         boolean exists = CollectionUtils.isNotEmpty(existingRecords);
         if (exists) {
             logger.warn("Active workflow already exists for userId: {} batchId: {}", userId, batchId);

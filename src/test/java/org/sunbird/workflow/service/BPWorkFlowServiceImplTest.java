@@ -1362,7 +1362,7 @@ class BPWorkFlowServiceImplTest {
         requestBody.put(Constants.BATCH_ID, "batch-exists");
         requestBody.put(Constants.USER_IDS, List.of(userId));
 
-        when(wfStatusRepo.findWorkflowByBatchAndUser("batch-exists", userId))
+        when(wfStatusRepo.findActiveWorkflows("batch-exists", userId, Boolean.TRUE))
                 .thenReturn(List.of(new WfStatusEntity()));
 
         Response resp = bpWorkFlowService.nominateUsers("root", "org", "actor1", requestBody);
@@ -1386,7 +1386,7 @@ class BPWorkFlowServiceImplTest {
         when(contentReadService.getServiceNameDetails("course-program"))
                 .thenReturn(Constants.ONE_STEP_PC_APPROVAL);
 
-        when(wfStatusRepo.findWorkflowByBatchAndUser("batch-pc", userId))
+        when(wfStatusRepo.findActiveWorkflows("batch-pc", userId, Boolean.TRUE))
                 .thenReturn(Collections.emptyList());
 
         Map<String, Object> batchAttr = new HashMap<>();
@@ -1424,7 +1424,7 @@ class BPWorkFlowServiceImplTest {
         when(contentReadService.getServiceNameDetails("course-program"))
                 .thenReturn(Constants.ONE_STEP_PC_APPROVAL);
 
-        when(wfStatusRepo.findWorkflowByBatchAndUser("batch-conflict", userId))
+        when(wfStatusRepo.findActiveWorkflows("batch-conflict", userId, Boolean.TRUE))
                 .thenReturn(Collections.emptyList());
 
         Map<String, Object> batchAttr = new HashMap<>();
@@ -1456,7 +1456,7 @@ class BPWorkFlowServiceImplTest {
         when(contentReadService.getServiceNameDetails("course-program"))
                 .thenReturn(Constants.ONE_STEP_PC_APPROVAL);
 
-        when(wfStatusRepo.findWorkflowByBatchAndUser("batch-start-invalid", userId))
+        when(wfStatusRepo.findActiveWorkflows("batch-start-invalid", userId, Boolean.TRUE))
                 .thenReturn(Collections.emptyList());
 
         Map<String, Object> batchAttr = new HashMap<>();
@@ -1487,7 +1487,7 @@ class BPWorkFlowServiceImplTest {
         when(contentReadService.getServiceNameDetails("course-program"))
                 .thenReturn(Constants.ONE_STEP_PC_APPROVAL);
 
-        when(wfStatusRepo.findWorkflowByBatchAndUser("batch-full", userId))
+        when(wfStatusRepo.findActiveWorkflows("batch-full", userId, Boolean.TRUE))
                 .thenReturn(Collections.emptyList());
 
         Map<String, Object> batchAttr = new HashMap<>();
@@ -1530,12 +1530,12 @@ class BPWorkFlowServiceImplTest {
         when(contentReadService.getServiceNameDetails("course-program"))
                 .thenReturn(Constants.ONE_STEP_PC_APPROVAL);
 
-        when(wfStatusRepo.findWorkflowByBatchAndUser("batch-mixed", "user-exists"))
+        when(wfStatusRepo.findActiveWorkflows("batch-mixed", "user-exists", Boolean.TRUE))
                 .thenReturn(List.of(new WfStatusEntity()));
 
-        when(wfStatusRepo.findWorkflowByBatchAndUser("batch-mixed", "user-conflict"))
+        when(wfStatusRepo.findActiveWorkflows("batch-mixed", "user-conflict", Boolean.TRUE))
                 .thenReturn(Collections.emptyList());
-        when(wfStatusRepo.findWorkflowByBatchAndUser("batch-mixed", "user-success"))
+        when(wfStatusRepo.findActiveWorkflows("batch-mixed", "user-success", Boolean.TRUE))
                 .thenReturn(Collections.emptyList());
 
         Map<String, Object> batchAttr = new HashMap<>();
@@ -1588,7 +1588,7 @@ class BPWorkFlowServiceImplTest {
         when(contentReadService.getServiceNameDetails("course-program"))
                 .thenReturn(Constants.TWO_STEP_PC_AND_MDO_APPROVAL);
 
-        when(wfStatusRepo.findWorkflowByBatchAndUser("batch-two-step-pc-mdo", userId))
+        when(wfStatusRepo.findActiveWorkflows("batch-two-step-pc-mdo", userId, Boolean.TRUE))
                 .thenReturn(Collections.emptyList());
 
         Map<String, Object> batchAttr = new HashMap<>();
@@ -1626,7 +1626,7 @@ class BPWorkFlowServiceImplTest {
         when(contentReadService.getServiceNameDetails("course-program"))
                 .thenReturn(Constants.ONE_STEP_MDO_APPROVAL);
 
-        when(wfStatusRepo.findWorkflowByBatchAndUser("batch-one-step-mdo", userId))
+        when(wfStatusRepo.findActiveWorkflows("batch-one-step-mdo", userId, Boolean.TRUE))
                 .thenReturn(Collections.emptyList());
 
         Map<String, Object> batchAttr = new HashMap<>();
@@ -1664,7 +1664,7 @@ class BPWorkFlowServiceImplTest {
         when(contentReadService.getServiceNameDetails("course-program"))
                 .thenReturn(Constants.TWO_STEP_MDO_AND_PC_APPROVAL);
 
-        when(wfStatusRepo.findWorkflowByBatchAndUser("batch-two-step-mdo-pc", userId))
+        when(wfStatusRepo.findActiveWorkflows("batch-two-step-mdo-pc", userId, Boolean.TRUE))
                 .thenReturn(Collections.emptyList());
 
         Map<String, Object> batchAttr = new HashMap<>();
@@ -1703,7 +1703,7 @@ class BPWorkFlowServiceImplTest {
         when(contentReadService.getServiceNameDetails("course-program"))
                 .thenReturn("SOME_UNKNOWN_APPROVAL_TYPE");
 
-        when(wfStatusRepo.findWorkflowByBatchAndUser("batch-invalid", userId))
+        when(wfStatusRepo.findActiveWorkflows("batch-invalid", userId, Boolean.TRUE))
                 .thenReturn(Collections.emptyList());
 
         when(userUtils.userProfileRead(userId))
@@ -1744,7 +1744,7 @@ class BPWorkFlowServiceImplTest {
         when(contentReadService.getServiceNameDetails("course-program"))
                 .thenReturn(Constants.ONE_STEP_PC_APPROVAL);
 
-        when(wfStatusRepo.findWorkflowByBatchAndUser("batch-dept", userId))
+        when(wfStatusRepo.findActiveWorkflows("batch-dept", userId, Boolean.TRUE))
                 .thenReturn(Collections.emptyList());
 
         Map<String, Object> batchAttr = new HashMap<>();
@@ -1784,7 +1784,7 @@ class BPWorkFlowServiceImplTest {
         when(contentReadService.getServiceNameDetails("course-program"))
                 .thenReturn(Constants.ONE_STEP_PC_APPROVAL);
 
-        when(wfStatusRepo.findWorkflowByBatchAndUser("batch-no-name", userId))
+        when(wfStatusRepo.findActiveWorkflows("batch-no-name", userId, Boolean.TRUE))
                 .thenReturn(Collections.emptyList());
 
         Map<String, Object> batchAttr = new HashMap<>();
