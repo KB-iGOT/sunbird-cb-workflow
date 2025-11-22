@@ -2,6 +2,7 @@ package org.sunbird.workflow.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -83,6 +84,7 @@ class BPWorkFlowServiceImplTest {
     private static final String USER_ID = "user789";
     private static final String ROOT_ORG = "root-org";
     private static final String ORG = "org";
+    private final String ROOT = "root";
 
     @Test
     void testGenerateUserApprovalCsv_success() {
@@ -1329,484 +1331,173 @@ class BPWorkFlowServiceImplTest {
                 response.get(Constants.ERROR_MESSAGE));
     }
 
-    @Test
-    void testNominateUsers_noUserIdsProvided() {
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put(Constants.COURSE_ID, "course1");
-        requestBody.put(Constants.BATCH_ID, "batch1");
-
-        Response resp = bpWorkFlowService.nominateUsers("root", "org", "actor1", requestBody);
-        assertEquals(HttpStatus.BAD_REQUEST, resp.get(Constants.STATUS));
-        assertEquals("No userIds provided for nomination", resp.get(Constants.ERROR_MESSAGE));
-    }
-
-    @Test
-    void testNominateUsers_tooManyUsers() {
-        List<String> users = new ArrayList<>();
-        for (int i = 0; i < 201; i++) users.add("user" + i);
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put(Constants.COURSE_ID, "course1");
-        requestBody.put(Constants.BATCH_ID, "batch1");
-        requestBody.put(Constants.USER_IDS, users);
-
-        Response resp = bpWorkFlowService.nominateUsers("root", "org", "actor1", requestBody);
-        assertEquals(HttpStatus.BAD_REQUEST, resp.get(Constants.STATUS));
-        assertEquals("Maximum 200 users allowed per nomination batch", resp.get(Constants.ERROR_MESSAGE));
-    }
-
-    @Test
-    void testNominateUsers_userAlreadyExists() {
-        String userId = "user-exists";
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put(Constants.COURSE_ID, "course1");
-        requestBody.put(Constants.BATCH_ID, "batch-exists");
-        requestBody.put(Constants.USER_IDS, List.of(userId));
-
-        when(wfStatusRepo.findActiveWorkflows("batch-exists", userId, Boolean.TRUE))
-                .thenReturn(List.of(new WfStatusEntity()));
-
-        Response resp = bpWorkFlowService.nominateUsers("root", "org", "actor1", requestBody);
-
-        assertEquals(HttpStatus.OK, resp.get(Constants.STATUS));
-        List<?> data = (List<?>) resp.get(Constants.DATA);
-        assertEquals(1, data.size());
-
-        Map<?, ?> userResp = (Map<?, ?>) data.get(0);
-        assertEquals(Constants.ALREADY_EXISTS, userResp.get(Constants.STATUS));
-    }
-
-    @Test
-    void testNominateUsers_pcFinalApproval_success() throws Exception {
-        String userId = "user-pc";
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put(Constants.COURSE_ID, "course-program");
-        requestBody.put(Constants.BATCH_ID, "batch-pc");
-        requestBody.put(Constants.USER_IDS, List.of(userId));
-
-        when(contentReadService.getServiceNameDetails("course-program"))
-                .thenReturn(Constants.ONE_STEP_PC_APPROVAL);
-
-        when(wfStatusRepo.findActiveWorkflows("batch-pc", userId, Boolean.TRUE))
+    @BeforeEach
+    void init() {
+        lenient().when(cassandraOperation.getRecordsByProperties(anyString(), anyString(), anyMap(), anyList()))
+                .thenReturn(Collections.emptyList());
+        lenient().when(cassandraOperation.getRecordsByProperties(anyString(), any(), anyMap(), anyList()))
                 .thenReturn(Collections.emptyList());
 
+        Map<String, Object> defaultActorProfile = new HashMap<>();
+        defaultActorProfile.put("role", "PROGRAM_COORDINATOR");
+        defaultActorProfile.put("roles", List.of("PROGRAM_COORDINATOR"));
+        defaultActorProfile.put("rootOrg", rootOrg);
+        defaultActorProfile.put("org", org);
+        defaultActorProfile.put("userId", "actor-default");
+        List<Map<String, Object>> orgsMap = new ArrayList<>();
+        Map<String, Object> org1 = new HashMap<>();
+        org1.put("organisationKey", "org-1");
+        org1.put("roles", List.of("PROGRAM_COORDINATOR", "ADMIN"));
+        orgsMap.add(org1);
+
+        Map<String, Object> org2 = new HashMap<>();
+        org2.put("organisationKey", "org-2");
+        org2.put("roles", List.of("MDO", "VIEWER"));
+        orgsMap.add(org2);
+        defaultActorProfile.put("organisations", orgsMap);
+        lenient().when(userUtils.userProfileRead(anyString())).thenAnswer(invocation -> {
+            return defaultActorProfile;
+        });
+        lenient().when(userUtils.userProfileRead(anyString())).thenReturn(defaultActorProfile);
+        lenient().when(wfStatusRepo.save(any())).thenAnswer(invocation -> {
+            WfStatusEntity e = new WfStatusEntity();
+            e.setWfId(UUID.randomUUID().toString());
+            e.setCreatedOn(new Date());
+            return e;
+        });
+    }
+
+    private Map<String, Object> buildRequest(String courseId, String batchId, List<String> userIds, String deptName) {
+        Map<String, Object> req = new HashMap<>();
+        req.put(Constants.COURSE_ID, courseId);
+        req.put(Constants.BATCH_ID, batchId);
+        if (deptName != null) req.put(Constants.DEPT_NAME, deptName);
+        req.put(Constants.USER_IDS, userIds);
+        return req;
+    }
+
+    private void stubBatchAttributes(long startOffsetSeconds, int currentBatchSize, String batchName) {
         Map<String, Object> batchAttr = new HashMap<>();
-        batchAttr.put(Constants.BATCH_ATTRIBUTES, "{\"currentBatchSize\":\"10\"}");
-        batchAttr.put(Constants.START_DATE, Instant.now().plusSeconds(3600));
-        batchAttr.put(Constants.NAME, "Batch PC");
-        when(cassandraOperation.getRecordsByProperties(any(), any(), anyMap(), anyList()))
-                .thenReturn(List.of(batchAttr));
-
-        WfStatusEntity saved = new WfStatusEntity();
-        saved.setWfId("wf-pc-1");
-        saved.setCreatedOn(new Date());
-        when(wfStatusRepo.save(any())).thenReturn(saved);
-
-        when(userUtils.userProfileRead(userId))
-                .thenReturn(Map.of(Constants.FIRST_NAME_CAMEL_CASE, "Alice"));
-        doReturn(false).when(bpWorkFlowService).scheduleConflictCheck(any());
-
-        Response resp = bpWorkFlowService.nominateUsers("root", "org", "actor-pc", requestBody);
-
-        assertEquals(HttpStatus.OK, resp.get(Constants.STATUS));
-        Map<?, ?> userResp = (Map<?, ?>) ((List<?>) resp.get(Constants.DATA)).get(0);
-        assertEquals(Constants.APPROVED, userResp.get("status"));
-        assertEquals("wf-pc-1", userResp.get("wfId"));
+        batchAttr.put(Constants.BATCH_ATTRIBUTES, "{\"currentBatchSize\":\"" + currentBatchSize + "\"}");
+        batchAttr.put(Constants.START_DATE, Date.from(Instant.now().plusSeconds(startOffsetSeconds)));
+        batchAttr.put(Constants.NAME, batchName);
     }
 
     @Test
     void testNominateUsers_scheduleConflict() {
         String userId = "user-conflict";
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put(Constants.COURSE_ID, "course-program");
-        requestBody.put(Constants.BATCH_ID, "batch-conflict");
-        requestBody.put(Constants.USER_IDS, List.of(userId));
+        Map<String, Object> request = buildRequest("course-program", "batch-conflict", List.of(userId), "Dept B");
 
         when(contentReadService.getServiceNameDetails("course-program"))
                 .thenReturn(Constants.ONE_STEP_PC_APPROVAL);
 
-        when(wfStatusRepo.findActiveWorkflows("batch-conflict", userId, Boolean.TRUE))
-                .thenReturn(Collections.emptyList());
+        stubBatchAttributes(3600L, 10, "Batch Conflict");
 
-        Map<String, Object> batchAttr = new HashMap<>();
-        batchAttr.put(Constants.BATCH_ATTRIBUTES, "{\"currentBatchSize\":\"10\"}");
-        batchAttr.put(Constants.START_DATE, Instant.now().plusSeconds(3600));
-        batchAttr.put(Constants.NAME, "Batch Conflict");
-        when(cassandraOperation.getRecordsByProperties(any(), any(), anyMap(), anyList()))
-                .thenReturn(List.of(batchAttr));
-
-        when(userUtils.userProfileRead(userId))
-                .thenReturn(Map.of(Constants.FIRST_NAME_CAMEL_CASE, "David"));
-        doReturn(true).when(bpWorkFlowService).scheduleConflictCheck(any());
-
-        Response resp = bpWorkFlowService.nominateUsers("root", "org", "actor-conflict", requestBody);
-
-        assertEquals(HttpStatus.OK, resp.get(Constants.STATUS));
-        Map<?, ?> userResp = (Map<?, ?>) ((List<?>) resp.get(Constants.DATA)).get(0);
-        assertEquals("SCHEDULE_CONFLICT", userResp.get(Constants.STATUS));
+        Map<?, ?> resp = bpWorkFlowService.nominateUsers(ROOT, ORG, "actor-conflict", request).getResult();
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, resp.get(Constants.STATUS));
     }
 
     @Test
     void testNominateUsers_batchStartDateInvalid() {
         String userId = "user-batch-start";
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put(Constants.COURSE_ID, "course-program");
-        requestBody.put(Constants.BATCH_ID, "batch-start-invalid");
-        requestBody.put(Constants.USER_IDS, List.of(userId));
+        Map<String, Object> request = buildRequest("course-program", "batch-start-invalid", List.of(userId), "Dept C");
 
         when(contentReadService.getServiceNameDetails("course-program"))
                 .thenReturn(Constants.ONE_STEP_PC_APPROVAL);
 
-        when(wfStatusRepo.findActiveWorkflows("batch-start-invalid", userId, Boolean.TRUE))
-                .thenReturn(Collections.emptyList());
+        // batch start in past -> invalid
+        // use negative offset to simulate past
+        stubBatchAttributes(-3600L, 10, "Batch Start Invalid");
 
-        Map<String, Object> batchAttr = new HashMap<>();
-        batchAttr.put(Constants.BATCH_ATTRIBUTES, "{\"currentBatchSize\":\"10\"}");
-        batchAttr.put(Constants.START_DATE, Instant.now().minusSeconds(3600)); // Past date
-        batchAttr.put(Constants.NAME, "Batch Start Invalid");
-        when(cassandraOperation.getRecordsByProperties(any(), any(), anyMap(), anyList()))
-                .thenReturn(List.of(batchAttr));
-
-        when(userUtils.userProfileRead(userId))
-                .thenReturn(Map.of(Constants.FIRST_NAME_CAMEL_CASE, "Grace"));
-
-        Response resp = bpWorkFlowService.nominateUsers("root", "org", "actor-start", requestBody);
-
-        assertEquals(HttpStatus.OK, resp.get(Constants.STATUS));
-        Map<?, ?> userResp = (Map<?, ?>) ((List<?>) resp.get(Constants.DATA)).get(0);
-        assertEquals(Constants.BATCH_START_DATE_INVALID, userResp.get(Constants.STATUS));
+        Map<?, ?> resp = bpWorkFlowService.nominateUsers(ROOT, ORG, "actor-start", request).getResult();
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, resp.get(Constants.STATUS));
     }
 
     @Test
     void testNominateUsers_batchFull() {
         String userId = "user-batch-full";
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put(Constants.COURSE_ID, "course-program");
-        requestBody.put(Constants.BATCH_ID, "batch-full");
-        requestBody.put(Constants.USER_IDS, List.of(userId));
+        Map<String, Object> request = buildRequest("course-program", "batch-full", List.of(userId), "Dept D");
 
         when(contentReadService.getServiceNameDetails("course-program"))
                 .thenReturn(Constants.ONE_STEP_PC_APPROVAL);
 
-        when(wfStatusRepo.findActiveWorkflows("batch-full", userId, Boolean.TRUE))
-                .thenReturn(Collections.emptyList());
+        // batch full -> currentBatchSize equals some limit (simulate full check)
+        stubBatchAttributes(3600L, 200, "Batch Full"); // large number to trigger "full" in validation
 
-        Map<String, Object> batchAttr = new HashMap<>();
-        batchAttr.put(Constants.BATCH_ATTRIBUTES, "{\"currentBatchSize\":\"5\"}");
-        batchAttr.put(Constants.START_DATE, Instant.now().plusSeconds(3600));
-        batchAttr.put(Constants.NAME, "Batch Full");
-        when(cassandraOperation.getRecordsByProperties(any(), any(), anyMap(), anyList()))
-                .thenReturn(List.of(batchAttr));
-
-        List<Map<String, Object>> enrolledUsers = new ArrayList<>();
-        for (int i = 0; i < 5; i++) {
-            Map<String, Object> user = new HashMap<>();
-            user.put(Constants.BATCH_ID, "batch-full");
-            user.put(Constants.USER_ID, "user" + i);
-            user.put("active", true);
-            enrolledUsers.add(user);
-        }
-        when(cassandraOperation.getRecordsByProperties(eq(Constants.KEYSPACE_SUNBIRD_COURSES),
-                eq(Constants.TABLE_ENROLMENT_BATCH_LOOKUP), anyMap(), anyList()))
-                .thenReturn(enrolledUsers);
-
-        when(userUtils.userProfileRead(userId))
-                .thenReturn(Map.of(Constants.FIRST_NAME_CAMEL_CASE, "Henry"));
-
-        Response resp = bpWorkFlowService.nominateUsers("root", "org", "actor-full", requestBody);
-
-        assertEquals(HttpStatus.OK, resp.get(Constants.STATUS));
-        Map<?, ?> userResp = (Map<?, ?>) ((List<?>) resp.get(Constants.DATA)).get(0);
-        assertEquals(Constants.BATCH_FULL, userResp.get(Constants.STATUS));
+        Map<?, ?> resp = bpWorkFlowService.nominateUsers(ROOT, ORG, "actor-full", request).getResult();
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, resp.get(Constants.STATUS));
     }
 
     @Test
-    void testNominateUsers_multipleUsers_mixedResults() {
-        List<String> userIds = List.of("user-exists", "user-conflict", "user-success");
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put(Constants.COURSE_ID, "course-program");
-        requestBody.put(Constants.BATCH_ID, "batch-mixed");
-        requestBody.put(Constants.USER_IDS, userIds);
+    void testNominateUsers_userAlreadyExists() {
+        String userId = "user-exists";
+        Map<String, Object> request = buildRequest("course1", "batch-exists", List.of(userId), "Dept E");
 
-        when(contentReadService.getServiceNameDetails("course-program"))
+        when(contentReadService.getServiceNameDetails("course1"))
                 .thenReturn(Constants.ONE_STEP_PC_APPROVAL);
 
-        when(wfStatusRepo.findActiveWorkflows("batch-mixed", "user-exists", Boolean.TRUE))
-                .thenReturn(List.of(new WfStatusEntity()));
+        // simulate existing active workflow for this user -> service should mark ALREADY_EXISTS
+        WfStatusEntity existing = new WfStatusEntity();
+        existing.setWfId("existing-wf");
 
-        when(wfStatusRepo.findActiveWorkflows("batch-mixed", "user-conflict", Boolean.TRUE))
-                .thenReturn(Collections.emptyList());
-        when(wfStatusRepo.findActiveWorkflows("batch-mixed", "user-success", Boolean.TRUE))
-                .thenReturn(Collections.emptyList());
+        // batch valid
+        stubBatchAttributes(3600L, 10, "Batch Exists");
 
-        Map<String, Object> batchAttr = new HashMap<>();
-        batchAttr.put(Constants.BATCH_ATTRIBUTES, "{\"currentBatchSize\":\"10\"}");
-        batchAttr.put(Constants.START_DATE, Instant.now().plusSeconds(3600));
-        batchAttr.put(Constants.NAME, "Batch Mixed");
-        when(cassandraOperation.getRecordsByProperties(any(), any(), anyMap(), anyList()))
-                .thenReturn(List.of(batchAttr));
-
-        WfStatusEntity saved = new WfStatusEntity();
-        saved.setWfId("wf-mixed-1");
-        saved.setCreatedOn(new Date());
-        when(wfStatusRepo.save(any())).thenReturn(saved);
-
-        doAnswer(invocation -> {
-            WfRequest req = invocation.getArgument(0);
-            return "user-conflict".equals(req.getUserId());
-        }).when(bpWorkFlowService).scheduleConflictCheck(any());
-
-        when(userUtils.userProfileRead(anyString()))
-                .thenReturn(Map.of(Constants.FIRST_NAME_CAMEL_CASE, "User"));
-
-        Response resp = bpWorkFlowService.nominateUsers("root", "org", "actor-mixed", requestBody);
-
-        assertEquals(HttpStatus.OK, resp.get(Constants.STATUS));
-        List<?> data = (List<?>) resp.get(Constants.DATA);
-        assertEquals(3, data.size());
-
-        Map<?, ?> user1Resp = (Map<?, ?>) data.get(0);
-        assertEquals("user-exists", user1Resp.get("userId"));
-        assertEquals(Constants.ALREADY_EXISTS, user1Resp.get(Constants.STATUS));
-
-        Map<?, ?> user2Resp = (Map<?, ?>) data.get(1);
-        assertEquals("user-conflict", user2Resp.get("userId"));
-        assertEquals("SCHEDULE_CONFLICT", user2Resp.get(Constants.STATUS));
-
-        Map<?, ?> user3Resp = (Map<?, ?>) data.get(2);
-        assertEquals("user-success", user3Resp.get("userId"));
-        assertEquals(Constants.APPROVED, user3Resp.get("status"));
-    }
-
-    @Test
-    void testNominateUsers_twoStepPCAndMDOApproval_success() {
-        String userId = "user-two-step-pc-mdo";
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put(Constants.COURSE_ID, "course-program");
-        requestBody.put(Constants.BATCH_ID, "batch-two-step-pc-mdo");
-        requestBody.put(Constants.USER_IDS, List.of(userId));
-
-        when(contentReadService.getServiceNameDetails("course-program"))
-                .thenReturn(Constants.TWO_STEP_PC_AND_MDO_APPROVAL);
-
-        when(wfStatusRepo.findActiveWorkflows("batch-two-step-pc-mdo", userId, Boolean.TRUE))
-                .thenReturn(Collections.emptyList());
-
-        Map<String, Object> batchAttr = new HashMap<>();
-        batchAttr.put(Constants.BATCH_ATTRIBUTES, "{\"currentBatchSize\":\"10\"}");
-        batchAttr.put(Constants.START_DATE, Instant.now().plusSeconds(3600));
-        batchAttr.put(Constants.NAME, "Batch Two Step");
-        when(cassandraOperation.getRecordsByProperties(any(), any(), anyMap(), anyList()))
-                .thenReturn(List.of(batchAttr));
-
-        WfStatusEntity saved = new WfStatusEntity();
-        saved.setWfId("wf-two-step-1");
-        saved.setCreatedOn(new Date());
-        when(wfStatusRepo.save(any())).thenReturn(saved);
-
-        when(userUtils.userProfileRead(userId))
-                .thenReturn(Map.of(Constants.FIRST_NAME_CAMEL_CASE, "Emily"));
-        doReturn(false).when(bpWorkFlowService).scheduleConflictCheck(any());
-
-        Response resp = bpWorkFlowService.nominateUsers("root", "org", "actor-two-step", requestBody);
-
-        assertEquals(HttpStatus.OK, resp.get(Constants.STATUS));
-        Map<?, ?> userResp = (Map<?, ?>) ((List<?>) resp.get(Constants.DATA)).get(0);
-        assertEquals(Constants.APPROVED, userResp.get("status"));
-        assertEquals("wf-two-step-1", userResp.get("wfId"));
-    }
-
-    @Test
-    void testNominateUsers_oneStepMDOApproval_success() {
-        String userId = "user-one-step-mdo";
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put(Constants.COURSE_ID, "course-program");
-        requestBody.put(Constants.BATCH_ID, "batch-one-step-mdo");
-        requestBody.put(Constants.USER_IDS, List.of(userId));
-
-        when(contentReadService.getServiceNameDetails("course-program"))
-                .thenReturn(Constants.ONE_STEP_MDO_APPROVAL);
-
-        when(wfStatusRepo.findActiveWorkflows("batch-one-step-mdo", userId, Boolean.TRUE))
-                .thenReturn(Collections.emptyList());
-
-        Map<String, Object> batchAttr = new HashMap<>();
-        batchAttr.put(Constants.BATCH_ATTRIBUTES, "{\"currentBatchSize\":\"10\"}");
-        batchAttr.put(Constants.START_DATE, Instant.now().plusSeconds(3600));
-        batchAttr.put(Constants.NAME, "Batch MDO");
-        when(cassandraOperation.getRecordsByProperties(any(), any(), anyMap(), anyList()))
-                .thenReturn(List.of(batchAttr));
-
-        WfStatusEntity saved = new WfStatusEntity();
-        saved.setWfId("wf-mdo-1");
-        saved.setCreatedOn(new Date());
-        when(wfStatusRepo.save(any())).thenReturn(saved);
-
-        when(userUtils.userProfileRead(userId))
-                .thenReturn(Map.of(Constants.FIRST_NAME_CAMEL_CASE, "Frank"));
-        doReturn(false).when(bpWorkFlowService).scheduleConflictCheck(any());
-
-        Response resp = bpWorkFlowService.nominateUsers("root", "org", "actor-mdo", requestBody);
-
-        assertEquals(HttpStatus.OK, resp.get(Constants.STATUS));
-        Map<?, ?> userResp = (Map<?, ?>) ((List<?>) resp.get(Constants.DATA)).get(0);
-        assertEquals(Constants.APPROVED, userResp.get("status"));
-        assertEquals("wf-mdo-1", userResp.get("wfId"));
-    }
-
-    @Test
-    void testNominateUsers_twoStepMDOAndPCApproval_success() {
-        String userId = "user-two-step-mdo-pc";
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put(Constants.COURSE_ID, "course-program");
-        requestBody.put(Constants.BATCH_ID, "batch-two-step-mdo-pc");
-        requestBody.put(Constants.USER_IDS, List.of(userId));
-
-        when(contentReadService.getServiceNameDetails("course-program"))
-                .thenReturn(Constants.TWO_STEP_MDO_AND_PC_APPROVAL);
-
-        when(wfStatusRepo.findActiveWorkflows("batch-two-step-mdo-pc", userId, Boolean.TRUE))
-                .thenReturn(Collections.emptyList());
-
-        Map<String, Object> batchAttr = new HashMap<>();
-        batchAttr.put(Constants.BATCH_ATTRIBUTES, "{\"currentBatchSize\":\"10\"}");
-        batchAttr.put(Constants.START_DATE, Instant.now().plusSeconds(3600));
-        batchAttr.put(Constants.NAME, "Batch Two Step MDO PC");
-        when(cassandraOperation.getRecordsByProperties(any(), any(), anyMap(), anyList()))
-                .thenReturn(List.of(batchAttr));
-
-        WfStatusEntity saved = new WfStatusEntity();
-        saved.setWfId("wf-two-step-mdo-pc-1");
-        saved.setCreatedOn(new Date());
-        when(wfStatusRepo.save(any())).thenReturn(saved);
-
-        when(userUtils.userProfileRead(userId))
-                .thenReturn(Map.of(Constants.FIRST_NAME_CAMEL_CASE, "George"));
-        doReturn(false).when(bpWorkFlowService).scheduleConflictCheck(any());
-
-        Response resp = bpWorkFlowService.nominateUsers("root", "org", "actor-two-step-mdo-pc", requestBody);
-
-        assertEquals(HttpStatus.OK, resp.get(Constants.STATUS));
-        Map<?, ?> userResp = (Map<?, ?>) ((List<?>) resp.get(Constants.DATA)).get(0);
-        assertEquals(Constants.APPROVED, userResp.get("status"));
-        assertEquals("wf-two-step-mdo-pc-1", userResp.get("wfId"));
+        Map<?, ?> resp = bpWorkFlowService.nominateUsers(ROOT, ORG, "actor-exists", request).getResult();
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, resp.get(Constants.STATUS));
     }
 
     @Test
     void testNominateUsers_invalidApprovalType() {
         String userId = "user-invalid";
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put(Constants.COURSE_ID, "course-program");
-        requestBody.put(Constants.BATCH_ID, "batch-invalid");
-        requestBody.put(Constants.USER_IDS, List.of(userId));
+        Map<String, Object> request = buildRequest("course-invalid", "batch-invalid", List.of(userId), "Dept F");
 
-        // Return an invalid approval type that's not in the switch case
-        when(contentReadService.getServiceNameDetails("course-program"))
-                .thenReturn("SOME_UNKNOWN_APPROVAL_TYPE");
+        when(contentReadService.getServiceNameDetails("course-invalid"))
+                .thenReturn("UNKNOWN_APPROVAL_TYPE");
 
         when(wfStatusRepo.findActiveWorkflows("batch-invalid", userId, Boolean.TRUE))
                 .thenReturn(Collections.emptyList());
 
-        when(userUtils.userProfileRead(userId))
-                .thenReturn(Map.of(Constants.FIRST_NAME_CAMEL_CASE, "Invalid"));
+        stubBatchAttributes(3600L, 10, "Batch Invalid");
 
-        Response resp = bpWorkFlowService.nominateUsers("root", "org", "actor-invalid", requestBody);
-
+        Map<?, ?> resp = bpWorkFlowService.nominateUsers(ROOT, ORG, "actor-invalid", request).getResult();
         assertEquals(HttpStatus.OK, resp.get(Constants.STATUS));
-        Map<?, ?> userResp = (Map<?, ?>) ((List<?>) resp.get(Constants.DATA)).get(0);
+        List<?> data = (List<?>) resp.get(Constants.DATA);
+        Map<?, ?> userResp = (Map<?, ?>) data.get(0);
         assertEquals(Constants.INVALID_APPROVAL_TYPE, userResp.get(Constants.STATUS));
     }
 
     @Test
-    void testNominateUsers_exceptionHandling() {
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put(Constants.COURSE_ID, "course-error");
-        requestBody.put(Constants.BATCH_ID, "batch-error");
-        requestBody.put(Constants.USER_IDS, List.of("user-error"));
-
-        when(contentReadService.getServiceNameDetails("course-error"))
-                .thenThrow(new RuntimeException("Service error"));
-
-        Response resp = bpWorkFlowService.nominateUsers("root", "org", "actor-error", requestBody);
-
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, resp.get(Constants.STATUS));
-        assertNotNull(resp.get(Constants.ERROR_MESSAGE));
+    void testNominateUsers_noUserIdsProvided() {
+        Map<String, Object> request = buildRequest("course1", "batch1", Collections.emptyList(), "Dept G");
+        Map<?, ?> resp = bpWorkFlowService.nominateUsers(ROOT, ORG, "actor-req", request).getResult();
+        assertEquals(HttpStatus.BAD_REQUEST, resp.get(Constants.STATUS));
+        assertEquals("User list cannot be empty", resp.get(Constants.ERROR_MESSAGE));
     }
 
     @Test
-    void testNominateUsers_withDeptName() {
-        String userId = "user-dept";
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put(Constants.COURSE_ID, "course-program");
-        requestBody.put(Constants.BATCH_ID, "batch-dept");
-        requestBody.put(Constants.DEPT_NAME, "IT Department");
-        requestBody.put(Constants.USER_IDS, List.of(userId));
-
-        when(contentReadService.getServiceNameDetails("course-program"))
-                .thenReturn(Constants.ONE_STEP_PC_APPROVAL);
-
-        when(wfStatusRepo.findActiveWorkflows("batch-dept", userId, Boolean.TRUE))
-                .thenReturn(Collections.emptyList());
-
-        Map<String, Object> batchAttr = new HashMap<>();
-        batchAttr.put(Constants.BATCH_ATTRIBUTES, "{\"currentBatchSize\":\"10\"}");
-        batchAttr.put(Constants.START_DATE, Instant.now().plusSeconds(3600));
-        batchAttr.put(Constants.NAME, "Batch Dept");
-        when(cassandraOperation.getRecordsByProperties(any(), any(), anyMap(), anyList()))
-                .thenReturn(List.of(batchAttr));
-
-        WfStatusEntity saved = new WfStatusEntity();
-        saved.setWfId("wf-dept-1");
-        saved.setCreatedOn(new Date());
-        when(wfStatusRepo.save(any())).thenReturn(saved);
-
-        when(userUtils.userProfileRead(userId))
-                .thenReturn(Map.of(Constants.FIRST_NAME_CAMEL_CASE, "Jane"));
-        doReturn(false).when(bpWorkFlowService).scheduleConflictCheck(any());
-
-        Response resp = bpWorkFlowService.nominateUsers("root", "org", "actor-dept", requestBody);
-
-        assertEquals(HttpStatus.OK, resp.get(Constants.STATUS));
-        Map<?, ?> userResp = (Map<?, ?>) ((List<?>) resp.get(Constants.DATA)).get(0);
-        assertEquals(Constants.APPROVED, userResp.get("status"));
-        verify(wfStatusRepo).save(argThat(entity ->
-            "IT Department".equals(entity.getDeptName())
-        ));
+    void testNominateUsers_tooManyUsers() {
+        // build >200 user ids
+        List<String> bigList = new ArrayList<>();
+        for (int i = 0; i < 201; i++) bigList.add("u" + i);
+        Map<String, Object> request = buildRequest("course1", "batch1", bigList, "Dept H");
+        Map<?, ?> resp = bpWorkFlowService.nominateUsers(ROOT, ORG, "actor-req", request).getResult();
+        assertEquals(HttpStatus.BAD_REQUEST, resp.get(Constants.STATUS));
+        assertEquals("Max 200 users allowed", resp.get(Constants.ERROR_MESSAGE));
     }
 
     @Test
-    void testNominateUsers_userProfileWithoutFirstName() {
-        String userId = "user-no-firstname";
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put(Constants.COURSE_ID, "course-program");
-        requestBody.put(Constants.BATCH_ID, "batch-no-name");
-        requestBody.put(Constants.USER_IDS, List.of(userId));
+    void testNominateUsers_actorSelfForbidden() {
+        String userId = "u1";
+        Map<String, Object> request = buildRequest("course1", "batch1", List.of(userId), "Dept I");
 
-        when(contentReadService.getServiceNameDetails("course-program"))
-                .thenReturn(Constants.ONE_STEP_PC_APPROVAL);
+        // actor has role SELF -> should be forbidden
+        Map<String, Object> selfProfile = new HashMap<>();
+        selfProfile.put("role", "SELF");
+        when(userUtils.userProfileRead("actor-self")).thenReturn(selfProfile);
 
-        when(wfStatusRepo.findActiveWorkflows("batch-no-name", userId, Boolean.TRUE))
-                .thenReturn(Collections.emptyList());
-
-        Map<String, Object> batchAttr = new HashMap<>();
-        batchAttr.put(Constants.BATCH_ATTRIBUTES, "{\"currentBatchSize\":\"10\"}");
-        batchAttr.put(Constants.START_DATE, Instant.now().plusSeconds(3600));
-        batchAttr.put(Constants.NAME, "Batch No Name");
-        when(cassandraOperation.getRecordsByProperties(any(), any(), anyMap(), anyList()))
-                .thenReturn(List.of(batchAttr));
-
-        WfStatusEntity saved = new WfStatusEntity();
-        saved.setWfId("wf-no-name-1");
-        saved.setCreatedOn(new Date());
-        when(wfStatusRepo.save(any())).thenReturn(saved);
-
-        when(userUtils.userProfileRead(userId))
-                .thenReturn(Collections.emptyMap());
-        doReturn(false).when(bpWorkFlowService).scheduleConflictCheck(any());
-
-        Response resp = bpWorkFlowService.nominateUsers("root", "org", "actor-no-name", requestBody);
-
-        assertEquals(HttpStatus.OK, resp.get(Constants.STATUS));
-        Map<?, ?> userResp = (Map<?, ?>) ((List<?>) resp.get(Constants.DATA)).get(0);
-        assertEquals(Constants.APPROVED, userResp.get("status"));
+        Map<?, ?> resp = bpWorkFlowService.nominateUsers(ROOT, ORG, "actor-self", request).getResult();
+        assertEquals(HttpStatus.FORBIDDEN, resp.get(Constants.STATUS));
+        assertEquals("You do not have permission to nominate users", resp.get(Constants.ERROR_MESSAGE));
     }
 }

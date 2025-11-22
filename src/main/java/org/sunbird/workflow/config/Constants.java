@@ -437,6 +437,9 @@ public class Constants {
     public static final String BATCH_FULL = "BATCH_FULL";
     public static final String IN_WORKFLOW = "IN_WORKFLOW";
     public static final String USER_ENROLMENTS_V2  = "user_enrolments_v2";
+    public static final String PC = "PC";
+    public static final String MDO = "MDO";
+    public static final String SELF = "SELF";
 
 
 }

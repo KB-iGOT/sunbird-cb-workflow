@@ -1550,7 +1550,12 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
     }
 
     public Response nominateUsers(String rootOrg, String org, String actorUserId, Map<String, Object> requestBody) {
-        logger.info("Nomination Wrapper API triggered by Program Coordinator: {}", actorUserId);
+        logger.info("Nomination Wrapper API triggered by actor: {}", actorUserId);
+
+        Response validationResponse = validateNominationRequest(actorUserId, requestBody);
+        if (validationResponse != null) {
+            return validationResponse;
+        }
 
         Response response = new Response();
         List<Map<String, Object>> processedUsers = new ArrayList<>();
@@ -1560,33 +1565,49 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
             String batchId = (String) requestBody.get(Constants.BATCH_ID);
             String deptName = (String) requestBody.get(Constants.DEPT_NAME);
             String wfApproveType = contentReadService.getServiceNameDetails(programId);
-            if (wfApproveType == null || wfApproveType.isEmpty()) {
+            if (StringUtils.isBlank(wfApproveType)) {
                 wfApproveType = Constants.BLENDED_PROGRAM_SERVICE_NAME;
             }
 
             @SuppressWarnings("unchecked")
             List<String> userIds = (List<String>) requestBody.get(Constants.USER_IDS);
-            if (CollectionUtils.isEmpty(userIds)) {
-                response.put(Constants.ERROR_MESSAGE, "No userIds provided for nomination");
-                response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
-                return response;
-            }
+            Map<String, Object> actorProfile = getUserProfile(actorUserId);
+            String incomingRole = extractUserRole(actorProfile);
 
-            if (userIds.size() > 200) {
-                response.put(Constants.ERROR_MESSAGE, "Maximum 200 users allowed per nomination batch");
-                response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
-                return response;
+            if (incomingRole.equalsIgnoreCase("SELF")) {
+                return errorResponse("You do not have permission to nominate users",
+                        HttpStatus.FORBIDDEN);
             }
 
             for (String userId : userIds) {
+
                 Map<String, Object> userResponse = new HashMap<>();
                 userResponse.put("userId", userId);
+                List<WfStatusEntity> activeRequests =
+                        wfStatusRepo.findActiveWorkflows(batchId, userId, Boolean.TRUE);
 
-                if (isExistingWorkflowPresent(batchId, userId)) {
-                    logger.warn("Skipping nomination for userId: {} as active workflow already exists for batchId: {}", userId, batchId);
-                    userResponse.put(Constants.STATUS, Constants.ALREADY_EXISTS);
-                    processedUsers.add(userResponse);
-                    continue;
+                if (CollectionUtils.isNotEmpty(activeRequests)) {
+                    for (WfStatusEntity req : activeRequests) {
+
+                        Map<String, Object> creatorProfile = getUserProfile(req.getActorUUID());
+                        String existingRole = extractUserRole(creatorProfile);
+
+                        logger.info("Workflow override check - existing={}, incoming={} for userId={}",
+                                existingRole, incomingRole, userId);
+
+                        if (shouldOverride(existingRole, incomingRole)) {
+                            req.setInWorkflow(false);
+                            req.setCurrentStatus("WITHDRAWN");
+                            req.setComment("Superseded by " + incomingRole + " nomination");
+                            req.setLastUpdatedOn(new Date());
+                            wfStatusRepo.save(req);
+                        } else {
+                            logger.info("Skipping nomination - existing approval by {} remains active", existingRole);
+                            userResponse.put(Constants.STATUS, Constants.ALREADY_EXISTS);
+                            processedUsers.add(userResponse);
+                            continue;
+                        }
+                    }
                 }
 
                 WfRequest wfRequest = new WfRequest();
@@ -1600,92 +1621,67 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
 
                 switch (wfApproveType) {
                     case Constants.ONE_STEP_PC_APPROVAL:
-                        wfRequest.setState(Constants.SEND_FOR_PC_APPROVAL);
-                        wfRequest.setAction(Constants.APPROVE);
-                        break;
-
-                    case Constants.TWO_STEP_PC_AND_MDO_APPROVAL:
-                        wfRequest.setState(Constants.SEND_FOR_MDO_APPROVAL);
-                        wfRequest.setAction(Constants.APPROVE);
-                        break;
-
-                    case Constants.ONE_STEP_MDO_APPROVAL:
-                        wfRequest.setState(Constants.SEND_FOR_MDO_APPROVAL);
-                        wfRequest.setAction(Constants.APPROVE);
-                        break;
-
                     case Constants.TWO_STEP_MDO_AND_PC_APPROVAL:
                         wfRequest.setState(Constants.SEND_FOR_PC_APPROVAL);
                         wfRequest.setAction(Constants.APPROVE);
                         break;
 
+                    case Constants.ONE_STEP_MDO_APPROVAL:
+                    case Constants.TWO_STEP_PC_AND_MDO_APPROVAL:
+                        wfRequest.setState(Constants.SEND_FOR_MDO_APPROVAL);
+                        wfRequest.setAction(Constants.APPROVE);
+                        break;
+
                     default:
-                        logger.warn("Invalid wfApproveType provided: {}", wfApproveType);
+                        logger.warn("Invalid wfApproveType: {}", wfApproveType);
                         userResponse.put(Constants.STATUS, Constants.INVALID_APPROVAL_TYPE);
                         processedUsers.add(userResponse);
                         continue;
                 }
-
 
                 Map<String, Object> batchDetailsMap = new HashMap<>();
                 String validationError = validateBatchUserRequestAccess(wfRequest, batchDetailsMap);
                 wfRequest.setBatchName((String) batchDetailsMap.get(Constants.BATCH_NAME));
                 wfRequest.setBatchStartDate((Date) batchDetailsMap.get(Constants.START_DATE));
 
-                if (Constants.BATCH_START_DATE_ERROR.equals(validationError)) {
-                    logger.warn("Batch start date invalid for userId: {}", userId);
-                    userResponse.put(Constants.STATUS, Constants.BATCH_START_DATE_INVALID);
+                if (validationError != null) {
+                    userResponse.put(Constants.STATUS, validationError);
                     processedUsers.add(userResponse);
                     continue;
                 }
 
-                if (Constants.BATCH_SIZE_ERROR.equals(validationError)) {
-                    logger.warn("Batch full for userId: {}", userId);
-                    userResponse.put(Constants.STATUS, Constants.BATCH_FULL);
-                    processedUsers.add(userResponse);
-                    continue;
-                }
-
-                List<Map<String, Object>> activeEnrollments = getActiveEnrollmentForUserAndCourse(userId, wfRequest.getCourseId());
-                if (CollectionUtils.isNotEmpty(activeEnrollments)) {
-                    logger.warn("Active enrollment exists for userId: {} and courseId: {}", userId, wfRequest.getCourseId());
+                if (CollectionUtils.isNotEmpty(getActiveEnrollmentForUserAndCourse(userId, programId))) {
                     userResponse.put(Constants.STATUS, Constants.ALREADY_EXISTS);
                     processedUsers.add(userResponse);
                     continue;
                 }
 
                 if (scheduleConflictCheck(wfRequest)) {
-                    logger.warn("Schedule conflict for userId: {}", userId);
                     userResponse.put(Constants.STATUS, "SCHEDULE_CONFLICT");
                     processedUsers.add(userResponse);
                     continue;
                 }
-                    WfStatusEntity entity = persistApprovedStateDirectly(wfRequest, rootOrg, org);
-                    wfRequest.setWfId(entity.getWfId());
-                    wfRequest.setCreatedOn(entity.getCreatedOn() != null ? entity.getCreatedOn().toString() : null);
-                    try {
-                        producer.push(configuration.getWorkFlowNotificationTopic(), wfRequest);
-                        producer.push(configuration.getWorkflowApplicationTopic(), wfRequest);
-                    } catch (Exception e) {
-                        logger.error("Error publishing kafka for approved nomination userId: {}", userId, e);
-                    }
-                    userResponse.put("status", Constants.APPROVED);
-                    userResponse.put("wfId", entity.getWfId());
-
+                WfStatusEntity entity = persistApprovedStateDirectly(wfRequest, rootOrg, org);
+                wfRequest.setWfId(entity.getWfId());
+                try {
+                    producer.push(configuration.getWorkFlowNotificationTopic(), wfRequest);
+                    producer.push(configuration.getWorkflowApplicationTopic(), wfRequest);
+                } catch (Exception ex) {
+                    logger.error("Kafka publishing failed for userId={}", userId, ex);
+                }
+                userResponse.put("status", Constants.APPROVED);
+                userResponse.put("wfId", entity.getWfId());
                 processedUsers.add(userResponse);
             }
 
             response.put(Constants.MESSAGE, "Nomination workflow processing complete");
             response.put(Constants.DATA, processedUsers);
             response.put(Constants.STATUS, HttpStatus.OK);
-
+            return response;
         } catch (Exception e) {
-            logger.error("Error in nomination workflow creation: ", e);
-            response.put(Constants.ERROR_MESSAGE, e.getMessage());
-            response.put(Constants.STATUS, HttpStatus.INTERNAL_SERVER_ERROR);
+            logger.error("Error processing nomination", e);
+            return errorResponse(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
-
-        return response;
     }
 
     private List<HashMap<String, Object>> buildUpdateFieldValuesWithFirstName(String userId) {
@@ -1763,5 +1759,82 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                 .collect(Collectors.toList());
     }
 
+
+    private Response validateNominationRequest(String actorUserId, Map<String, Object> requestBody) {
+
+        String programId = (String) requestBody.get(Constants.COURSE_ID);
+        if (StringUtils.isBlank(programId))
+            return errorResponse("Program ID is required", HttpStatus.BAD_REQUEST);
+
+        String batchId = (String) requestBody.get(Constants.BATCH_ID);
+        if (StringUtils.isBlank(batchId))
+            return errorResponse("Batch ID is required", HttpStatus.BAD_REQUEST);
+
+        String deptName = (String) requestBody.get(Constants.DEPT_NAME);
+        if (StringUtils.isBlank(deptName))
+            return errorResponse("Department is required", HttpStatus.BAD_REQUEST);
+
+        @SuppressWarnings("unchecked")
+        List<String> userIds = (List<String>) requestBody.get(Constants.USER_IDS);
+        if (CollectionUtils.isEmpty(userIds))
+            return errorResponse("User list cannot be empty", HttpStatus.BAD_REQUEST);
+
+        userIds = userIds.stream()
+                .filter(StringUtils::isNotBlank)
+                .filter(id -> !id.equals(actorUserId))
+                .distinct()
+                .toList();
+
+        if (userIds.isEmpty())
+            return errorResponse("Invalid user list", HttpStatus.BAD_REQUEST);
+
+        if (userIds.size() > 200)
+            return errorResponse("Max 200 users allowed", HttpStatus.BAD_REQUEST);
+
+        requestBody.put(Constants.USER_IDS, userIds);
+        return null;
+    }
+
+    private Map<String, Object> getUserProfile(String userId) {
+        Map<String, Object> userData = userUtils.userProfileRead(userId);
+        return MapUtils.isNotEmpty(userData) ? userData : Collections.emptyMap();
+    }
+
+    @SuppressWarnings("unchecked")
+    private String extractUserRole(Map<String, Object> profile) {
+        try {
+            List<Map<String, Object>> orgs = (List<Map<String, Object>>) profile.get(Constants.ORGANISATIONS);
+            if (orgs != null) {
+                for (Map<String, Object> org : orgs) {
+                    List<String> roles = (List<String>) org.get(Constants.ROLES);
+                    if (roles != null) {
+
+                        if (roles.contains(Constants.PROGRAM_COORDINATOR)) {
+                            return Constants.PC;
+                        }
+
+                        if (roles.contains(Constants.MDO_ADMIN) || roles.contains(Constants.MDO_LEADER)) {
+                            return Constants.MDO;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignore) {}
+
+        return Constants.SELF;
+    }
+
+    private boolean shouldOverride(String existingRole, String incomingRole) {
+        if (incomingRole.equalsIgnoreCase(Constants.PC) && !existingRole.equalsIgnoreCase(Constants.PC)) return true;
+        if (incomingRole.equalsIgnoreCase(Constants.MDO) && existingRole.equalsIgnoreCase(Constants.SELF)) return true;
+        return false;
+    }
+
+    private Response errorResponse(String msg, HttpStatus status) {
+        Response res = new Response();
+        res.put(Constants.ERROR_MESSAGE, msg);
+        res.put(Constants.STATUS, status);
+        return res;
+    }
 
 }
