@@ -518,7 +518,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                 wfRequest.setAction(Constants.INITIATE);
                 wfRequest.setNominatedByMdo(true);
                 wfRequest.setBatchName((String) courseBatchDetails.get(Constants.BATCH_NAME));
-                wfRequest.setBatchStartDate(Date.from((Instant) courseBatchDetails.get(Constants.START_DATE)));
+                wfRequest.setBatchStartDate((Date) courseBatchDetails.get(Constants.START_DATE));
                 response = saveAdminEnrollUserIntoWfStatus(rootOrg, org, wfRequest);
                // producer.push(configuration.getWorkFlowNotificationTopic(), wfRequest);
                 producer.push(configuration.getWorkflowApplicationTopic(), wfRequest);
@@ -1585,12 +1585,17 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                 userResponse.put("userId", userId);
                 List<WfStatusEntity> activeRequests =
                         wfStatusRepo.findActiveWorkflows(batchId, userId, Boolean.TRUE);
-
+                boolean blockNewNomination = false;
                 if (CollectionUtils.isNotEmpty(activeRequests)) {
                     for (WfStatusEntity req : activeRequests) {
-
-                        Map<String, Object> creatorProfile = getUserProfile(req.getActorUUID());
-                        String existingRole = extractUserRole(creatorProfile);
+                        String existingRole;
+                        if (StringUtils.isBlank(req.getActorUUID())) {
+                            logger.warn("ActorUUID missing for workflow {}, treating as SELF", req.getWfId());
+                            existingRole = Constants.SELF;
+                        } else {
+                            Map<String, Object> creatorProfile = getUserProfile(req.getActorUUID());
+                            existingRole = extractUserRole(creatorProfile);
+                        }
 
                         logger.info("Workflow override check - existing={}, incoming={} for userId={}",
                                 existingRole, incomingRole, userId);
@@ -1605,9 +1610,14 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                             logger.info("Skipping nomination - existing approval by {} remains active", existingRole);
                             userResponse.put(Constants.STATUS, Constants.ALREADY_EXISTS);
                             processedUsers.add(userResponse);
-                            continue;
+                            blockNewNomination = true;
+                            break;
                         }
                     }
+                }
+
+                if (blockNewNomination) {
+                    continue;
                 }
 
                 WfRequest wfRequest = new WfRequest();
@@ -1644,7 +1654,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                 wfRequest.setBatchName((String) batchDetailsMap.get(Constants.BATCH_NAME));
                 wfRequest.setBatchStartDate((Date) batchDetailsMap.get(Constants.START_DATE));
 
-                if (validationError != null) {
+                if (StringUtils.isNotBlank(validationError)) {
                     userResponse.put(Constants.STATUS, validationError);
                     processedUsers.add(userResponse);
                     continue;
@@ -1707,6 +1717,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         entity.setLastUpdatedOn(new Date());
         entity.setRootOrg(rootOrg);
         entity.setOrg(org);
+        entity.setActorUUID(wfRequest.getActorUserId());
         try {
             entity.setUpdateFieldValues(mapper.writeValueAsString(wfRequest.getUpdateFieldValues()));
         } catch (JsonProcessingException e) {
@@ -1825,8 +1836,22 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
     }
 
     private boolean shouldOverride(String existingRole, String incomingRole) {
-        if (incomingRole.equalsIgnoreCase(Constants.PC) && !existingRole.equalsIgnoreCase(Constants.PC)) return true;
-        if (incomingRole.equalsIgnoreCase(Constants.MDO) && existingRole.equalsIgnoreCase(Constants.SELF)) return true;
+        if (existingRole.equalsIgnoreCase(incomingRole)) {
+            logger.info("Same role override not allowed: existing={} incoming={}", existingRole, incomingRole);
+            return false;
+        }
+
+        if (incomingRole.equalsIgnoreCase(Constants.PC)) {
+            logger.info("PC override allowed: existing={} incoming={}", existingRole, incomingRole);
+            return true;
+        }
+
+        if (incomingRole.equalsIgnoreCase(Constants.MDO) && existingRole.equalsIgnoreCase(Constants.SELF)) {
+            logger.info("MDO override allowed: existing={} incoming={}", existingRole, incomingRole);
+            return true;
+        }
+
+        logger.info("Override not allowed: existing={} incoming={}", existingRole, incomingRole);
         return false;
     }
 
