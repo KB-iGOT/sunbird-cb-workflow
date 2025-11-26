@@ -196,9 +196,16 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                 } else {
                     logger.error("user enrolment failed"
                             + ((Map<String, Object>) enrolResp.get(Constants.PARAMS)).get(Constants.ERROR_MESSAGE));
+                    if (wfRequest.getState().equalsIgnoreCase(Constants.SEND_FOR_PC_APPROVAL) && wfRequest.getServiceName().equalsIgnoreCase(Constants.BLENDED_PROGRAM_SERVICE_NAME)) {
+                        reverseApprovedRequest(wfRequest);
+                    }
                 }
+
             } catch (Exception e) {
                 logger.error("Exception while enrol user");
+                if (wfRequest.getState().equalsIgnoreCase(Constants.SEND_FOR_PC_APPROVAL) && wfRequest.getServiceName().equalsIgnoreCase(Constants.BLENDED_PROGRAM_SERVICE_NAME)) {
+                    reverseApprovedRequest(wfRequest);
+                }
             }
         }
     }
@@ -1860,6 +1867,16 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         res.put(Constants.ERROR_MESSAGE, msg);
         res.put(Constants.STATUS, status);
         return res;
+    }
+
+    private void reverseApprovedRequest(WfRequest wfRequest) {
+        WfStatusEntity applicationStatus = wfStatusRepo.findByApplicationIdAndWfId(wfRequest.getApplicationId(), wfRequest.getWfId());
+        if (applicationStatus != null && applicationStatus.getCreatedOn() != null) {
+            wfRequest.setCreatedOn(applicationStatus.getCreatedOn().toString());
+        }
+        applicationStatus.setLastUpdatedOn(new Date());
+        applicationStatus.setCurrentStatus(Constants.SEND_FOR_PC_APPROVAL);
+        WfStatusEntity savedEntity = wfStatusRepo.save(applicationStatus);
     }
 
 }

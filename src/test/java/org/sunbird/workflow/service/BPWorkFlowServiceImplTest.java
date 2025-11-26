@@ -1500,4 +1500,27 @@ class BPWorkFlowServiceImplTest {
         assertEquals(HttpStatus.FORBIDDEN, resp.get(Constants.STATUS));
         assertEquals("You do not have permission to nominate users", resp.get(Constants.ERROR_MESSAGE));
     }
+
+
+    @Test
+    void testReverseApprovedRequest_updatesRequestAndPersistsEntity() throws Exception {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setApplicationId("app123");
+        wfRequest.setWfId("wf123");
+        Date createdOn = new Date();
+        WfStatusEntity entity = new WfStatusEntity();
+        entity.setWfId("wf123");
+        entity.setApplicationId("app123");
+        entity.setCreatedOn(createdOn);
+        entity.setCurrentStatus("APPROVED");
+        entity.setLastUpdatedOn(null);
+        when(wfStatusRepo.findByApplicationIdAndWfId("app123", "wf123")).thenReturn(entity);
+        when(wfStatusRepo.save(any(WfStatusEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        ReflectionTestUtils.invokeMethod(bpWorkFlowService, "reverseApprovedRequest", wfRequest);
+        assertEquals(createdOn.toString(), wfRequest.getCreatedOn(), "WfRequest.createdOn should be copied from entity.createdOn");
+        assertEquals(Constants.SEND_FOR_PC_APPROVAL, entity.getCurrentStatus(), "Entity status should be set to SEND_FOR_PC_APPROVAL");
+        assertNotNull(entity.getLastUpdatedOn(), "Entity.lastUpdatedOn should be updated");
+        verify(wfStatusRepo).save(entity);
+    }
+
 }
