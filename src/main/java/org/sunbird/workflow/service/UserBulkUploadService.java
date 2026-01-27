@@ -772,9 +772,15 @@ public class UserBulkUploadService {
                     boolean emailExists = email != null && !email.isEmpty();
                     boolean phoneExists = phone != null && !phone.isEmpty();
                     if (!emailExists && !phoneExists) {
-                        errList.add("Email or Phone is missing");
+                        errList.add("Both Email and Mobile number are mandatory");
+                    } else {
+                        if (!emailExists) {
+                            errList.add("Email is missing");
+                        }
+                        if (!phoneExists) {
+                            errList.add("Mobile number is missing");
+                        }
                     }
-
                     Map<String, Object> userDetailsForMobile = null;
                     Map<String, Object> userDetailsForMobileAndEmail = null;
                     Map<String, Object> filters = null;
