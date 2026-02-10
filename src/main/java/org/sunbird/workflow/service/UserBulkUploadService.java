@@ -818,6 +818,7 @@ public class UserBulkUploadService {
                         isEmailOrPhoneNumberExist = this.verifyUserRecordExists(filters, userDetailsForMobileAndEmail);
                     }
                     if (!CollectionUtils.isEmpty(errList)) {
+                        csvValues.put("Status", Constants.FAILED_UPPERCASE);
                         csvValues.put("Error Details", String.join(tagsDelimiter, errList));
                         failedRecordsCount++;
                         totalRecordsCount++;
@@ -844,6 +845,7 @@ public class UserBulkUploadService {
                     }
 
                     if (!CollectionUtils.isEmpty(errList)) {
+                        csvValues.put("Status", Constants.FAILED_UPPERCASE);
                         csvValues.put("Error Details", String.join(tagsDelimiter, errList));
                         failedRecordsCount++;
                         totalRecordsCount++;
