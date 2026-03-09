@@ -176,7 +176,7 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 					for (Map.Entry entry : objectMap.entrySet())
 						updatedProfileElement.put((String) entry.getKey(), entry.getValue());
 					mergeLeaf(existingProfileDetail, updatedProfileElement, wfRequestParamObj.get("fieldKey").toString(), osid);
-				} else {
+				} else if (!wfRequestParamObj.get(Constants.FIELD_KEY).equals(Constants.PROFESSIONAL_DETAILS)) {
 					existingProfileDetail.put((String) wfRequestParamObj.get(Constants.FIELD_KEY), wfRequestParamObj.get(Constants.TO_VALUE));
 				}
 			}
