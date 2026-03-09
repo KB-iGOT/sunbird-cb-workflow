@@ -143,38 +143,42 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 				String osid = wfRequestParamObj.get(Constants.OSID) == null ? "" : wfRequestParamObj.get(Constants.OSID).toString();
 				Map<String, Object> updatedProfileElement = new HashMap<>();
 				Object updatedProfileElementObj = existingProfileDetail.get(wfRequestParamObj.get(Constants.FIELD_KEY));
-				if (updatedProfileElementObj instanceof ArrayList) {
-					List<Map<String, Object>> existingProfileElementList = mapper.convertValue(updatedProfileElementObj, ArrayList.class);
-					for (Map<String, Object> existingProfileElement : existingProfileElementList) {
-						if (existingProfileElement.get(Constants.OSID) != null
-								&& existingProfileElement.get(Constants.OSID).toString().equalsIgnoreCase(osid))
-							updatedProfileElement.putAll(existingProfileElement);
-					}
-				} else if (updatedProfileElementObj instanceof HashMap) {
-					Map<String, Object> existingProfileElementList = mapper.convertValue(updatedProfileElementObj, Map.class);
-					updatedProfileElement.putAll(existingProfileElementList);
-				} else if (updatedProfileElementObj instanceof Boolean) {
-					Map<String,Object> toValueMap = (Map<String, Object>) wfRequestParamObj.get(Constants.TO_VALUE);
-					existingProfileDetail.put((String) wfRequestParamObj.get(Constants.FIELD_KEY), (Boolean) toValueMap.get(Constants.VERIFIED_KARMAYOGI));
-				} else if (null == updatedProfileElementObj) {
-					if (Constants.VERIFIED_KARMAYOGI.equalsIgnoreCase((String) wfRequestParamObj.get(Constants.FIELD_KEY))) {
-						Map<String,Object> toValueMap = (Map<String, Object>) wfRequestParamObj.get(Constants.TO_VALUE);
+				if (!ObjectUtils.isEmpty(updatedProfileElementObj)) {
+					if (updatedProfileElementObj instanceof ArrayList) {
+						List<Map<String, Object>> existingProfileElementList = mapper.convertValue(updatedProfileElementObj, ArrayList.class);
+						for (Map<String, Object> existingProfileElement : existingProfileElementList) {
+							if (existingProfileElement.get(Constants.OSID) != null
+									&& existingProfileElement.get(Constants.OSID).toString().equalsIgnoreCase(osid))
+								updatedProfileElement.putAll(existingProfileElement);
+						}
+					} else if (updatedProfileElementObj instanceof HashMap) {
+						Map<String, Object> existingProfileElementList = mapper.convertValue(updatedProfileElementObj, Map.class);
+						updatedProfileElement.putAll(existingProfileElementList);
+					} else if (updatedProfileElementObj instanceof Boolean) {
+						Map<String, Object> toValueMap = (Map<String, Object>) wfRequestParamObj.get(Constants.TO_VALUE);
 						existingProfileDetail.put((String) wfRequestParamObj.get(Constants.FIELD_KEY), (Boolean) toValueMap.get(Constants.VERIFIED_KARMAYOGI));
-					} else if (Constants.PROFESSIONAL_DETAILS.equalsIgnoreCase((String) wfRequestParamObj.get(Constants.FIELD_KEY))) {
-						List<Map<String, Object>> detailsList = new ArrayList<>();
-						Map<String, Object> detailsMap = new HashMap<>();
-						detailsMap = (Map<String, Object>) wfRequestParamObj.get(Constants.TO_VALUE);
-						detailsList.add(detailsMap);
-						existingProfileDetail.put((String) wfRequestParamObj.get(Constants.FIELD_KEY), detailsList);
-					} else {
-						logger.error("profile element to be updated is neither arraylist nor hashmap");
-						return null;
+					} else if (null == updatedProfileElementObj) {
+						if (Constants.VERIFIED_KARMAYOGI.equalsIgnoreCase((String) wfRequestParamObj.get(Constants.FIELD_KEY))) {
+							Map<String, Object> toValueMap = (Map<String, Object>) wfRequestParamObj.get(Constants.TO_VALUE);
+							existingProfileDetail.put((String) wfRequestParamObj.get(Constants.FIELD_KEY), (Boolean) toValueMap.get(Constants.VERIFIED_KARMAYOGI));
+						} else if (Constants.PROFESSIONAL_DETAILS.equalsIgnoreCase((String) wfRequestParamObj.get(Constants.FIELD_KEY))) {
+							List<Map<String, Object>> detailsList = new ArrayList<>();
+							Map<String, Object> detailsMap = new HashMap<>();
+							detailsMap = (Map<String, Object>) wfRequestParamObj.get(Constants.TO_VALUE);
+							detailsList.add(detailsMap);
+							existingProfileDetail.put((String) wfRequestParamObj.get(Constants.FIELD_KEY), detailsList);
+						} else {
+							logger.error("profile element to be updated is neither arraylist nor hashmap");
+							return null;
+						}
 					}
+					Map<String, Object> objectMap = (Map<String, Object>) wfRequestParamObj.get(Constants.TO_VALUE);
+					for (Map.Entry entry : objectMap.entrySet())
+						updatedProfileElement.put((String) entry.getKey(), entry.getValue());
+					mergeLeaf(existingProfileDetail, updatedProfileElement, wfRequestParamObj.get("fieldKey").toString(), osid);
+				} else {
+					existingProfileDetail.put((String) wfRequestParamObj.get(Constants.FIELD_KEY), wfRequestParamObj.get(Constants.TO_VALUE));
 				}
-				Map<String, Object> objectMap = (Map<String, Object>) wfRequestParamObj.get(Constants.TO_VALUE);
-				for (Map.Entry entry : objectMap.entrySet())
-					updatedProfileElement.put((String) entry.getKey(), entry.getValue());
-				mergeLeaf(existingProfileDetail, updatedProfileElement, wfRequestParamObj.get("fieldKey").toString(), osid);
 			}
 		} catch (Exception e) {
 			logger.error("Merge profile exception::{}", e);
