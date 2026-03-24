@@ -138,7 +138,7 @@ class WorkFlowServiceImplV2Test {
 
         service.updateProfessionalDetailsInCache(userId, group, designation);
 
-        verify(redisCacheMgr).putInBasicProfileCache(any(), any());
+        verify(redisCacheMgr).putInBasicProfileCache(any(), any(), anyInt());
     }
 
     @Test

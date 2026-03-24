@@ -72,8 +72,9 @@ class RedisCacheMgrTest {
 
     @Test
     void testPutInBasicProfileCache() {
-        redisCacheMgr.putInBasicProfileCache("bpKey", "data");
+        redisCacheMgr.putInBasicProfileCache("bpKey", "data", 86400);
         verify(jedis).set("bpKey", "data");
+        verify(jedis).expire("bpKey", 86400L);
     }
 
     @Test
@@ -110,7 +111,7 @@ class RedisCacheMgrTest {
     void testPutInBasicProfileCache_exception() {
         when(jedisPool.getResource()).thenThrow(new RuntimeException("Redis error"));
 
-        assertDoesNotThrow(()->redisCacheMgr.putInBasicProfileCache("key", "data"));
+        assertDoesNotThrow(()->redisCacheMgr.putInBasicProfileCache("key", "data", 86400));
     }
 
     @Test

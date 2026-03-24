@@ -17,6 +17,7 @@ import java.lang.reflect.Method;
 import java.util.*;
 
 import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class UserProfileWfServiceImplTest {
@@ -683,7 +684,7 @@ class UserProfileWfServiceImplTest {
 
         // SUCCESS CASE
         method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, userDetails);
-        verify(redisCacheMgr).putInBasicProfileCache(anyString(), eq("{}"));
+        verify(redisCacheMgr).putInBasicProfileCache(anyString(), eq("{}"), anyInt());
 
         // FAILURE CASE
         method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, userDetails);

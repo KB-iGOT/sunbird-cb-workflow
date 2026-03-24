@@ -52,10 +52,11 @@ public class RedisCacheMgr {
         }
     }
 
-    public void putInBasicProfileCache(String key, String data) {
+    public void putInBasicProfileCache(String key, String data, int ttl) {
         try (Jedis jedis = jedisPool.getResource()) {
             jedis.set(key, data);
-            logger.debug("Cache_key_value " + Constants.BASIC_PROFILE_KEY + key + " is saved in redis");
+            jedis.expire(key, ttl);
+            logger.debug("Cache_key_value " + Constants.BASIC_PROFILE_KEY + key + " is saved in redis with ttl=" + ttl + "s");
         } catch (Exception e) {
             logger.error("An Error Occurred while putInBasicProfileCache to Redis", e);
         }

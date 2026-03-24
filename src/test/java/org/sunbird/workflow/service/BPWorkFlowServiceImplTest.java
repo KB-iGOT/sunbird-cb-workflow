@@ -631,6 +631,7 @@ class BPWorkFlowServiceImplTest {
 
         when(requestServiceImpl.fetchResultUsingPost(any(), any(), eq(Map.class), any(HashMap.class)))
                 .thenReturn(enrolResp);
+        when(wfStatusRepo.findByApplicationIdAndWfId(any(), any())).thenReturn(new WfStatusEntity());
 
         bpWorkFlowService.updateEnrolmentDetails(wfRequest);
 
@@ -670,6 +671,7 @@ class BPWorkFlowServiceImplTest {
 
         when(requestServiceImpl.fetchResultUsingPost(any(), any(), eq(Map.class), any(HashMap.class)))
                 .thenThrow(new RuntimeException("Simulated exception"));
+        when(wfStatusRepo.findByApplicationIdAndWfId(any(), any())).thenReturn(new WfStatusEntity());
 
         bpWorkFlowService.updateEnrolmentDetails(wfRequest);
 

@@ -269,6 +269,9 @@ public class Configuration {
     @Value("${designation.search.result.size}")
     private int searchDesignationResultSize;
 
+    @Value("${user.profile.cache.ttl}")
+    private int basicProfileCacheTtl;
+
     public String getAdminBlendedProgramEnrolEndPoint() {
         return adminBlendedProgramEnrolEndPoint;
     }
@@ -935,5 +938,9 @@ public class Configuration {
     public int getSearchDesignationResultSize() { return searchDesignationResultSize; }
 
     public void setSearchDesignationResultSize(int searchDesignationResultSize) { this.searchDesignationResultSize = searchDesignationResultSize; }
+
+    public int getBasicProfileCacheTtl() { return basicProfileCacheTtl; }
+
+    public void setBasicProfileCacheTtl(int basicProfileCacheTtl) { this.basicProfileCacheTtl = basicProfileCacheTtl; }
 
 }

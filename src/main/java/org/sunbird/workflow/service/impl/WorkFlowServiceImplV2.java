@@ -698,7 +698,7 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
                     }
                 }
 
-                redisCacheMgr.putInBasicProfileCache(key, mapper.writeValueAsString(profileNode));
+                redisCacheMgr.putInBasicProfileCache(key, mapper.writeValueAsString(profileNode), configuration.getBasicProfileCacheTtl());
             } else {
                 logger.warn("No cache found for user " + userId);
             }
