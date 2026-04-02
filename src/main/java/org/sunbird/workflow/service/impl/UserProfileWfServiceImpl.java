@@ -417,6 +417,9 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 		wfStatusEntity.setCurrentStatus(Constants.FAILED);
 		wfStatusEntity.setInWorkflow(false);
 		wfStatusRepo.save(wfStatusEntity);
+		// Invalidate cache after saving failed workflow status
+		String failedCacheKey = Constants.REDIS_COMMON_KEY + wfStatusEntity.getUserId() + ":" + Constants.FAILED + ":" + wfStatusEntity.getServiceName();
+		redisCacheMgr.deleteCache(failedCacheKey);
 	}
 
 	private Map<String, Object> getUpdateRequest(WfRequest wfRequest, Map<String, Object> updateRequest) {
@@ -685,6 +688,9 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 				wfStatusEntity.setInWorkflow(false);
 				wfStatusEntity.setComment(updateError);
 				wfStatusRepo.save(wfStatusEntity);
+				// Invalidate cache after saving failed profile update workflow status
+				String profileUpdateFailedCacheKey = Constants.REDIS_COMMON_KEY + wfStatusEntity.getUserId() + ":" + Constants.FAILED + ":" + wfStatusEntity.getServiceName();
+				redisCacheMgr.deleteCache(profileUpdateFailedCacheKey);
 			}
 		}
 	}

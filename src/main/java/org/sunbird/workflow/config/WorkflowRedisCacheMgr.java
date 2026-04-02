@@ -36,4 +36,16 @@ public class WorkflowRedisCacheMgr {
                 return null;
             }
         }
+
+    public boolean deleteCache(String key) {
+        try (Jedis jedis = jedisPool.getResource()) {
+            jedis.select(1);
+            jedis.del(key);
+            logger.debug("Cache_key_value " + key + " is deleted from redis");
+            return true;
+        } catch (Exception e) {
+            logger.error("Failed to evict the cache", e);
+            return false;
+        }
+    }
 }

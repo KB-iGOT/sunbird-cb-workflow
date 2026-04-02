@@ -476,6 +476,9 @@ public class UserBulkUploadService {
                                     }
                                     wfStatusEntity.setInWorkflow(false);
                                     wfStatusRepo.save(wfStatusEntity);
+                                    // Invalidate cache after saving bulk upload workflow status
+                                    String bulkUploadCacheKey = Constants.REDIS_COMMON_KEY + wfStatusEntity.getUserId() + ":" + wfStatusEntity.getServiceName() + ":" + wfStatusEntity.getCurrentStatus();
+                                    redisCacheMgr.deleteCache(bulkUploadCacheKey);
                                     if (Constants.APPROVED.equalsIgnoreCase(wfStatusEntity.getCurrentStatus())) {
                                         userProfileWfService.updateUserProfile(wfRequest);
                                         WfStatusEntity wfStatusEntityFailed = wfStatusRepo.findByWfId(wfRequest.getWfId());
@@ -1013,6 +1016,9 @@ public class UserBulkUploadService {
                                     }
                                     wfStatusEntity.setInWorkflow(false);
                                     wfStatusRepo.save(wfStatusEntity);
+                                    // Invalidate cache after saving bulk upload workflow status
+                                    String bulkUploadCacheKey2 = Constants.REDIS_COMMON_KEY + wfStatusEntity.getUserId() + ":" + wfStatusEntity.getServiceName() + ":" + wfStatusEntity.getCurrentStatus();
+                                    redisCacheMgr.deleteCache(bulkUploadCacheKey2);
                                     if (Constants.APPROVED.equalsIgnoreCase(wfStatusEntity.getCurrentStatus())) {
                                         userProfileWfService.updateUserProfile(wfRequest);
                                         WfStatusEntity wfStatusEntityFailed = wfStatusRepo.findByWfId(wfRequest.getWfId());

@@ -401,6 +401,9 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
         applicationStatus.setComment(wfRequest.getComment());
         addModificationEntry(applicationStatus, modifiedBy, wfRequest.getAction(), role);
         WfStatusEntity savedEntity = wfStatusRepo.save(applicationStatus);
+        // Invalidate cache after saving workflow status
+        String cacheKey = Constants.REDIS_COMMON_KEY + savedEntity.getUserId() + ":" + nextState + ":" + savedEntity.getServiceName();
+        redisCacheMgr.deleteCache(cacheKey);
         String userId = savedEntity.getUserId();
 
         if (Constants.ORG_TRANSFER_REQUEST.equalsIgnoreCase(applicationStatus.getRequestType()) && nextWfStatus.getIsLastState()) {
@@ -454,6 +457,11 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
             // Save only valid entities
             if (!CollectionUtils.isEmpty(validEntities)) {
                 wfStatusRepo.saveAll(validEntities);
+                // Invalidate cache for all saved entities
+                for (WfStatusEntity entity : validEntities) {
+                    String bulkCacheKey = Constants.REDIS_COMMON_KEY + entity.getUserId() + ":" + entity.getCurrentStatus() + ":" + entity.getServiceName();
+                    redisCacheMgr.deleteCache(bulkCacheKey);
+                }
             } else {
                 logger.warn("No valid workflow entities to save for userId: {}", userId);
             }

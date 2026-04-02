@@ -227,6 +227,9 @@ public class WorkflowServiceImpl implements Workflowservice {
 			addModificationEntry(applicationStatus,userId,wfRequest.getAction(),role);
 			String fieldKey = null;
 			WfStatusEntity savedEntity = wfStatusRepo.save(applicationStatus);
+			// Invalidate cache after saving workflow status
+			String cacheKey = Constants.REDIS_COMMON_KEY + savedEntity.getUserId() + ":" + serviceName + ":" + savedEntity.getCurrentStatus();
+			redisCacheMgr.deleteCache(cacheKey);
 			if (Constants.ORG_TRANSFER_REQUEST.equalsIgnoreCase(applicationStatus.getRequestType())) {
 				log.info("Entering transfer request handling for userId: {}", applicationStatus.getUserId());
 				List<WfStatusEntity> listEntities = wfStatusRepo.findByUserIdAndCurrentStatus(savedEntity.getUserId(), Constants.SEND_FOR_APPROVAL, Boolean.TRUE);
@@ -739,6 +742,9 @@ public class WorkflowServiceImpl implements Workflowservice {
 		}
 		applicationStatus.setInWorkflow(false);
 		wfStatusRepo.save(applicationStatus);
+		// Invalidate cache after saving user profile workflow status
+		String userProfileCacheKey = Constants.REDIS_COMMON_KEY + wfRequest.getUserId() + ":" + applicationStatus.getServiceName() + ":" + Constants.APPROVED_STATE;
+		redisCacheMgr.deleteCache(userProfileCacheKey);
 		producer.push(configuration.getWorkFlowNotificationTopic(), wfRequest);
 		producer.push(configuration.getWorkflowApplicationTopic(), wfRequest);
 		Response response = new Response();
@@ -1012,10 +1018,15 @@ public class WorkflowServiceImpl implements Workflowservice {
 						wfStatusEntity.setCurrentStatus(Constants.REJECTED);
 						wfStatusEntity.setInWorkflow(false);
 						wfStatusRepo.save(wfStatusEntity);
+						String pendingRequestCacheKey = Constants.REDIS_COMMON_KEY + wfStatusEntity.getUserId() + ":" + serviceName + ":" + Constants.REJECTED;
+						redisCacheMgr.deleteCache(pendingRequestCacheKey);
 					}
 				}
 			}
 			Integer numOfUpdatedRecords = wfStatusRepo.updatePendingRequestsToNewMDO(userId, serviceName, currentStatus, newDeptName);
+			// Invalidate cache for the user after updating pending requests
+			String userUpdateCacheKey = Constants.REDIS_COMMON_KEY + userId + ":" + serviceName + ":" + currentStatus;
+			redisCacheMgr.deleteCache(userUpdateCacheKey);
 			log.info(String.format("The number of records updated for user: %s is %d", userId, numOfUpdatedRecords));
 			response.put(Constants.MESSAGE, Constants.SUCCESSFUL);
 			response.put(Constants.STATUS, HttpStatus.OK);
