@@ -145,7 +145,7 @@ public class WorkFlowController {
 		return new ResponseEntity<>(response, HttpStatus.OK);
 	}
 
-	@PostMapping(path = "/ai-assessment/transition")
+	@PostMapping(path = "/aiAssessment/transition")
 	public ResponseEntity<Response> aiAssessmentTransition(
 			@RequestHeader String rootOrg,
 			@RequestHeader String org,
@@ -154,7 +154,7 @@ public class WorkFlowController {
 		return new ResponseEntity<>(response, HttpStatus.OK);
 	}
 
-	@PostMapping(path = "/ai-assessment/search",
+	@PostMapping(path = "/aiAssessment/search",
 			produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<Response> getAiAssessmentRequests(
 			@RequestBody SearchCriteria searchCriteria) {
