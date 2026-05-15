@@ -145,5 +145,8 @@ public interface WfStatusRepo extends JpaRepository<WfStatusEntity, String> {
     List<WfStatusEntity> findActiveWorkflows(String applicationId, String userId, Boolean inWorkflow);
 
 
+    Page<WfStatusEntity> findByServiceName(String serviceName, Pageable pageable);
+
+    Page<WfStatusEntity> findByServiceNameAndCurrentStatus(String serviceName, String currentStatus, Pageable pageable);
 }
 

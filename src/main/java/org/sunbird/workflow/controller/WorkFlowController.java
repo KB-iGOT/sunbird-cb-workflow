@@ -144,4 +144,21 @@ public class WorkFlowController {
 		Response response = workflowService.getUserProfileApprovalRequest(rootOrg, org, searchCriteria,rootOrgId);
 		return new ResponseEntity<>(response, HttpStatus.OK);
 	}
+
+	@PostMapping(path = "/ai-assessment/transition")
+	public ResponseEntity<Response> aiAssessmentTransition(
+			@RequestHeader String rootOrg,
+			@RequestHeader String org,
+			@RequestBody WfRequest wfRequest) {
+		Response response = workflowService.workflowTransition(rootOrg, org, wfRequest);
+		return new ResponseEntity<>(response, HttpStatus.OK);
+	}
+
+	@PostMapping(path = "/ai-assessment/search",
+			produces = MediaType.APPLICATION_JSON_VALUE)
+	public ResponseEntity<Response> getAiAssessmentRequests(
+			@RequestBody SearchCriteria searchCriteria) {
+		Response response = workflowService.getAiAssessmentRequests(searchCriteria);
+		return new ResponseEntity<>(response, HttpStatus.OK);
+	}
 }

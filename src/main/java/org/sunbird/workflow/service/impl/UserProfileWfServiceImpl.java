@@ -482,7 +482,9 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 		Map<String, Object> requestObject = new HashMap<>();
 		Map<String, Object> request = new HashMap<>();
 		Map<String, Object> filters = new HashMap<>();
-		filters.put("rootOrgId", rootOrgId);
+		if (StringUtils.isNotBlank(rootOrgId)) {
+			filters.put("rootOrgId", rootOrgId);
+		}
 		filters.put("organisations.roles", roles);
 		request.put("filters", filters);
 		request.put(Constants.FIELDS, configuration.getMdoAdminSearchFields());
