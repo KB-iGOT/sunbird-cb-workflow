@@ -162,8 +162,9 @@ public class WorkFlowController {
 	@PostMapping(path = "/aiAssessment/search",
 			produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<Response> getAiAssessmentRequests(
-			@RequestBody SearchCriteria searchCriteria) {
-		Response response = workflowService.getAiAssessmentRequests(searchCriteria);
+			@RequestBody SearchCriteria searchCriteria,
+			@RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+		Response response = workflowValidator.validateSearchAccess(token, searchCriteria);
 		return new ResponseEntity<>(response, HttpStatus.OK);
 	}
 }

@@ -13,6 +13,7 @@ import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -1944,12 +1945,42 @@ public class WorkflowServiceImpl implements Workflowservice {
 	public Response getAiAssessmentRequests(SearchCriteria criteria) {
 		try {
 			Pageable pageable = getPageReqForApplicationSearch(criteria);
+			pageable = PageRequest.of(
+					pageable.getPageNumber(),
+					pageable.getPageSize(),
+					Sort.by(Sort.Direction.DESC, "lastUpdatedOn"));
 
-			Page<WfStatusEntity> wfStatusPage = StringUtils.isEmpty(criteria.getApplicationStatus()) ? wfStatusRepo.findByServiceName(Constants.AI_ASSESSMENT_SERVICE_NAME, pageable)
-					                           : wfStatusRepo.findByServiceNameAndCurrentStatus(Constants.AI_ASSESSMENT_SERVICE_NAME, criteria.getApplicationStatus(), pageable);
+			boolean hasStatus = !StringUtils.isEmpty(criteria.getApplicationStatus());
+			boolean hasDept = !StringUtils.isEmpty(criteria.getDeptName());
+
+			Page<WfStatusEntity> wfStatusPage;
+
+			if (hasStatus && hasDept) {
+				wfStatusPage = wfStatusRepo
+						.findByServiceNameAndCurrentStatusAndDeptName(
+								Constants.AI_ASSESSMENT_SERVICE_NAME,
+								criteria.getApplicationStatus(),
+								criteria.getDeptName(), pageable);
+
+			} else if (hasStatus) {
+				wfStatusPage = wfStatusRepo
+						.findByServiceNameAndCurrentStatus(
+								Constants.AI_ASSESSMENT_SERVICE_NAME,
+								criteria.getApplicationStatus(), pageable);
+
+			} else if (hasDept) {
+				wfStatusPage = wfStatusRepo
+						.findByServiceNameAndDeptName(
+								Constants.AI_ASSESSMENT_SERVICE_NAME,
+								criteria.getDeptName(), pageable);
+
+			} else {
+				wfStatusPage = wfStatusRepo
+						.findByServiceName(
+								Constants.AI_ASSESSMENT_SERVICE_NAME, pageable);
+			}
 
 			List<WfStatusEntity> entities = wfStatusPage.getContent();
-
 			log.info("Paginated records count: {}", entities.size());
 
 			if (CollectionUtils.isEmpty(entities)) {
