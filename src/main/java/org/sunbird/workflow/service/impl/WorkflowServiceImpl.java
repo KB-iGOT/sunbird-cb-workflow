@@ -1948,7 +1948,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 			pageable = PageRequest.of(
 					pageable.getPageNumber(),
 					pageable.getPageSize(),
-					Sort.by(Sort.Direction.DESC, "lastUpdatedOn"));
+					Sort.by(Sort.Direction.DESC, "createdOn"));
 
 			boolean hasStatus = !StringUtils.isEmpty(criteria.getApplicationStatus());
 			boolean hasDept = !StringUtils.isEmpty(criteria.getDeptName());
@@ -1995,10 +1995,33 @@ public class WorkflowServiceImpl implements Workflowservice {
 			Map<String, List<WfStatusEntity>> groupedEntities = entities
 					.stream()
 					.collect(Collectors.groupingBy(
-							WfStatusEntity::getApplicationId));
+							WfStatusEntity::getApplicationId,
+							LinkedHashMap::new,
+							Collectors.toList()));
 
 			List<Map<String, Object>> userProfiles = userProfileWfService
 					.enrichUserData(groupedEntities, null);
+
+			userProfiles.sort((a, b) -> {
+				List<WfStatusEntity> wfInfoA = (List<WfStatusEntity>) a.get("wfInfo");
+				List<WfStatusEntity> wfInfoB = (List<WfStatusEntity>) b.get("wfInfo");
+
+				long latestA = wfInfoA.stream()
+						.map(WfStatusEntity::getCreatedOn)
+						.filter(Objects::nonNull)
+						.mapToLong(Date::getTime)
+						.max()
+						.orElse(0L);
+
+				long latestB = wfInfoB.stream()
+						.map(WfStatusEntity::getCreatedOn)
+						.filter(Objects::nonNull)
+						.mapToLong(Date::getTime)
+						.max()
+						.orElse(0L);
+
+				return Long.compare(latestB, latestA);
+			});
 
 			Response response = new Response();
 			response.put(Constants.MESSAGE, Constants.SUCCESSFUL);
