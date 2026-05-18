@@ -10,6 +10,7 @@ import org.sunbird.workflow.config.Configuration;
 import org.sunbird.workflow.config.Constants;
 import org.sunbird.workflow.exception.ApplicationException;
 import org.sunbird.workflow.exception.BadRequestException;
+import org.sunbird.workflow.exception.InvalidDataInputException;
 import org.sunbird.workflow.models.Response;
 import org.sunbird.workflow.models.SearchCriteria;
 import org.sunbird.workflow.models.WfRequest;
@@ -42,11 +43,12 @@ public class AiAssessmentServiceImpl extends WorkflowServiceImpl {
         this.userProfileWfService = userProfileWfService;
     }
 
-    public Response aiAssessmentWorkflowTransition(String rootOrg, String org, WfRequest wfRequest, String token) {
+    public Response aiAssessmentWorkflowTransition(WfRequest wfRequest, String token) {
         java.util.List<String> actorRoles = accessTokenValidator.fetchUserRolesFromToken(token);
         log.info("Actor roles: {}", actorRoles);
         validateRoles(wfRequest.getAction(), actorRoles);
-        return workflowTransition(rootOrg, org, wfRequest);
+        validateAiAssessmentWfRequest(wfRequest);
+        return workflowTransition(wfRequest.getRootOrgId(), wfRequest.getRootOrgId(), wfRequest);
     }
 
     private void validateRoles(String action, List<String> actorRoles) {
@@ -158,5 +160,33 @@ public class AiAssessmentServiceImpl extends WorkflowServiceImpl {
         }
 
         return actorUserId;
+    }
+
+    private void validateAiAssessmentWfRequest(WfRequest wfRequest) {
+        if (StringUtils.isEmpty(wfRequest.getUserId())) {
+            throw new InvalidDataInputException("userId is mandatory");
+        }
+        if (StringUtils.isEmpty(wfRequest.getServiceName())) {
+            throw new InvalidDataInputException("serviceName is mandatory");
+        }
+        if (!Constants.AI_ASSESSMENT_SERVICE_NAME
+                .equalsIgnoreCase(wfRequest.getServiceName())) {
+            throw new InvalidDataInputException(
+                    "serviceName must be " + Constants.AI_ASSESSMENT_SERVICE_NAME);
+        }
+        if (StringUtils.isEmpty(wfRequest.getState())) {
+            throw new InvalidDataInputException("state is mandatory");
+        }
+        if (StringUtils.isEmpty(wfRequest.getAction())) {
+            throw new InvalidDataInputException("action is mandatory");
+        }
+        if (StringUtils.isEmpty(wfRequest.getRootOrgId())) {
+            throw new InvalidDataInputException("rootOrgId is mandatory");
+        }
+        if (CollectionUtils.isEmpty(wfRequest.getUpdateFieldValues())) {
+            throw new InvalidDataInputException("updateFieldValues is mandatory");
+        }
+        log.info("AI Assessment WfRequest validation passed for userId: {}",
+                wfRequest.getUserId());
     }
 }
