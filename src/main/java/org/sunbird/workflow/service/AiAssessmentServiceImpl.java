@@ -27,7 +27,7 @@ public class AiAssessmentServiceImpl extends WorkflowServiceImpl {
         this.configuration = configuration;
     }
 
-    public Response validate(String rootOrg, String org, WfRequest wfRequest, String token) {
+    public Response aiAssessmentWorkflowTransition(String rootOrg, String org, WfRequest wfRequest, String token) {
         java.util.List<String> actorRoles = accessTokenValidator.fetchUserRolesFromToken(token);
         log.info("Actor roles: {}", actorRoles);
         validateRoles(wfRequest.getAction(), actorRoles);
@@ -65,7 +65,7 @@ public class AiAssessmentServiceImpl extends WorkflowServiceImpl {
         }
     }
 
-    public Response validateSearchAccess(String token, SearchCriteria criteria) {
+    public Response fetchAiAssessement(String token, SearchCriteria criteria) {
         String actorUserId = accessTokenValidator.fetchUserIdFromAccessToken(token);
         if (StringUtils.isEmpty(actorUserId)) {
             throw new BadRequestException("Invalid or expired token");
