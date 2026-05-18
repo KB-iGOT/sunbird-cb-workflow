@@ -950,7 +950,7 @@ public class WorkflowServiceImpl implements Workflowservice {
 					uri.append(configuration.getLmsServiceHost()).append(configuration.getMultilevelBPEnrolEndPoint()).append(Constants.TWO_STEP_PC_AND_MDO_APPROVAL);
 					break;
 				case Constants.AI_ASSESSMENT_SERVICE_NAME:
-					uri.append(configuration.getLmsServiceHost()).append(configuration.getMultilevelBPEnrolEndPoint()).append(Constants.ONE_STEP_SPV_APPROVAL);
+					uri.append(configuration.getLmsServiceHost()).append(configuration.getLmsServiceConfigPath()).append(Constants.ONE_STEP_SPV_APPROVAL);
 					break;
 				default:
 					break;

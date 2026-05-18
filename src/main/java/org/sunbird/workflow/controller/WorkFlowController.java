@@ -20,6 +20,7 @@ import org.sunbird.workflow.models.Response;
 import org.sunbird.workflow.models.SBApiResponse;
 import org.sunbird.workflow.models.SearchCriteria;
 import org.sunbird.workflow.models.WfRequest;
+import org.sunbird.workflow.service.WorkflowValidator;
 import org.sunbird.workflow.service.Workflowservice;
 
 @RestController
@@ -27,6 +28,9 @@ import org.sunbird.workflow.service.Workflowservice;
 public class WorkFlowController {
 	@Autowired
 	private Workflowservice workflowService;
+
+	@Autowired
+	private WorkflowValidator workflowValidator;
 
 	@PostMapping("/transition")
 	public ResponseEntity<Response> wfTransition(@RequestHeader String rootOrg, @RequestHeader String org,
@@ -149,8 +153,9 @@ public class WorkFlowController {
 	public ResponseEntity<Response> aiAssessmentTransition(
 			@RequestHeader String rootOrg,
 			@RequestHeader String org,
-			@RequestBody WfRequest wfRequest) {
-		Response response = workflowService.workflowTransition(rootOrg, org, wfRequest);
+			@RequestBody WfRequest wfRequest,
+			@RequestHeader(name = Constants.X_AUTH_TOKEN) String userAuthToken) {
+		Response response = workflowValidator.validate(rootOrg, org, wfRequest, userAuthToken);
 		return new ResponseEntity<>(response, HttpStatus.OK);
 	}
 

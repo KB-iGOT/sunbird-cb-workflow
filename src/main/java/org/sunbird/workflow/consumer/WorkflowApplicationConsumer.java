@@ -18,7 +18,9 @@ import org.sunbird.workflow.config.Configuration;
 import org.sunbird.workflow.config.Constants;
 import org.sunbird.workflow.models.WfRequest;
 import org.sunbird.workflow.producer.Producer;
+import org.sunbird.workflow.service.Workflowservice;
 import org.sunbird.workflow.service.impl.RequestServiceImpl;
+import org.sunbird.workflow.utils.AccessTokenValidator;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,23 +30,21 @@ import java.util.concurrent.CompletableFuture;
 
 @Service
 public class WorkflowApplicationConsumer {
-
-
     Logger logger = LogManager.getLogger(WorkflowApplicationConsumer.class);
 
     static final RestTemplate restTemplate = new RestTemplate();
 
-    @Autowired
-    private ObjectMapper mapper;
+    private final Producer producer;
+    private final RequestServiceImpl requestServiceImpl;
+    private final Configuration configuration;
+    private final ObjectMapper mapper;
 
-    @Autowired
-    private Configuration configuration;
-
-    @Autowired
-    private Producer producer;
-
-    @Autowired
-    private RequestServiceImpl requestServiceImpl;
+    public WorkflowApplicationConsumer(Producer producer, RequestServiceImpl requestServiceImpl, Configuration configuration, ObjectMapper mapper) {
+        this.producer = producer;
+        this.requestServiceImpl = requestServiceImpl;
+        this.configuration = configuration;
+        this.mapper = mapper;
+    }
 
     @KafkaListener(groupId = "aiAssessmentTopic-consumer", topics = "${ai.assessment.topic}")
     public void processAiAssessmentMessage(ConsumerRecord<String, String> data) {
@@ -63,14 +63,10 @@ public class WorkflowApplicationConsumer {
             WfRequest wfRequest = mapper.readValue(strData, WfRequest.class);
             logger.info("Received AI Assessment APPROVED for userId: {}",
                     wfRequest.getUserId());
-
-
             List<String> existingRoles = fetchUserRoles(wfRequest.getUserId(),
                     wfRequest.getRootOrgId());
             logger.info("Existing roles for userId: {} are: {}",
                     wfRequest.getUserId(), existingRoles);
-
-
             if (!existingRoles.contains(Constants.AI_ASSESSMENT_CREATOR)) {
                 existingRoles.add(Constants.AI_ASSESSMENT_CREATOR);
             } else {
