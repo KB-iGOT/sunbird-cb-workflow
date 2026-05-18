@@ -3,6 +3,7 @@ package org.sunbird.workflow.controller;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +28,7 @@ import org.sunbird.workflow.service.Workflowservice;
 @RequestMapping("/v1/workflow")
 public class WorkFlowController {
 	@Autowired
+	@Qualifier("workflowServiceImpl")
 	private Workflowservice workflowService;
 
 	@Autowired
@@ -155,7 +157,7 @@ public class WorkFlowController {
 			@RequestHeader String org,
 			@RequestBody WfRequest wfRequest,
 			@RequestHeader(name = Constants.X_AUTH_TOKEN) String userAuthToken) {
-		Response response = aiAssessmentServiceImpl.validate(rootOrg, org, wfRequest, userAuthToken);
+		Response response = aiAssessmentServiceImpl.aiAssessmentWorkflowTransition(rootOrg, org, wfRequest, userAuthToken);
 		return new ResponseEntity<>(response, HttpStatus.OK);
 	}
 
@@ -164,7 +166,7 @@ public class WorkFlowController {
 	public ResponseEntity<Response> getAiAssessmentRequests(
 			@RequestBody SearchCriteria searchCriteria,
 			@RequestHeader(Constants.X_AUTH_TOKEN) String token) {
-		Response response = aiAssessmentServiceImpl.validateSearchAccess(token, searchCriteria);
+		Response response = aiAssessmentServiceImpl.fetchAiAssessement(token, searchCriteria);
 		return new ResponseEntity<>(response, HttpStatus.OK);
 	}
 }

@@ -8,6 +8,7 @@ import org.apache.logging.log4j.Logger;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
@@ -51,6 +52,7 @@ public class NotificationServiceImpl {
 	private ObjectMapper mapper;
 
 	@Autowired
+	@Qualifier("workflowServiceImpl")
 	private Workflowservice workflowservice;
 
 	@Autowired

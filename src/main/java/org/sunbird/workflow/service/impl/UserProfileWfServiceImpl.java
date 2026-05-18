@@ -15,6 +15,7 @@ import org.json.JSONTokener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
@@ -39,9 +40,6 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 
 	private Logger logger = LoggerFactory.getLogger(UserProfileWfServiceImpl.class);
 
-	@Autowired
-	@Lazy
-	private Workflowservice workflowservice;
 
 	@Autowired
 	private RequestServiceImpl requestServiceImpl;
@@ -59,6 +57,7 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 	private WfStatusRepo wfStatusRepo;
 
 	@Autowired
+	@Qualifier("workflowServiceImpl")
 	WorkflowServiceImpl workflowService;
 
 	@Autowired
