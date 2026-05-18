@@ -169,4 +169,12 @@ public class WorkFlowController {
 		Response response = aiAssessmentServiceImpl.fetchAiAssessement(token, searchCriteria);
 		return new ResponseEntity<>(response, HttpStatus.OK);
 	}
+
+	@GetMapping(path = "/aiAssessment/getUserWF",
+			produces = MediaType.APPLICATION_JSON_VALUE)
+	public ResponseEntity<Response> getAiAssessmentRequestByUserId(
+			@RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+		Response response = aiAssessmentServiceImpl.getAiAssessmentRequestByUserId(token);
+		return new ResponseEntity<>(response, HttpStatus.OK);
+	}
 }
