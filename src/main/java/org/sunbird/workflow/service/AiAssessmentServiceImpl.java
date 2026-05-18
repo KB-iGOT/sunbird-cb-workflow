@@ -105,10 +105,9 @@ public class AiAssessmentServiceImpl extends WorkflowServiceImpl {
                 throw new BadRequestException("Invalid or expired token");
             }
             List<WfStatusEntity> entities = wfStatusRepo
-                    .findByUserIdAndServiceNameAndInWorkflow(
+                    .findByUserIdAndServiceNameOrderByLastUpdatedOnDesc(
                             userId,
-                            Constants.AI_ASSESSMENT_SERVICE_NAME,
-                            true);
+                            Constants.AI_ASSESSMENT_SERVICE_NAME);
 
             if (CollectionUtils.isEmpty(entities)) {
                 Response response = new Response();
