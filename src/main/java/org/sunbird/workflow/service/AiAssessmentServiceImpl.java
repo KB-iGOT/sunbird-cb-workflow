@@ -10,30 +10,28 @@ import org.sunbird.workflow.exception.BadRequestException;
 import org.sunbird.workflow.models.Response;
 import org.sunbird.workflow.models.SearchCriteria;
 import org.sunbird.workflow.models.WfRequest;
+import org.sunbird.workflow.service.impl.WorkflowServiceImpl;
 import org.sunbird.workflow.utils.AccessTokenValidator;
 
 import java.util.List;
 @Service
-public class WorkflowValidator {
+public class AiAssessmentServiceImpl extends WorkflowServiceImpl {
 
-    private static final Logger log = LogManager.getLogger(WorkflowValidator.class);
+    private static final Logger log = LogManager.getLogger(AiAssessmentServiceImpl.class);
 
     private final AccessTokenValidator accessTokenValidator;
     private final Configuration configuration;
-    private final Workflowservice workflowservice;
 
-    public WorkflowValidator(AccessTokenValidator accessTokenValidator, Configuration configuration, Workflowservice workflowservice) {
+    public AiAssessmentServiceImpl(AccessTokenValidator accessTokenValidator, Configuration configuration) {
         this.accessTokenValidator = accessTokenValidator;
         this.configuration = configuration;
-        this.workflowservice = workflowservice;
-
     }
 
     public Response validate(String rootOrg, String org, WfRequest wfRequest, String token) {
         java.util.List<String> actorRoles = accessTokenValidator.fetchUserRolesFromToken(token);
         log.info("Actor roles: {}", actorRoles);
         validateRoles(wfRequest.getAction(), actorRoles);
-        return workflowservice.workflowTransition(rootOrg, org, wfRequest);
+        return workflowTransition(rootOrg, org, wfRequest);
     }
 
     private void validateRoles(String action, List<String> actorRoles) {
@@ -81,6 +79,6 @@ public class WorkflowValidator {
         if (!hasRole) {
             throw new BadRequestException("Only SPV Publisher can access AI Assessment requests");
         }
-        return workflowservice.getAiAssessmentRequests(criteria);
+        return getAiAssessmentRequests(criteria);
     }
 }
