@@ -20,6 +20,7 @@ import org.sunbird.workflow.models.Response;
 import org.sunbird.workflow.models.SBApiResponse;
 import org.sunbird.workflow.models.SearchCriteria;
 import org.sunbird.workflow.models.WfRequest;
+import org.sunbird.workflow.service.AiAssessmentServiceImpl;
 import org.sunbird.workflow.service.Workflowservice;
 
 @RestController
@@ -27,6 +28,9 @@ import org.sunbird.workflow.service.Workflowservice;
 public class WorkFlowController {
 	@Autowired
 	private Workflowservice workflowService;
+
+	@Autowired
+	private AiAssessmentServiceImpl aiAssessmentServiceImpl;
 
 	@PostMapping("/transition")
 	public ResponseEntity<Response> wfTransition(@RequestHeader String rootOrg, @RequestHeader String org,
@@ -142,6 +146,25 @@ public class WorkFlowController {
 			@RequestHeader(name = Constants.X_AUTH_USER_ORG_ID, required = false) String rootOrgId,
 			@RequestBody SearchCriteria searchCriteria) {
 		Response response = workflowService.getUserProfileApprovalRequest(rootOrg, org, searchCriteria,rootOrgId);
+		return new ResponseEntity<>(response, HttpStatus.OK);
+	}
+
+	@PostMapping(path = "/aiAssessment/transition")
+	public ResponseEntity<Response> aiAssessmentTransition(
+			@RequestHeader String rootOrg,
+			@RequestHeader String org,
+			@RequestBody WfRequest wfRequest,
+			@RequestHeader(name = Constants.X_AUTH_TOKEN) String userAuthToken) {
+		Response response = aiAssessmentServiceImpl.validate(rootOrg, org, wfRequest, userAuthToken);
+		return new ResponseEntity<>(response, HttpStatus.OK);
+	}
+
+	@PostMapping(path = "/aiAssessment/search",
+			produces = MediaType.APPLICATION_JSON_VALUE)
+	public ResponseEntity<Response> getAiAssessmentRequests(
+			@RequestBody SearchCriteria searchCriteria,
+			@RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+		Response response = aiAssessmentServiceImpl.validateSearchAccess(token, searchCriteria);
 		return new ResponseEntity<>(response, HttpStatus.OK);
 	}
 }
