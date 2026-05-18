@@ -153,11 +153,9 @@ public class WorkFlowController {
 
 	@PostMapping(path = "/aiAssessment/transition")
 	public ResponseEntity<Response> aiAssessmentTransition(
-			@RequestHeader String rootOrg,
-			@RequestHeader String org,
 			@RequestBody WfRequest wfRequest,
 			@RequestHeader(name = Constants.X_AUTH_TOKEN) String userAuthToken) {
-		Response response = aiAssessmentServiceImpl.aiAssessmentWorkflowTransition(rootOrg, org, wfRequest, userAuthToken);
+		Response response = aiAssessmentServiceImpl.aiAssessmentWorkflowTransition(wfRequest, userAuthToken);
 		return new ResponseEntity<>(response, HttpStatus.OK);
 	}
 
