@@ -338,6 +338,9 @@ public class Configuration {
     @Value("${bp.batch.stats.sync.page.size:100}")
     private int bpBatchStatsSyncPageSize;
 
+    @Value("${sunbird_time_zone}")
+    private String sunbirdTimeZone;
+
     public String getAdminBlendedProgramEnrolEndPoint() {
         return adminBlendedProgramEnrolEndPoint;
     }
@@ -1025,11 +1028,6 @@ public class Configuration {
         return Arrays.asList(aiAssessmentApproveRejectRoles.split(","));
     }
 
-    public String getSunbirdTimeZone() { return sunbirdTimeZone; }
-
-    public void setSunbirdTimeZone(String sunbirdTimeZone) { this.sunbirdTimeZone = sunbirdTimeZone; }
-
-
     public String getBpBatchStatsTopic() {
         return bpBatchStatsTopic;
     }
@@ -1132,4 +1130,8 @@ public class Configuration {
 
 
 
+
+    public String getSunbirdTimeZone() { return sunbirdTimeZone; }
+
+    public void setSunbirdTimeZone(String sunbirdTimeZone) { this.sunbirdTimeZone = sunbirdTimeZone; }
 }
