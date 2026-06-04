@@ -28,6 +28,7 @@ import org.sunbird.workflow.utils.CassandraOperation;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -613,7 +614,6 @@ public class NotificationServiceImpl {
 				.getMdoAdminAndPCDetails(
 						null,
 						Collections.singletonList(Constants.SPV_PUBLISHER));
-
 		if (CollectionUtils.isEmpty(spvEmailList)) {
 			logger.warn("No SPV emails found for rootOrgId: {}",
 					wfRequest.getRootOrgId());
@@ -624,23 +624,31 @@ public class NotificationServiceImpl {
 				.getUsersResult(Collections.singleton(wfRequest.getUserId()));
 		Map<String, Object> userInfo = (Map<String, Object>) usersObj
 				.get(wfRequest.getUserId());
+
 		String userName = (String) userInfo.get(Constants.FIRST_NAME);
+		String organization = StringUtils.isNotBlank(wfStatusEntity.getDeptName())
+				? wfStatusEntity.getDeptName()
+				: (String) userInfo.get(DEPARTMENT_NAME);
+		String submittedOn = new SimpleDateFormat(DATE_FORMAT)
+				.format(wfStatusEntity.getCreatedOn());
+		String approvalLink = configuration.getDomainHost()
+				+ configuration.getAiAssessmentApprovalLink();
 
-		String body = AI_ASSESSMENT_SPV_BODY
-				.replace(USER_NAME_TAG, userName);
-
-		if (StringUtils.isNotBlank(wfRequest.getComment())) {
-			body = body + " Comment: <b>" + wfRequest.getComment() + "</b>.";
-		}
+		String body = configuration.getAiAssessmentSpvEmailBody()
+				.replace(PLACEHOLDER_USER_NAME, userName)
+				.replace(PLACEHOLDER_ORGANIZATION, organization)
+				.replace(PLACEHOLDER_SUBMITTED_ON, submittedOn)
+				.replace(PLACEHOLDER_APPROVAL_LINK, approvalLink)
+				.replace(PLACEHOLDER_APPLICATION_NAME, KARMYOGI_BHARAT.toString());
 
 		Map<String, Object> mailNotificationDetails = new HashMap<>();
 		mailNotificationDetails.put(EMAIL_LIST, spvEmailList);
-		mailNotificationDetails.put(EMAIL_TO, SPV_PUBLISHER);
-		mailNotificationDetails.put(SUBJECT, AI_ASSESSMENT_SPV_SUBJECT);
+		mailNotificationDetails.put(EMAIL_TO, SPVPUBLISHER);
+		mailNotificationDetails.put(SUBJECT, configuration.getAiAssessmentSpvEmailSubject());
 		mailNotificationDetails.put(BODY, body);
 
 		sendNotificationEmail(mailNotificationDetails);
-		logger.info("SPV notified for AI Assessment request userId: {}",
+		logger.info("SPV notified for AI Assessment PENDING userId: {}",
 				wfRequest.getUserId());
 	}
 
@@ -652,23 +660,45 @@ public class NotificationServiceImpl {
 				.getUsersResult(Collections.singleton(wfRequest.getUserId()));
 		Map<String, Object> userInfo = (Map<String, Object>) usersObj
 				.get(wfRequest.getUserId());
+		String userName = (String) userInfo.get(Constants.FIRST_NAME);
+
+		HashMap<String, Object> approverObj = userProfileWfService
+				.getUsersResult(Collections.singleton(wfRequest.getActorUserId()));
+		Map<String, Object> approverInfo = (Map<String, Object>) approverObj
+				.get(wfRequest.getActorUserId());
+		String approverName = approverInfo != null
+				? (String) approverInfo.get(Constants.FIRST_NAME) : SPVPUBLISHER;
+
+		String actionDate = new SimpleDateFormat(DATE_FORMAT)
+				.format(wfStatusEntity.getLastUpdatedOn());
 
 		String currentStatus = wfStatusEntity.getCurrentStatus();
-		String subject = Constants.APPROVED.equalsIgnoreCase(currentStatus)
-				? AI_ASSESSMENT_USER_APPROVED_SUBJECT
-				: AI_ASSESSMENT_USER_REJECTED_SUBJECT;
-		String body = Constants.APPROVED.equalsIgnoreCase(currentStatus)
-				? AI_ASSESSMENT_USER_APPROVED_BODY
-				: AI_ASSESSMENT_USER_REJECTED_BODY;
+		String subject;
+		String body;
 
-		if (StringUtils.isNotBlank(wfRequest.getComment())) {
-			body = body + " Comment: <b>" + wfRequest.getComment() + "</b>.";
+		if (Constants.APPROVED.equalsIgnoreCase(currentStatus)) {
+			subject = configuration.getAiAssessmentApprovedEmailSubject();
+			body = configuration.getAiAssessmentApprovedEmailBody()
+					.replace(PLACEHOLDER_USER_NAME, userName)
+					.replace(PLACEHOLDER_APPROVER_NAME, approverName)
+					.replace(PLACEHOLDER_ACTION_DATE, actionDate)
+					.replace(PLACEHOLDER_APPLICATION_NAME, KARMYOGI_BHARAT.toString());
+		} else {
+			String rejectionReason = StringUtils.isNotBlank(wfRequest.getComment())
+					? wfRequest.getComment() : NOT_SPECIFIED;
+			subject = configuration.getAiAssessmentRejectedEmailSubject();
+			body = configuration.getAiAssessmentRejectedEmailBody()
+					.replace(PLACEHOLDER_USER_NAME, userName)
+					.replace(PLACEHOLDER_APPROVER_NAME, approverName)
+					.replace(PLACEHOLDER_ACTION_DATE, actionDate)
+					.replace(PLACEHOLDER_REJECTION_REASON, rejectionReason)
+					.replace(PLACEHOLDER_APPLICATION_NAME, KARMYOGI_BHARAT.toString());
 		}
 
 		Map<String, Object> mailNotificationDetails = new HashMap<>();
 		mailNotificationDetails.put(EMAIL_LIST,
 				Collections.singletonList(userInfo.get(Constants.EMAIL)));
-		mailNotificationDetails.put(EMAIL_TO, userInfo.get(Constants.FIRST_NAME));
+		mailNotificationDetails.put(EMAIL_TO, userName);
 		mailNotificationDetails.put(SUBJECT, subject);
 		mailNotificationDetails.put(BODY, body);
 
