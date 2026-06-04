@@ -28,7 +28,6 @@ import org.sunbird.workflow.utils.CassandraOperation;
 
 import java.io.IOException;
 import java.io.StringWriter;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -629,8 +628,7 @@ public class NotificationServiceImpl {
 		String organization = StringUtils.isNotBlank(wfStatusEntity.getDeptName())
 				? wfStatusEntity.getDeptName()
 				: (String) userInfo.get(DEPARTMENT_NAME);
-		String submittedOn = new SimpleDateFormat(DATE_FORMAT)
-				.format(wfStatusEntity.getCreatedOn());
+		String submittedOn = formatDate(wfStatusEntity.getCreatedOn());
 		String approvalLink = configuration.getCbpPortalHost()
 				+ configuration.getAiAssessmentApprovalLink();
 
@@ -668,9 +666,7 @@ public class NotificationServiceImpl {
 				.get(wfRequest.getActorUserId());
 		String approverName = approverInfo != null
 				? (String) approverInfo.get(Constants.FIRST_NAME) : SPVPUBLISHER;
-
-		String actionDate = new SimpleDateFormat(DATE_FORMAT)
-				.format(wfStatusEntity.getLastUpdatedOn());
+		String actionDate = formatDate(wfStatusEntity.getLastUpdatedOn());
 
 		String currentStatus = wfStatusEntity.getCurrentStatus();
 		String subject;
@@ -705,5 +701,13 @@ public class NotificationServiceImpl {
 		sendNotificationEmail(mailNotificationDetails);
 		logger.info("User notified for AI Assessment {} userId: {}",
 				currentStatus, wfRequest.getUserId());
+	}
+
+	private String formatDate(Date date) {
+		return ObjectUtils.isEmpty(date)
+				? NOT_SPECIFIED
+				: date.toInstant()
+				  .atZone(IST_ZONE_ID)
+				  .format(DATE_FORMATTER);
 	}
 }

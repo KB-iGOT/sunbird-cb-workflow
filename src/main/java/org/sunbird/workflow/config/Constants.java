@@ -1,5 +1,7 @@
 package org.sunbird.workflow.config;
 
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -462,5 +464,7 @@ public class Constants {
 	public static final String PLACEHOLDER_REJECTION_REASON = "#rejectionReason";
 	public static final String NOT_SPECIFIED = "Not specified";
 	public static final String DATE_FORMAT = "dd-MM-yyyy HH:mm:ss";
+	public static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(DATE_FORMAT);
+	public static final ZoneId IST_ZONE_ID = ZoneId.of("Asia/Kolkata");
 
 }
