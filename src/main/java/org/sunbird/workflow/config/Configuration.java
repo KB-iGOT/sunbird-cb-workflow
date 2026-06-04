@@ -305,6 +305,9 @@ public class Configuration {
     @Value("${ai.assessment.approval.link}")
     private String aiAssessmentApprovalLink;
 
+    @Value("${cbp.portal.host}")
+    private String cbpPortalHost;
+
     public String getAdminBlendedProgramEnrolEndPoint() {
         return adminBlendedProgramEnrolEndPoint;
     }
@@ -1018,5 +1021,9 @@ public class Configuration {
 
     public String getAiAssessmentApprovalLink() {
         return aiAssessmentApprovalLink;
+    }
+
+    public String getCbpPortalHost() {
+        return cbpPortalHost;
     }
 }

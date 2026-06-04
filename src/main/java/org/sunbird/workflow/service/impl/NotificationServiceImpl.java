@@ -631,7 +631,7 @@ public class NotificationServiceImpl {
 				: (String) userInfo.get(DEPARTMENT_NAME);
 		String submittedOn = new SimpleDateFormat(DATE_FORMAT)
 				.format(wfStatusEntity.getCreatedOn());
-		String approvalLink = configuration.getDomainHost()
+		String approvalLink = configuration.getCbpPortalHost()
 				+ configuration.getAiAssessmentApprovalLink();
 
 		String body = configuration.getAiAssessmentSpvEmailBody()
