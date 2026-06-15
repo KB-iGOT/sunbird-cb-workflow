@@ -290,6 +290,9 @@ public class Configuration {
     @Value("${sunbird_time_zone}")
     private String sunbirdTimeZone;
 
+    @Value("${kafka.topics.bp.batch.stats}")
+    private String bpBatchStatsTopic;
+
     public String getAdminBlendedProgramEnrolEndPoint() {
         return adminBlendedProgramEnrolEndPoint;
     }
@@ -984,4 +987,13 @@ public class Configuration {
     public String getSunbirdTimeZone() { return sunbirdTimeZone; }
 
     public void setSunbirdTimeZone(String sunbirdTimeZone) { this.sunbirdTimeZone = sunbirdTimeZone; }
+
+
+    public String getBpBatchStatsTopic() {
+        return bpBatchStatsTopic;
+    }
+
+    public void setBpBatchStatsTopic(String bpBatchStatsTopic) {
+        this.bpBatchStatsTopic = bpBatchStatsTopic;
+    }
 }
