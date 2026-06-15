@@ -142,9 +142,11 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
             return response;
         }
         Response wfResponse = workflowService.workflowTransition(rootOrg, org, wfRequest, userId, role);
-        Map<String, Object> responseData = (Map<String, Object>) wfResponse.get(Constants.DATA);
-        if (responseData != null) {
-            publishBatchStatsOnStatusChange(wfRequest.getApplicationId(), (String) responseData.get(Constants.STATUS));
+        if (wfResponse != null) {
+            Map<String, Object> responseData = (Map<String, Object>) wfResponse.get(Constants.DATA);
+            if (responseData != null) {
+                publishBatchStatsOnStatusChange(wfRequest.getApplicationId(), (String) responseData.get(Constants.STATUS));
+            }
         }
         return wfResponse;
     }
