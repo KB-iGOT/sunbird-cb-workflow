@@ -1579,16 +1579,54 @@ class BPWorkFlowServiceImplTest {
     }
 
     @Test
-    void testUpdateBPWorkFlow_doesNotPublishBatchStats_whenTransitionStatusIsNotWithdrawn() {
+    void testUpdateBPWorkFlow_doesNotPublishBatchStats_whenTransitionStatusHasNoStatsEvent() {
         wfRequest = buildSkipValidationRequest();
         stubSkipValidationAndConflictCheck();
+        Map<String, Object> dataMap = new HashMap<>();
+        dataMap.put(Constants.STATUS, Constants.SEND_FOR_PC_APPROVAL);
+        Response wfResponse = new Response();
+        wfResponse.put(Constants.DATA, dataMap);
+        when(workflowservice.workflowTransition(any(), any(), any(), any(), any())).thenReturn(wfResponse);
+        bpWorkFlowService.updateBPWorkFlow(ROOT_ORG, ORG, wfRequest, USER_ID, "role");
+        verify(producer, never()).push(any(), any(BatchStatsEvent.class));
+    }
+
+    @Test
+    void testUpdateBPWorkFlow_publishesPendingDecrementEvent_whenTransitionResultIsApproved() {
+        wfRequest = buildSkipValidationRequest();
+        stubSkipValidationAndConflictCheck();
+        when(configuration.getBpBatchStatsTopic()).thenReturn("bp-stats-topic");
         Map<String, Object> dataMap = new HashMap<>();
         dataMap.put(Constants.STATUS, Constants.APPROVED_STATE);
         Response wfResponse = new Response();
         wfResponse.put(Constants.DATA, dataMap);
         when(workflowservice.workflowTransition(any(), any(), any(), any(), any())).thenReturn(wfResponse);
         bpWorkFlowService.updateBPWorkFlow(ROOT_ORG, ORG, wfRequest, USER_ID, "role");
-        verify(producer, never()).push(any(), any(BatchStatsEvent.class));
+        ArgumentCaptor<BatchStatsEvent> captor = ArgumentCaptor.forClass(BatchStatsEvent.class);
+        verify(producer, times(1)).push(eq("bp-stats-topic"), captor.capture());
+        BatchStatsEvent event = captor.getValue();
+        assertEquals(Constants.BATCH_STATS_FIELD_PENDING, event.getField());
+        assertEquals(-1L, event.getDelta());
+        assertEquals(BATCH_ID, event.getBatchId());
+    }
+
+    @Test
+    void testUpdateBPWorkFlow_publishesPendingDecrementEvent_whenTransitionResultIsRejected() {
+        wfRequest = buildSkipValidationRequest();
+        stubSkipValidationAndConflictCheck();
+        when(configuration.getBpBatchStatsTopic()).thenReturn("bp-stats-topic");
+        Map<String, Object> dataMap = new HashMap<>();
+        dataMap.put(Constants.STATUS, Constants.REJECTED);
+        Response wfResponse = new Response();
+        wfResponse.put(Constants.DATA, dataMap);
+        when(workflowservice.workflowTransition(any(), any(), any(), any(), any())).thenReturn(wfResponse);
+        bpWorkFlowService.updateBPWorkFlow(ROOT_ORG, ORG, wfRequest, USER_ID, "role");
+        ArgumentCaptor<BatchStatsEvent> captor = ArgumentCaptor.forClass(BatchStatsEvent.class);
+        verify(producer, times(1)).push(eq("bp-stats-topic"), captor.capture());
+        BatchStatsEvent event = captor.getValue();
+        assertEquals(Constants.BATCH_STATS_FIELD_PENDING, event.getField());
+        assertEquals(-1L, event.getDelta());
+        assertEquals(BATCH_ID, event.getBatchId());
     }
 
     @Test

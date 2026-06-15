@@ -1939,6 +1939,12 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
             logger.info("Publishing batch stats withdrawal events for batchId={}", batchId);
             producer.push(configuration.getBpBatchStatsTopic(), new BatchStatsEvent(batchId, Constants.BATCH_STATS_FIELD_PENDING, -1L));
             producer.push(configuration.getBpBatchStatsTopic(), new BatchStatsEvent(batchId, Constants.BATCH_STATS_FIELD_WITHDRAWN, 1L));
+        } else if (Constants.APPROVED_STATE.equals(status)) {
+            logger.info("Publishing batch stats approval events for batchId={}", batchId);
+            producer.push(configuration.getBpBatchStatsTopic(), new BatchStatsEvent(batchId, Constants.BATCH_STATS_FIELD_PENDING, -1L));
+        } else if (Constants.REJECTED.equals(status)) {
+            logger.info("Publishing batch stats rejection events for batchId={}", batchId);
+            producer.push(configuration.getBpBatchStatsTopic(), new BatchStatsEvent(batchId, Constants.BATCH_STATS_FIELD_PENDING, -1L));
         }
     }
 
