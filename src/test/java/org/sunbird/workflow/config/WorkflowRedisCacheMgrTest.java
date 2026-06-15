@@ -25,6 +25,9 @@ class WorkflowRedisCacheMgrTest {
     private WfStatusRepo wfStatusRepo;
 
     @Mock
+    private Configuration configuration;
+
+    @Mock
     private Jedis jedis;
 
     private WorkflowRedisCacheMgr cacheMgr;
@@ -35,8 +38,10 @@ class WorkflowRedisCacheMgrTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        cacheMgr = new WorkflowRedisCacheMgr(jedisPool, wfStatusRepo);
+        cacheMgr = new WorkflowRedisCacheMgr(jedisPool, wfStatusRepo, configuration);
         when(jedisPool.getResource()).thenReturn(jedis);
+        when(configuration.getBpBatchStatsCacheTtl()).thenReturn(14400);
+        when(configuration.getBpBatchStatsCacheIndex()).thenReturn(2);
     }
 
 

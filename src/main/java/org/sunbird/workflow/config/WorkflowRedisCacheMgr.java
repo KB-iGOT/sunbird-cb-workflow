@@ -15,12 +15,15 @@ public class WorkflowRedisCacheMgr {
 
     private final JedisPool jedisPool;
     private final WfStatusRepo wfStatusRepo;
+    private final Configuration configuration;
     private final Logger logger = LoggerFactory.getLogger(WorkflowRedisCacheMgr.class);
 
     public WorkflowRedisCacheMgr(@Qualifier("jedisWorkflowPopulationPool") JedisPool jedisPool,
-                                 WfStatusRepo wfStatusRepo) {
+                                 WfStatusRepo wfStatusRepo,
+                                 Configuration configuration) {
         this.jedisPool = jedisPool;
         this.wfStatusRepo = wfStatusRepo;
+        this.configuration = configuration;
     }
 
     public void put(String key, String value, int ttl, int index) {
@@ -67,7 +70,9 @@ public class WorkflowRedisCacheMgr {
         }
         jedis.hmset(key, Map.of(Constants.BATCH_STATS_FIELD_PENDING, String.valueOf(pending),
                 Constants.BATCH_STATS_FIELD_WITHDRAWN, String.valueOf(withdrawn)));
-        logger.info("Batch stats cache initialised for batchId={} pending={} withdrawn={}", batchId, pending, withdrawn);
+        jedis.expire(key, configuration.getBpBatchStatsCacheTtl());
+        logger.info("Batch stats cache initialised for batchId={} pending={} withdrawn={} ttl={}s",
+                batchId, pending, withdrawn, configuration.getBpBatchStatsCacheTtl());
     }
 
     /**
@@ -77,6 +82,7 @@ public class WorkflowRedisCacheMgr {
     public void incrementBatchFieldCount(String batchId, String field) {
         var key = Constants.BP_BATCH_STATS_PREFIX + batchId;
         try (Jedis jedis = jedisPool.getResource()) {
+            jedis.select(configuration.getBpBatchStatsCacheIndex());
             if (!jedis.exists(key)) {
                 initBatchStatsFromDb(batchId, jedis, key);
             }
@@ -94,6 +100,7 @@ public class WorkflowRedisCacheMgr {
     public void decrementBatchFieldCount(String batchId, String field) {
         var key = Constants.BP_BATCH_STATS_PREFIX + batchId;
         try (Jedis jedis = jedisPool.getResource()) {
+            jedis.select(configuration.getBpBatchStatsCacheIndex());
             if (!jedis.exists(key)) {
                 logger.debug("Skipping decrement for field={} batchId={} — key not in cache", field, batchId);
                 return;
@@ -112,6 +119,7 @@ public class WorkflowRedisCacheMgr {
     public Map<String, String> getBatchStats(String batchId) {
         var key = Constants.BP_BATCH_STATS_PREFIX + batchId;
         try (Jedis jedis = jedisPool.getResource()) {
+            jedis.select(configuration.getBpBatchStatsCacheIndex());
             if (!jedis.exists(key)) {
                 initBatchStatsFromDb(batchId, jedis, key);
             }

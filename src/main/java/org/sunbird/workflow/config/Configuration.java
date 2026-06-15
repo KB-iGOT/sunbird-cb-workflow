@@ -293,6 +293,12 @@ public class Configuration {
     @Value("${kafka.topics.bp.batch.stats}")
     private String bpBatchStatsTopic;
 
+    @Value("${bp.batch.stats.cache.ttl}")
+    private int bpBatchStatsCacheTtl;
+
+    @Value("${bp.batch.stats.cache.index}")
+    private int bpBatchStatsCacheIndex;
+
     public String getAdminBlendedProgramEnrolEndPoint() {
         return adminBlendedProgramEnrolEndPoint;
     }
@@ -995,5 +1001,21 @@ public class Configuration {
 
     public void setBpBatchStatsTopic(String bpBatchStatsTopic) {
         this.bpBatchStatsTopic = bpBatchStatsTopic;
+    }
+
+    public int getBpBatchStatsCacheTtl() {
+        return bpBatchStatsCacheTtl;
+    }
+
+    public void setBpBatchStatsCacheTtl(int bpBatchStatsCacheTtl) {
+        this.bpBatchStatsCacheTtl = bpBatchStatsCacheTtl;
+    }
+
+    public int getBpBatchStatsCacheIndex() {
+        return bpBatchStatsCacheIndex;
+    }
+
+    public void setBpBatchStatsCacheIndex(int bpBatchStatsCacheIndex) {
+        this.bpBatchStatsCacheIndex = bpBatchStatsCacheIndex;
     }
 }
