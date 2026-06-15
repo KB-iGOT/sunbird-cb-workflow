@@ -1611,7 +1611,7 @@ class BPWorkFlowServiceImplTest {
     }
 
     @Test
-    void testUpdateBPWorkFlow_publishesPendingDecrementEvent_whenTransitionResultIsRejected() {
+    void testUpdateBPWorkFlow_publishesTwoBatchStatsEvents_whenTransitionResultIsRejected() {
         wfRequest = buildSkipValidationRequest();
         stubSkipValidationAndConflictCheck();
         when(configuration.getBpBatchStatsTopic()).thenReturn("bp-stats-topic");
@@ -1622,11 +1622,19 @@ class BPWorkFlowServiceImplTest {
         when(workflowservice.workflowTransition(any(), any(), any(), any(), any())).thenReturn(wfResponse);
         bpWorkFlowService.updateBPWorkFlow(ROOT_ORG, ORG, wfRequest, USER_ID, "role");
         ArgumentCaptor<BatchStatsEvent> captor = ArgumentCaptor.forClass(BatchStatsEvent.class);
-        verify(producer, times(1)).push(eq("bp-stats-topic"), captor.capture());
-        BatchStatsEvent event = captor.getValue();
-        assertEquals(Constants.BATCH_STATS_FIELD_PENDING, event.getField());
-        assertEquals(-1L, event.getDelta());
-        assertEquals(BATCH_ID, event.getBatchId());
+        verify(producer, times(2)).push(eq("bp-stats-topic"), captor.capture());
+        List<BatchStatsEvent> events = captor.getAllValues();
+        BatchStatsEvent pendingEvent = events.stream()
+                .filter(e -> Constants.BATCH_STATS_FIELD_PENDING.equals(e.getField()))
+                .findFirst().orElse(null);
+        assertNotNull(pendingEvent, "Expected pending decrement event");
+        assertEquals(-1L, pendingEvent.getDelta());
+        BatchStatsEvent rejectedEvent = events.stream()
+                .filter(e -> Constants.BATCH_STATS_FIELD_REJECTED.equals(e.getField()))
+                .findFirst().orElse(null);
+        assertNotNull(rejectedEvent, "Expected rejected increment event");
+        assertEquals(1L, rejectedEvent.getDelta());
+        assertEquals(BATCH_ID, rejectedEvent.getBatchId());
     }
 
     @Test

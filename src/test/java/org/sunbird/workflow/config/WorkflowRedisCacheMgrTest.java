@@ -101,7 +101,8 @@ class WorkflowRedisCacheMgrTest {
         // pending = 3, withdrawn = 1
         verify(jedis).hmset(key, Map.of(
                 Constants.BATCH_STATS_FIELD_PENDING, "3",
-                Constants.BATCH_STATS_FIELD_WITHDRAWN, "1"
+                Constants.BATCH_STATS_FIELD_WITHDRAWN, "1",
+                Constants.BATCH_STATS_FIELD_REJECTED, "0"
         ));
         verify(jedis).hincrBy(key, Constants.BATCH_STATS_FIELD_PENDING, 1L);
     }
@@ -119,7 +120,8 @@ class WorkflowRedisCacheMgrTest {
         cacheMgr.incrementBatchFieldCount(batchId, Constants.BATCH_STATS_FIELD_PENDING);
         verify(jedis).hmset(key, Map.of(
                 Constants.BATCH_STATS_FIELD_PENDING, "0",
-                Constants.BATCH_STATS_FIELD_WITHDRAWN, "0"
+                Constants.BATCH_STATS_FIELD_WITHDRAWN, "0",
+                Constants.BATCH_STATS_FIELD_REJECTED, "0"
         ));
     }
 
@@ -132,7 +134,8 @@ class WorkflowRedisCacheMgrTest {
         cacheMgr.incrementBatchFieldCount(batchId, Constants.BATCH_STATS_FIELD_PENDING);
         verify(jedis).hmset(key, Map.of(
                 Constants.BATCH_STATS_FIELD_PENDING, "0",
-                Constants.BATCH_STATS_FIELD_WITHDRAWN, "0"
+                Constants.BATCH_STATS_FIELD_WITHDRAWN, "0",
+                Constants.BATCH_STATS_FIELD_REJECTED, "0"
         ));
     }
 
@@ -192,7 +195,8 @@ class WorkflowRedisCacheMgrTest {
         Map<String, String> result = cacheMgr.getBatchStats(batchId);
         verify(jedis).hmset(eq(key), argThat(m ->
                 "5".equals(m.get(Constants.BATCH_STATS_FIELD_PENDING)) &&
-                "0".equals(m.get(Constants.BATCH_STATS_FIELD_WITHDRAWN))
+                "0".equals(m.get(Constants.BATCH_STATS_FIELD_WITHDRAWN)) &&
+                "0".equals(m.get(Constants.BATCH_STATS_FIELD_REJECTED))
         ));
         assertEquals(expected, result);
     }
@@ -218,5 +222,23 @@ class WorkflowRedisCacheMgrTest {
         Map<String, String> stored = mapCaptor.getValue();
         assertEquals("3", stored.get(Constants.BATCH_STATS_FIELD_WITHDRAWN));
         assertEquals("0", stored.get(Constants.BATCH_STATS_FIELD_PENDING));
+        assertEquals("0", stored.get(Constants.BATCH_STATS_FIELD_REJECTED));
+    }
+
+    @Test
+    void increment_rejectedStatusInDb_isCountedAsRejectedNotPending() {
+        String batchId = "batch-011";
+        String key = Constants.BP_BATCH_STATS_PREFIX + batchId;
+        when(jedis.exists(key)).thenReturn(false);
+        List<Object[]> dbRows = new ArrayList<>();
+        dbRows.add(new Object[]{"REJECTED", 4L});
+        dbRows.add(new Object[]{"ENROLL_IS_IN_PROGRESS", 2L});
+        when(wfStatusRepo.countGroupedByStatusForApplicationId(batchId)).thenReturn(dbRows);
+        cacheMgr.incrementBatchFieldCount(batchId, Constants.BATCH_STATS_FIELD_PENDING);
+        verify(jedis).hmset(eq(key), mapCaptor.capture());
+        Map<String, String> stored = mapCaptor.getValue();
+        assertEquals("4", stored.get(Constants.BATCH_STATS_FIELD_REJECTED));
+        assertEquals("2", stored.get(Constants.BATCH_STATS_FIELD_PENDING));
+        assertEquals("0", stored.get(Constants.BATCH_STATS_FIELD_WITHDRAWN));
     }
 }

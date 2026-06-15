@@ -1945,6 +1945,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         } else if (Constants.REJECTED.equals(status)) {
             logger.info("Publishing batch stats rejection events for batchId={}", batchId);
             producer.push(configuration.getBpBatchStatsTopic(), new BatchStatsEvent(batchId, Constants.BATCH_STATS_FIELD_PENDING, -1L));
+            producer.push(configuration.getBpBatchStatsTopic(), new BatchStatsEvent(batchId, Constants.BATCH_STATS_FIELD_REJECTED, 1L));
         }
     }
 

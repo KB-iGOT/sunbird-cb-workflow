@@ -58,21 +58,27 @@ public class WorkflowRedisCacheMgr {
         var rows = wfStatusRepo.countGroupedByStatusForApplicationId(batchId);
         long pending = 0L;
         long withdrawn = 0L;
+        long rejected = 0L;
         for (var row : rows) {
             var status = (String) row[0];
             var count = ((Number) row[1]).longValue();
             if (!Constants.BATCH_STATS_TERMINAL_STATUSES.contains(status)) {
                 pending += count;
             }
-            if (Constants.BATCH_STATS_FIELD_WITHDRAWN.equalsIgnoreCase(status)) {
+            if (Constants.WITHDRAWN.equalsIgnoreCase(status)) {
                 withdrawn = count;
             }
+            if (Constants.REJECTED.equalsIgnoreCase(status)) {
+                rejected = count;
+            }
         }
-        jedis.hmset(key, Map.of(Constants.BATCH_STATS_FIELD_PENDING, String.valueOf(pending),
-                Constants.BATCH_STATS_FIELD_WITHDRAWN, String.valueOf(withdrawn)));
+        jedis.hmset(key, Map.of(
+                Constants.BATCH_STATS_FIELD_PENDING, String.valueOf(pending),
+                Constants.BATCH_STATS_FIELD_WITHDRAWN, String.valueOf(withdrawn),
+                Constants.BATCH_STATS_FIELD_REJECTED, String.valueOf(rejected)));
         jedis.expire(key, configuration.getBpBatchStatsCacheTtl());
-        logger.info("Batch stats cache initialised for batchId={} pending={} withdrawn={} ttl={}s",
-                batchId, pending, withdrawn, configuration.getBpBatchStatsCacheTtl());
+        logger.info("Batch stats cache initialised for batchId={} pending={} withdrawn={} rejected={} ttl={}s",
+                batchId, pending, withdrawn, rejected, configuration.getBpBatchStatsCacheTtl());
     }
 
     /**
