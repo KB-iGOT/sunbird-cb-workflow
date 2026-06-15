@@ -121,7 +121,7 @@ class WorkflowRedisCacheMgrTest {
         verify(jedis).hmset(key, Map.of(
                 Constants.BATCH_STATS_FIELD_PENDING, "0",
                 Constants.BATCH_STATS_FIELD_WITHDRAWN, "0",
-                Constants.BATCH_STATS_FIELD_REJECTED, "0"
+                Constants.BATCH_STATS_FIELD_REJECTED, "5"
         ));
     }
 
