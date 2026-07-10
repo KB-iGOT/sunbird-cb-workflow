@@ -338,9 +338,6 @@ public class Configuration {
     @Value("${bp.batch.stats.sync.page.size:100}")
     private int bpBatchStatsSyncPageSize;
 
-    @Value("${sunbird_time_zone}")
-    private String sunbirdTimeZone;
-
     public String getAdminBlendedProgramEnrolEndPoint() {
         return adminBlendedProgramEnrolEndPoint;
     }
