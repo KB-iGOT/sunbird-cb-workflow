@@ -39,6 +39,7 @@ import org.sunbird.workflow.postgres.entity.WfStatusEntity;
 import org.sunbird.workflow.postgres.repo.WfStatusRepo;
 import org.sunbird.workflow.service.impl.RequestServiceImpl;
 import org.sunbird.workflow.utils.CassandraOperation;
+import org.sunbird.workflow.utils.UserUtil;
 import org.sunbird.workflow.utils.ValidationUtil;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -75,6 +76,9 @@ public class UserBulkUploadService {
 
     @Autowired
     RedisCacheMgr redisCacheMgr;
+
+    @Autowired
+    private UserUtil userUtil;
 
     public void initiateUserBulkUploadProcess(String inputData) {
         logger.info("UserBulkUploadService:: initiateUserBulkUploadProcess: Started");
@@ -1040,50 +1044,124 @@ public class UserBulkUploadService {
                     }
 
                     Set<String> employmentDetailsKey = new HashSet<>();
+                    Set<String> professionalDetailsKey = new HashSet<>();
+                    Set<String> personalDetailsKey = new HashSet<>();
+                    Map<String, Object> readData = userUtil.userProfileRead(userId);
+                    if (readData == null || !Constants.OK.equals(readData.get(Constants.RESPONSE_CODE))) {
+                        userRecordUpdate = false;
+
+                        csvValues.put("Status", Constants.FAILED_UPPERCASE);
+                        csvValues.put("Error Details", Constants.UPDATE_FAILED);
+
+                        failedRecordsCount++;
+                        totalRecordsCount++;
+                        updatedRecords.add(csvValues);
+
+                        continue;
+                    }
+                    Map<String, Object> result =
+                            (Map<String, Object>) readData.get(Constants.RESULT);
+                    Map<String, Object> response =
+                            (Map<String, Object>) result.get(Constants.RESPONSE);
+                    Map<String, Object> profileDetails =
+                            (Map<String, Object>) response.get(Constants.PROFILE_DETAILS);
+                    if (profileDetails == null) {
+                        profileDetails = new HashMap<>();
+                    }
+                    Map<String, Object> personalDetails =
+                            (Map<String, Object>) profileDetails.get(Constants.PERSONAL_DETAILS);
+                    if (personalDetails == null) {
+                        personalDetails = new HashMap<>();
+                    }
+                    List<Map<String, Object>> professionalDetails =
+                            (List<Map<String, Object>>) profileDetails.get(Constants.PROFESSIONAL_DETAILS);
+                    if (professionalDetails == null) {
+                        professionalDetails = new ArrayList<>();
+                    }
                     employmentDetailsKey.add(Constants.EMPLOYEE_CODE);
                     employmentDetailsKey.add(Constants.PIN_CODE);
-
-                    Set<String> professionalDetailsKey = new HashSet<>();
                     professionalDetailsKey.add(Constants.GROUP);
                     professionalDetailsKey.add(Constants.DESIGNATION);
-
-                    Set<String> personalDetailsKey = new HashSet<>();
                     personalDetailsKey.add(Constants.FIRSTNAME);
                     personalDetailsKey.add(Constants.DOB);
                     personalDetailsKey.add(Constants.DOMICILE_MEDIUM);
                     personalDetailsKey.add(Constants.CATEGORY);
                     personalDetailsKey.add(Constants.GENDER);
                     personalDetailsKey.add(Constants.MOBILE);
+                    if (readData == null || !Constants.OK.equals(readData.get(Constants.RESPONSE_CODE))) {
+                        userRecordUpdate = false;
 
-                    WfRequest wfRequest = this.getWFRequest(valuesToBeUpdate, userId);
-                    List<HashMap<String, Object>> updatedValues = new ArrayList<>();
+                        csvValues.put("Status", Constants.FAILED_UPPERCASE);
+                        csvValues.put("Error Details", Constants.UPDATE_FAILED);
+
+                        failedRecordsCount++;
+                        totalRecordsCount++;
+                        updatedRecords.add(csvValues);
+
+                        continue;
+                    }
+
+                    Map<String, Object> professionalDetail;
+                    if (!CollectionUtils.isEmpty(professionalDetails)) {
+                        professionalDetail = professionalDetails.get(0);
+                    } else {
+                        professionalDetail = new HashMap<>();
+                    }
+                    Map<String, Object> employmentDetails =
+                            (Map<String, Object>) profileDetails.get(Constants.EMPLOYMENT_DETAILS);
+                    if (employmentDetails == null) {
+                        employmentDetails = new HashMap<>();
+                    }
+                    Map<String, Object> additionalProperties =
+                            (Map<String, Object>) profileDetails.get(Constants.ADDITIONAL_PROPERTIES);
+                    if (additionalProperties == null) {
+                        additionalProperties = new HashMap<>();
+                    }
                     for (Map.Entry<String, Object> entry : valuesToBeUpdate.entrySet()) {
-                        String fieldKey;
-                        HashMap<String, Object> updatedValueMap = new HashMap<>();
-                        updatedValueMap.put(entry.getKey(), entry.getValue());
-                        HashMap<String, Object> updateValues = new HashMap<>();
-                        updateValues.put(Constants.FROM_VALUE, new HashMap<>());
-                        updateValues.put(Constants.TO_VALUE, updatedValueMap);
-                        if (employmentDetailsKey.contains(entry.getKey())) {
-                            fieldKey = Constants.EMPLOYMENT_DETAILS;
-                        } else if (professionalDetailsKey.contains(entry.getKey())) {
-                            fieldKey = Constants.PROFESSIONAL_DETAILS;
-                        } else if (personalDetailsKey.contains(entry.getKey())) {
-                            fieldKey = Constants.PERSONAL_DETAILS;
+                        String key = entry.getKey();
+                        Object value = entry.getValue();
+                        if (Constants.FIRSTNAME.equals(key)
+                                || Constants.DOB.equals(key)
+                                || Constants.GENDER.equals(key)
+                                || Constants.CATEGORY.equals(key)
+                                || Constants.DOMICILE_MEDIUM.equals(key)
+                                || Constants.MOBILE.equals(key)) {
+                            personalDetails.put(key, value);
+                        } else if (Constants.GROUP.equals(key)
+                                || Constants.DESIGNATION.equals(key)) {
+                            professionalDetail.put(key, value);
+                        } else if (Constants.EMPLOYEE_CODE.equals(key)
+                                || Constants.PIN_CODE.equals(key)) {
+                            employmentDetails.put(key, value);
                         } else {
-                            fieldKey = Constants.ADDITIONAL_PROPERTIES;
-                        }
-                        updateValues.put(Constants.FIELD_KEY, fieldKey);
-                        updatedValues.add(updateValues);
-                        if (null != wfRequest) {
-                            wfRequest.setUpdateFieldValues(updatedValues);
+                            additionalProperties.put(key, value);
                         }
                     }
-                    userProfileWfService.updateUserProfileForBulkUpload(wfRequest);
-                    WfStatusEntity wfStatusEntityFailed = wfStatusRepo.findByWfId(wfRequest.getWfId());
-                    if (null != wfStatusEntityFailed && Constants.REJECTED.equalsIgnoreCase(wfStatusEntityFailed.getCurrentStatus())) {
+                    if (professionalDetails != null && !professionalDetails.isEmpty()) {
+                        professionalDetails.set(0, professionalDetail);
+                    } else {
+                        professionalDetails.add(professionalDetail);
+                    }
+                    profileDetails.put(Constants.PERSONAL_DETAILS, personalDetails);
+                    profileDetails.put(Constants.PROFESSIONAL_DETAILS, professionalDetails);
+                    profileDetails.put(Constants.EMPLOYMENT_DETAILS, employmentDetails);
+                    profileDetails.put(Constants.ADDITIONAL_PROPERTIES, additionalProperties);
+                    Map<String, Object> request = new HashMap<>();
+                    request.put(Constants.USER_ID, userId);
+                    request.put(Constants.PROFILE_DETAILS, profileDetails);
+                    Map<String, Object> requestBody = new HashMap<>();
+                    requestBody.put(Constants.REQUEST, request);
+                    Map<String, Object> updateUserApiResp =
+                            requestServiceImpl.fetchResultUsingPatch(
+                                    configuration.getLmsServiceHost()
+                                            + configuration.getUserProfileUpdateEndPoint(),
+                                    requestBody,
+                                    getHeaders());
+                    if (updateUserApiResp == null
+                            || !Constants.OK.equals(updateUserApiResp.get(Constants.RESPONSE_CODE))) {
                         userRecordUpdate = false;
                     }
+
                     if (userRecordUpdate) {
                         noOfSuccessfulRecords++;
                         csvValues.put("Status", Constants.SUCCESSFUL_UPERCASE);
@@ -1152,6 +1230,13 @@ public class UserBulkUploadService {
                 file.delete();
         }
         }
+
+    private HashMap<String, String> getHeaders() {
+        HashMap<String, String> headersValue = new HashMap<>();
+        headersValue.put(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON);
+        return headersValue;
+    }
+
 
     private String uploadTheUpdatedCSVFile(File file)
             throws IOException {
