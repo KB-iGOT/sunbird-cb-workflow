@@ -1043,122 +1043,7 @@ public class UserBulkUploadService {
                         continue;
                     }
 
-                    Set<String> employmentDetailsKey = new HashSet<>();
-                    Set<String> professionalDetailsKey = new HashSet<>();
-                    Set<String> personalDetailsKey = new HashSet<>();
-                    Map<String, Object> readData = userUtil.userProfileRead(userId);
-                    if (readData == null || !Constants.OK.equals(readData.get(Constants.RESPONSE_CODE))) {
-                        userRecordUpdate = false;
-
-                        csvValues.put("Status", Constants.FAILED_UPPERCASE);
-                        csvValues.put("Error Details", Constants.UPDATE_FAILED);
-
-                        failedRecordsCount++;
-                        totalRecordsCount++;
-                        updatedRecords.add(csvValues);
-
-                        continue;
-                    }
-                    Map<String, Object> result =
-                            (Map<String, Object>) readData.get(Constants.RESULT);
-                    Map<String, Object> response =
-                            (Map<String, Object>) result.get(Constants.RESPONSE);
-                    Map<String, Object> profileDetails =
-                            (Map<String, Object>) response.get(Constants.PROFILE_DETAILS);
-                    if (profileDetails == null) {
-                        profileDetails = new HashMap<>();
-                    }
-                    Map<String, Object> personalDetails =
-                            (Map<String, Object>) profileDetails.get(Constants.PERSONAL_DETAILS);
-                    if (personalDetails == null) {
-                        personalDetails = new HashMap<>();
-                    }
-                    List<Map<String, Object>> professionalDetails =
-                            (List<Map<String, Object>>) profileDetails.get(Constants.PROFESSIONAL_DETAILS);
-                    if (professionalDetails == null) {
-                        professionalDetails = new ArrayList<>();
-                    }
-                    employmentDetailsKey.add(Constants.EMPLOYEE_CODE);
-                    employmentDetailsKey.add(Constants.PIN_CODE);
-                    professionalDetailsKey.add(Constants.GROUP);
-                    professionalDetailsKey.add(Constants.DESIGNATION);
-                    personalDetailsKey.add(Constants.FIRSTNAME);
-                    personalDetailsKey.add(Constants.DOB);
-                    personalDetailsKey.add(Constants.DOMICILE_MEDIUM);
-                    personalDetailsKey.add(Constants.CATEGORY);
-                    personalDetailsKey.add(Constants.GENDER);
-                    personalDetailsKey.add(Constants.MOBILE);
-                    if (readData == null || !Constants.OK.equals(readData.get(Constants.RESPONSE_CODE))) {
-                        userRecordUpdate = false;
-
-                        csvValues.put("Status", Constants.FAILED_UPPERCASE);
-                        csvValues.put("Error Details", Constants.UPDATE_FAILED);
-
-                        failedRecordsCount++;
-                        totalRecordsCount++;
-                        updatedRecords.add(csvValues);
-
-                        continue;
-                    }
-
-                    Map<String, Object> professionalDetail;
-                    if (!CollectionUtils.isEmpty(professionalDetails)) {
-                        professionalDetail = professionalDetails.get(0);
-                    } else {
-                        professionalDetail = new HashMap<>();
-                    }
-                    Map<String, Object> employmentDetails =
-                            (Map<String, Object>) profileDetails.get(Constants.EMPLOYMENT_DETAILS);
-                    if (employmentDetails == null) {
-                        employmentDetails = new HashMap<>();
-                    }
-                    Map<String, Object> additionalProperties =
-                            (Map<String, Object>) profileDetails.get(Constants.ADDITIONAL_PROPERTIES);
-                    if (additionalProperties == null) {
-                        additionalProperties = new HashMap<>();
-                    }
-                    for (Map.Entry<String, Object> entry : valuesToBeUpdate.entrySet()) {
-                        String key = entry.getKey();
-                        Object value = entry.getValue();
-                        if (Constants.FIRSTNAME.equals(key)
-                                || Constants.DOB.equals(key)
-                                || Constants.GENDER.equals(key)
-                                || Constants.CATEGORY.equals(key)
-                                || Constants.DOMICILE_MEDIUM.equals(key)
-                                || Constants.MOBILE.equals(key)) {
-                            personalDetails.put(key, value);
-                        } else if (Constants.GROUP.equals(key)
-                                || Constants.DESIGNATION.equals(key)) {
-                            professionalDetail.put(key, value);
-                        } else if (Constants.EMPLOYEE_CODE.equals(key)
-                                || Constants.PIN_CODE.equals(key)) {
-                            employmentDetails.put(key, value);
-                        } else {
-                            additionalProperties.put(key, value);
-                        }
-                    }
-                    if (professionalDetails != null && !professionalDetails.isEmpty()) {
-                        professionalDetails.set(0, professionalDetail);
-                    } else {
-                        professionalDetails.add(professionalDetail);
-                    }
-                    profileDetails.put(Constants.PERSONAL_DETAILS, personalDetails);
-                    profileDetails.put(Constants.PROFESSIONAL_DETAILS, professionalDetails);
-                    profileDetails.put(Constants.EMPLOYMENT_DETAILS, employmentDetails);
-                    profileDetails.put(Constants.ADDITIONAL_PROPERTIES, additionalProperties);
-                    Map<String, Object> request = new HashMap<>();
-                    request.put(Constants.USER_ID, userId);
-                    request.put(Constants.PROFILE_DETAILS, profileDetails);
-                    Map<String, Object> requestBody = new HashMap<>();
-                    requestBody.put(Constants.REQUEST, request);
-                    Map<String, Object> updateUserApiResp =
-                            requestServiceImpl.fetchResultUsingPatch(
-                                    configuration.getLmsServiceHost()
-                                            + configuration.getUserProfileUpdateEndPoint(),
-                                    requestBody,
-                                    getHeaders());
-                    if (updateUserApiResp == null
-                            || !Constants.OK.equals(updateUserApiResp.get(Constants.RESPONSE_CODE))) {
+                    if (!updateBulkUserProfile(userId, valuesToBeUpdate)) {
                         userRecordUpdate = false;
                     }
 
@@ -1235,6 +1120,116 @@ public class UserBulkUploadService {
         HashMap<String, String> headersValue = new HashMap<>();
         headersValue.put(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON);
         return headersValue;
+    }
+
+    @SuppressWarnings("unchecked")
+    private boolean updateBulkUserProfile(String userId, Map<String, Object> valuesToBeUpdate) {
+        // UserUtil returns the inner result.response object, not the API response envelope.
+        Map<String, Object> userResponse = userUtil.userProfileRead(userId);
+        if (MapUtils.isEmpty(userResponse)) {
+            logger.error("Unable to read profile for userId: {}", userId);
+            return false;
+        }
+
+        Map<String, Object> profileDetails = getOrCreateMap(userResponse, Constants.PROFILE_DETAILS);
+        if (profileDetails == null) {
+            logger.error("Invalid profile-details structure for userId: {}", userId);
+            return false;
+        }
+
+        Map<String, Object> personalDetails = getOrCreateMap(profileDetails, Constants.PERSONAL_DETAILS);
+        Map<String, Object> employmentDetails = getOrCreateMap(profileDetails, Constants.EMPLOYMENT_DETAILS);
+        Map<String, Object> additionalProperties = getOrCreateMap(profileDetails, Constants.ADDITIONAL_PROPERTIES);
+        Map<String, Object> professionalDetails = getOrCreateFirstProfessionalDetail(profileDetails);
+
+        if (personalDetails == null || employmentDetails == null
+                || additionalProperties == null || professionalDetails == null) {
+            logger.error("Invalid profile-details structure for userId: {}", userId);
+            return false;
+        }
+
+        for (Map.Entry<String, Object> entry : valuesToBeUpdate.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+
+            if (isPersonalDetail(key)) {
+                personalDetails.put(key, value);
+            } else if (isProfessionalDetail(key)) {
+                professionalDetails.put(key, value);
+            } else if (isEmploymentDetail(key)) {
+                employmentDetails.put(key, value);
+            } else {
+                additionalProperties.put(key, value);
+            }
+        }
+
+        Map<String, Object> request = new HashMap<>();
+        request.put(Constants.USER_ID, userId);
+        request.put(Constants.PROFILE_DETAILS, profileDetails);
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put(Constants.REQUEST, request);
+
+        Map<String, Object> updateResponse = requestServiceImpl.fetchResultUsingPatch(
+                configuration.getLmsServiceHost() + configuration.getUserProfileUpdateEndPoint(),
+                requestBody,
+                getHeaders());
+
+        return updateResponse != null
+                && Constants.OK.equals(updateResponse.get(Constants.RESPONSE_CODE));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> getOrCreateMap(Map<String, Object> parent, String key) {
+        Object value = parent.get(key);
+        if (value == null) {
+            Map<String, Object> newValue = new HashMap<>();
+            parent.put(key, newValue);
+            return newValue;
+        }
+        return value instanceof Map<?, ?> ? (Map<String, Object>) value : null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> getOrCreateFirstProfessionalDetail(Map<String, Object> profileDetails) {
+        Object value = profileDetails.get(Constants.PROFESSIONAL_DETAILS);
+        if (value == null) {
+            List<Map<String, Object>> details = new ArrayList<>();
+            Map<String, Object> detail = new HashMap<>();
+            details.add(detail);
+            profileDetails.put(Constants.PROFESSIONAL_DETAILS, details);
+            return detail;
+        }
+        if (!(value instanceof List<?>)) {
+            return null;
+        }
+
+        List<?> details = (List<?>) value;
+        if (details.isEmpty()) {
+            Map<String, Object> detail = new HashMap<>();
+            ((List<Map<String, Object>>) details).add(detail);
+            return detail;
+        }
+        return details.get(0) instanceof Map<?, ?>
+                ? (Map<String, Object>) details.get(0)
+                : null;
+    }
+
+    private boolean isPersonalDetail(String key) {
+        return Constants.FIRSTNAME.equals(key)
+                || Constants.DOB.equals(key)
+                || Constants.GENDER.equals(key)
+                || Constants.CATEGORY.equals(key)
+                || Constants.DOMICILE_MEDIUM.equals(key)
+                || Constants.MOBILE.equals(key);
+    }
+
+    private boolean isProfessionalDetail(String key) {
+        return Constants.GROUP.equals(key) || Constants.DESIGNATION.equals(key);
+    }
+
+    private boolean isEmploymentDetail(String key) {
+        return Constants.EMPLOYEE_CODE.equals(key) || Constants.PIN_CODE.equals(key);
     }
 
 
