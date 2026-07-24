@@ -1053,7 +1053,7 @@ public class UserBulkUploadService {
                         csvValues.put("Error Details", "NA");
                     } else {
                         failedRecordsCount++;
-                        csvValues.put("Status", Constants.UPDATE_FAILED);
+                        csvValues.put("Status", Constants.FAILED_UPPERCASE);
                         csvValues.put("Error Details", Constants.UPDATE_FAILED);
                     }
                     totalRecordsCount++;
