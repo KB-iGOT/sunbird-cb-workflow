@@ -177,4 +177,15 @@ public class BPWorkFlowController {
         return new ResponseEntity<>(response, (HttpStatus) response.get(Constants.STATUS));
     }
 
+    @PostMapping("/qr/enrolments")
+    public ResponseEntity<Response> blendedProgramQrEnrol(@RequestHeader String rootOrg,
+                                                          @RequestHeader String org,
+                                                          @RequestHeader(Constants.X_AUTH_TOKEN) String userAuthToken,
+                                                          @RequestBody QrSelfEnrolRequest qrRequest) {
+
+        Response response = bPWorkFlowService.enrolQrCodeBPWorkFlow(rootOrg, org, userAuthToken, qrRequest);
+        HttpStatus statusCode = (HttpStatus) response.get(Constants.STATUS);
+        return new ResponseEntity<>(response, statusCode);
+    }
+
 }

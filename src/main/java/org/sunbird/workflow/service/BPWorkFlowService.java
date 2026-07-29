@@ -3,6 +3,7 @@ package org.sunbird.workflow.service;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
+import org.sunbird.workflow.models.QrSelfEnrolRequest;
 import org.sunbird.workflow.models.Response;
 import org.sunbird.workflow.models.SearchCriteria;
 import org.sunbird.workflow.models.SearchCriteriaV2;
@@ -71,5 +72,7 @@ public interface BPWorkFlowService {
     public Response removeApprovedUser(WfRequest wfRequest, boolean isPc);
 
     public Response nominateUsers(String rootOrg, String org, String actorUserId, Map<String, Object> requestBody);
+
+    public Response enrolQrCodeBPWorkFlow(String rootOrg, String org, String userAuthToken, QrSelfEnrolRequest qrRequest);
 
 }

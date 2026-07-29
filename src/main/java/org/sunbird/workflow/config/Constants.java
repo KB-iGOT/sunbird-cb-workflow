@@ -494,4 +494,6 @@ public class Constants {
 	public static final String TABLE_USER_ROLES = "user_roles";
 	public static final String ROLE = "role";
 	public static final String VOLUNTEER_NOT_ELIGIBLE_TO_ENROLL = "User is not eligible to enrol into this course.";
+	public static final String SELF_ENROLLMENT = "selfEnrollment";
+	public static final String SELF_ENROLL_BY_QR = "selfEnrollByQRCode";
 }
