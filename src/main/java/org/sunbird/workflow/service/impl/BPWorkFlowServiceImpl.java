@@ -35,6 +35,7 @@ import org.sunbird.workflow.producer.Producer;
 import org.sunbird.workflow.service.BPWorkFlowService;
 import org.sunbird.workflow.service.ContentReadService;
 import org.sunbird.workflow.service.Workflowservice;
+import org.sunbird.workflow.utils.AccessTokenValidator;
 import org.sunbird.workflow.utils.CassandraOperation;
 import org.sunbird.workflow.utils.ElasticsearchServiceManager;
 import org.sunbird.workflow.utils.UserUtil;
@@ -237,7 +238,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         }
     }
 
-    private Map<String, Object> getCurrentBatchAttributes(String batchId, String courseId) {
+    public Map<String, Object> getCurrentBatchAttributes(String batchId, String courseId) {
         Map<String, Object> propertyMap = new HashMap<>();
         propertyMap.put(Constants.BATCH_ID, batchId);
         propertyMap.put(Constants.COURSE_ID, courseId);
@@ -284,7 +285,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         }
         return Collections.emptyMap();
     }
-    private int getTotalApprovedUserCount(WfRequest wfRequest) {
+    public int getTotalApprovedUserCount(WfRequest wfRequest) {
         Map<String, Object> propertyMap = new HashMap<>();
         propertyMap.put(Constants.BATCH_ID, wfRequest.getApplicationId());
         List<Map<String, Object>>  list =  cassandraOperation.getRecordsByProperties(Constants.KEYSPACE_SUNBIRD_COURSES,
@@ -296,7 +297,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                 })
                 .collect(Collectors.toList()).size();
     }
-    private boolean validateBatchEnrolment(Map<String, Object> courseBatchDetails, int totalApprovedUserCount,
+    public boolean validateBatchEnrolment(Map<String, Object> courseBatchDetails, int totalApprovedUserCount,
             int totalUserEnrolCount, String bpState) {
         if (MapUtils.isEmpty(courseBatchDetails)) {
             return false;
@@ -517,7 +518,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         return errMsg;
     }
 
-    private int getTotalUserEnrolCountForBatch(String applicationId) {
+    public int getTotalUserEnrolCountForBatch(String applicationId) {
         List<WfStatusEntity> wfEntries = wfStatusRepo
                 .findByApplicationId(applicationId);
         wfEntries = wfEntries.stream().filter(wfEntry -> !configuration.getBpBatchFullValidationExcludeStates()
