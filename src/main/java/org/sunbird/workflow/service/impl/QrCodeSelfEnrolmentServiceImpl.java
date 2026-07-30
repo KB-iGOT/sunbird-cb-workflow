@@ -37,6 +37,7 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
     private final AccessTokenValidator accessTokenValidator;
     private final ContentReadService contentReadService;
     private final ObjectMapper mapper;
+    private final WorkflowAuditProcessingServiceImpl workflowAuditProcessingService;
 
     /**
      * Orchestrate QR Code self-enrolment workflow with direct approval
@@ -87,12 +88,8 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
 
         // Batch validation
         Map<String, Object> courseBatchDetails = bpWorkFlowService.getCurrentBatchAttributes(batchId, courseId);
-        validationResponse = validateBatchActive(courseBatchDetails, batchId, courseId);
-        if (validationResponse != null) {
-            return validationResponse;
-        }
 
-        validationResponse = validateQrEnrollmentWindow(courseBatchDetails);
+        validationResponse = validateQrEnrollmentWindow(courseBatchDetails, batchId, courseId);
         if (validationResponse != null) {
             return validationResponse;
         }
@@ -137,12 +134,20 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
         logger.info("User enrolled successfully in blended program. UserId: {}, CourseId: {}, BatchId: {}",
                 userId, courseId, batchId);
 
+        // Create audit trail for compliance tracking
+        try {
+            workflowAuditProcessingService.createAudit(wfRequest);
+            logger.debug("Audit trail created for QR enrollment wfId: {}", wfStatusEntity.getWfId());
+        } catch (Exception e) {
+            logger.error("Error creating audit trail for QR enrollment wfId: {}", wfStatusEntity.getWfId(), e);
+        }
+
         // Build and return success response
         Response response = new Response();
         HashMap<String, Object> data = new HashMap<>();
         data.put(Constants.STATUS, Constants.APPROVED);
         data.put(Constants.WF_IDS_CONSTANT, wfStatusEntity.getWfId());
-        response.put(Constants.MESSAGE, Constants.STATUS_CHANGE_MESSAGE + Constants.APPROVED);
+        response.put(Constants.MESSAGE, String.format(Constants.QR_ENROLLMENT_SUCCESS_MESSAGE, courseId, batchId));
         response.put(Constants.DATA, data);
         response.put(Constants.STATUS, HttpStatus.OK);
         logger.debug("QR enrolment response built successfully for wfId: {}", wfStatusEntity.getWfId());
@@ -224,14 +229,14 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
     }
 
     /**
-     * Validate batch is active and enrollment period is open
+     * Validate batch exists and QR Code enrollment is only allowed on batch start date
      *
-     * @param courseBatchDetails - Batch details map
-     * @param batchId            - Batch ID
-     * @param courseId           - Course ID
+     * @param courseBatchDetails - Batch attributes containing start date
+     * @param batchId - Batch ID for error logging
+     * @param courseId - Course ID for error logging
      * @return Response if validation fails, null if validation passes
      */
-    private Response validateBatchActive(Map<String, Object> courseBatchDetails, String batchId, String courseId) {
+    private Response validateQrEnrollmentWindow(Map<String, Object> courseBatchDetails, String batchId, String courseId) {
         if (MapUtils.isEmpty(courseBatchDetails)) {
             logger.warn("QR enrolment failed: Batch not found for batchId: {}, courseId: {}", batchId, courseId);
             Response response = new Response();
@@ -239,24 +244,7 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
             response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
             return response;
         }
-        Date enrollmentEndDate = (Date) courseBatchDetails.get(Constants.ENROLMENT_END_DATE);
-        if (enrollmentEndDate != null && enrollmentEndDate.before(new Date())) {
-            logger.warn("QR enrolment failed: Batch enrollment period has ended for batchId: {}", batchId);
-            Response response = new Response();
-            response.put(Constants.ERROR_MESSAGE, Constants.BATCH_ENROLLMENT_PERIOD_ENDED_ERROR);
-            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
-            return response;
-        }
-        return null;
-    }
 
-    /**
-     * Validate QR Code enrollment is only allowed on batch start date
-     *
-     * @param courseBatchDetails - Batch attributes containing start date
-     * @return Response if validation fails, null if validation passes
-     */
-    private Response validateQrEnrollmentWindow(Map<String, Object> courseBatchDetails) {
         Date batchStartDate = (Date) courseBatchDetails.get(Constants.START_DATE);
         if (batchStartDate == null) {
             logger.warn("QR enrolment failed: Batch start date is not available");
@@ -445,7 +433,7 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
         applicationStatus.setLastUpdatedOn(new Date());
         applicationStatus.setOrg(org);
         applicationStatus.setRootOrg(rootOrg);
-        applicationStatus.setServiceName("selfEnrollByQRCode");
+        applicationStatus.setServiceName(Constants.BLENDED_PROGRAM_SERVICE_NAME);
 
         try {
             applicationStatus.setUpdateFieldValues(mapper.writeValueAsString(wfRequest.getUpdateFieldValues()));

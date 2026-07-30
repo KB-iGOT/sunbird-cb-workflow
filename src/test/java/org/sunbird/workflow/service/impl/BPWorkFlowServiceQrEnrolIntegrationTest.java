@@ -57,6 +57,9 @@ class BPWorkFlowServiceQrEnrolIntegrationTest {
     @Mock
     private AccessTokenValidator accessTokenValidator;
 
+    @Mock
+    private WorkflowAuditProcessingServiceImpl workflowAuditProcessingService;
+
     @InjectMocks
     private BPWorkFlowServiceImpl bpWorkFlowService;
 
@@ -95,7 +98,8 @@ class BPWorkFlowServiceQrEnrolIntegrationTest {
                 configuration,
                 accessTokenValidator,
                 contentReadService,
-                new ObjectMapper()
+                new ObjectMapper(),
+                workflowAuditProcessingService
         );
     }
 
@@ -132,7 +136,7 @@ class BPWorkFlowServiceQrEnrolIntegrationTest {
         assertEquals(rootOrg, savedEntity.getRootOrg());
         assertEquals(org, savedEntity.getOrg());
         assertFalse(savedEntity.getInWorkflow());
-        assertEquals("selfEnrollByQRCode", savedEntity.getServiceName());
+        assertEquals(Constants.BLENDED_PROGRAM_SERVICE_NAME, savedEntity.getServiceName());
     }
 
     @Test

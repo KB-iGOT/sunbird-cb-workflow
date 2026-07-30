@@ -53,12 +53,14 @@ class BPWorkFlowControllerQrEnrolTest {
         String rootOrg = "igot";
         String org = "dopt";
         String authToken = "auth-token-123";
+        String courseId = "course123";
+        String batchId = "batch123";
 
-        QrSelfEnrolRequest qrRequest = new QrSelfEnrolRequest("course123", "batch123");
+        QrSelfEnrolRequest qrRequest = new QrSelfEnrolRequest(courseId, batchId);
 
         Response serviceResponse = new Response();
         serviceResponse.put(Constants.STATUS, HttpStatus.OK);
-        serviceResponse.put(Constants.MESSAGE, Constants.STATUS_CHANGE_MESSAGE + Constants.APPROVED);
+        serviceResponse.put(Constants.MESSAGE, String.format(Constants.QR_ENROLLMENT_SUCCESS_MESSAGE, courseId, batchId));
         Map<String, Object> data = new HashMap<>();
         data.put(Constants.STATUS, Constants.APPROVED);
         data.put(Constants.WF_IDS_CONSTANT, "wf-id-123");
@@ -119,12 +121,14 @@ class BPWorkFlowControllerQrEnrolTest {
         String rootOrg = "igot";
         String org = "dopt";
         String authToken = "auth-token-123";
+        String courseId = "course123";
+        String batchId = "batch123";
 
-        QrSelfEnrolRequest qrRequest = new QrSelfEnrolRequest("course123", "batch123");
+        QrSelfEnrolRequest qrRequest = new QrSelfEnrolRequest(courseId, batchId);
 
         Response serviceResponse = new Response();
         serviceResponse.put(Constants.STATUS, HttpStatus.OK);
-        serviceResponse.put(Constants.MESSAGE, Constants.STATUS_CHANGE_MESSAGE + Constants.APPROVED);
+        serviceResponse.put(Constants.MESSAGE, String.format(Constants.QR_ENROLLMENT_SUCCESS_MESSAGE, courseId, batchId));
         Map<String, Object> data = new HashMap<>();
         data.put(Constants.STATUS, Constants.APPROVED);
         data.put(Constants.WF_IDS_CONSTANT, "wf-id-456");
