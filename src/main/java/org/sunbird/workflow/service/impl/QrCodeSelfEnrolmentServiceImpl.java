@@ -88,12 +88,8 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
 
         // Batch validation
         Map<String, Object> courseBatchDetails = bpWorkFlowService.getCurrentBatchAttributes(batchId, courseId);
-        validationResponse = validateBatchActive(courseBatchDetails, batchId, courseId);
-        if (validationResponse != null) {
-            return validationResponse;
-        }
 
-        validationResponse = validateQrEnrollmentWindow(courseBatchDetails);
+        validationResponse = validateQrEnrollmentWindow(courseBatchDetails, batchId, courseId);
         if (validationResponse != null) {
             return validationResponse;
         }
@@ -233,14 +229,14 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
     }
 
     /**
-     * Validate batch is active and enrollment period is open
+     * Validate batch exists and QR Code enrollment is only allowed on batch start date
      *
-     * @param courseBatchDetails - Batch details map
-     * @param batchId            - Batch ID
-     * @param courseId           - Course ID
+     * @param courseBatchDetails - Batch attributes containing start date
+     * @param batchId - Batch ID for error logging
+     * @param courseId - Course ID for error logging
      * @return Response if validation fails, null if validation passes
      */
-    private Response validateBatchActive(Map<String, Object> courseBatchDetails, String batchId, String courseId) {
+    private Response validateQrEnrollmentWindow(Map<String, Object> courseBatchDetails, String batchId, String courseId) {
         if (MapUtils.isEmpty(courseBatchDetails)) {
             logger.warn("QR enrolment failed: Batch not found for batchId: {}, courseId: {}", batchId, courseId);
             Response response = new Response();
@@ -248,24 +244,7 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
             response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
             return response;
         }
-        Date enrollmentEndDate = (Date) courseBatchDetails.get(Constants.ENROLMENT_END_DATE);
-        if (enrollmentEndDate != null && enrollmentEndDate.before(new Date())) {
-            logger.warn("QR enrolment failed: Batch enrollment period has ended for batchId: {}", batchId);
-            Response response = new Response();
-            response.put(Constants.ERROR_MESSAGE, Constants.BATCH_ENROLLMENT_PERIOD_ENDED_ERROR);
-            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
-            return response;
-        }
-        return null;
-    }
 
-    /**
-     * Validate QR Code enrollment is only allowed on batch start date
-     *
-     * @param courseBatchDetails - Batch attributes containing start date
-     * @return Response if validation fails, null if validation passes
-     */
-    private Response validateQrEnrollmentWindow(Map<String, Object> courseBatchDetails) {
         Date batchStartDate = (Date) courseBatchDetails.get(Constants.START_DATE);
         if (batchStartDate == null) {
             logger.warn("QR enrolment failed: Batch start date is not available");
