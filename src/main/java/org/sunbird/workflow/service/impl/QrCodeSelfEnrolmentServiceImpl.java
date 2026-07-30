@@ -37,6 +37,7 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
     private final AccessTokenValidator accessTokenValidator;
     private final ContentReadService contentReadService;
     private final ObjectMapper mapper;
+    private final WorkflowAuditProcessingServiceImpl workflowAuditProcessingService;
 
     /**
      * Orchestrate QR Code self-enrolment workflow with direct approval
@@ -137,12 +138,20 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
         logger.info("User enrolled successfully in blended program. UserId: {}, CourseId: {}, BatchId: {}",
                 userId, courseId, batchId);
 
+        // Create audit trail for compliance tracking
+        try {
+            workflowAuditProcessingService.createAudit(wfRequest);
+            logger.debug("Audit trail created for QR enrollment wfId: {}", wfStatusEntity.getWfId());
+        } catch (Exception e) {
+            logger.error("Error creating audit trail for QR enrollment wfId: {}", wfStatusEntity.getWfId(), e);
+        }
+
         // Build and return success response
         Response response = new Response();
         HashMap<String, Object> data = new HashMap<>();
         data.put(Constants.STATUS, Constants.APPROVED);
         data.put(Constants.WF_IDS_CONSTANT, wfStatusEntity.getWfId());
-        response.put(Constants.MESSAGE, Constants.STATUS_CHANGE_MESSAGE + Constants.APPROVED);
+        response.put(Constants.MESSAGE, String.format(Constants.QR_ENROLLMENT_SUCCESS_MESSAGE, courseId, batchId));
         response.put(Constants.DATA, data);
         response.put(Constants.STATUS, HttpStatus.OK);
         logger.debug("QR enrolment response built successfully for wfId: {}", wfStatusEntity.getWfId());
@@ -445,7 +454,7 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
         applicationStatus.setLastUpdatedOn(new Date());
         applicationStatus.setOrg(org);
         applicationStatus.setRootOrg(rootOrg);
-        applicationStatus.setServiceName("selfEnrollByQRCode");
+        applicationStatus.setServiceName(Constants.BLENDED_PROGRAM_SERVICE_NAME);
 
         try {
             applicationStatus.setUpdateFieldValues(mapper.writeValueAsString(wfRequest.getUpdateFieldValues()));
