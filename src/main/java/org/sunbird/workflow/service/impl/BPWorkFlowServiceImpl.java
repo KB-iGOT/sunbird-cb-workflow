@@ -241,7 +241,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         }
     }
 
-    private Map<String, Object> getCurrentBatchAttributes(String batchId, String courseId) {
+    public Map<String, Object> getCurrentBatchAttributes(String batchId, String courseId) {
         Map<String, Object> propertyMap = new HashMap<>();
         propertyMap.put(Constants.BATCH_ID, batchId);
         propertyMap.put(Constants.COURSE_ID, courseId);
@@ -288,7 +288,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         }
         return Collections.emptyMap();
     }
-    private int getTotalApprovedUserCount(WfRequest wfRequest) {
+    public int getTotalApprovedUserCount(WfRequest wfRequest) {
         Map<String, Object> propertyMap = new HashMap<>();
         propertyMap.put(Constants.BATCH_ID, wfRequest.getApplicationId());
         List<Map<String, Object>>  list =  cassandraOperation.getRecordsByProperties(Constants.KEYSPACE_SUNBIRD_COURSES,
@@ -300,7 +300,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                 })
                 .collect(Collectors.toList()).size();
     }
-    private boolean validateBatchEnrolment(Map<String, Object> courseBatchDetails, int totalApprovedUserCount,
+    public boolean validateBatchEnrolment(Map<String, Object> courseBatchDetails, int totalApprovedUserCount,
             int totalUserEnrolCount, String bpState) {
         if (MapUtils.isEmpty(courseBatchDetails)) {
             return false;
@@ -521,7 +521,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         return errMsg;
     }
 
-    private int getTotalUserEnrolCountForBatch(String applicationId) {
+    public int getTotalUserEnrolCountForBatch(String applicationId) {
         List<WfStatusEntity> wfEntries = wfStatusRepo
                 .findByApplicationId(applicationId);
         wfEntries = wfEntries.stream().filter(wfEntry -> !configuration.getBpBatchFullValidationExcludeStates()
@@ -1969,263 +1969,6 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         logger.info("courseIds in orgEligibilityIndex -> " + courseIds.toString());
         return !CollectionUtils.isEmpty(courseIds)
                 && courseIds.contains(courseId);
-    }
-
-    @Override
-    public Response enrolQrCodeBPWorkFlow(String rootOrg, String org, String userAuthToken, QrSelfEnrolRequest qrRequest) {
-        logger.info("QR Code enrolment initiated for course: {}, batch: {}", qrRequest.getCourseId(), qrRequest.getBatchId());
-
-        String userId = accessTokenValidator.fetchUserIdFromAccessToken(userAuthToken);
-        if (StringUtils.isEmpty(userId)) {
-            logger.warn("QR enrolment failed: Invalid or expired access token provided");
-            Response response = new Response();
-            response.put(Constants.ERROR_MESSAGE, "Invalid access token.");
-            response.put(Constants.STATUS, HttpStatus.UNAUTHORIZED);
-            return response;
-        }
-        validateQrRequest(qrRequest, rootOrg, org);
-
-        String courseId = qrRequest.getCourseId();
-        String batchId = qrRequest.getBatchId();
-        Map<String, Object> courseDetails = contentReadService.getServiceNameDetails(courseId);
-        validateCourseExists(courseDetails, courseId);
-        validateSelfEnrolmentEnabled(courseDetails);
-        Map<String, Object> courseBatchDetails = getCurrentBatchAttributes(batchId, courseId);
-        validateBatchActive(courseBatchDetails, batchId, courseId);
-        validateQrEnrollmentWindow(courseBatchDetails);
-
-        validateUniqueBatchEnrollment(userId, courseId, batchId);
-        WfRequest wfRequest = buildQrEnrolRequest(userId, courseId, batchId, courseBatchDetails);
-        int totalApprovedUserCount = getTotalApprovedUserCount(wfRequest);
-        int totalUserEnrolCount = getTotalUserEnrolCountForBatch(wfRequest.getApplicationId());
-        logger.debug("Batch capacity check: approved={}, total enrolled={}", totalApprovedUserCount, totalUserEnrolCount);
-
-        boolean enrolAccess = validateBatchEnrolment(courseBatchDetails, totalApprovedUserCount, totalUserEnrolCount,
-                Constants.BP_ENROLL_STATE);
-        if (!enrolAccess) {
-            logger.warn("QR enrolment failed: Batch capacity exceeded for batchId: {}", batchId);
-            Response response = new Response();
-            response.put(Constants.ERROR_MESSAGE, configuration.getBatchFullMesg());
-            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
-            return response;
-        }
-        validateNoActiveWorkflow(userId, batchId);
-        logger.info(" enrollment validation passed for userId: {}", userId);
-
-        // QR Direct Approval: Save wf_status with APPROVED status directly
-        WfStatusEntity wfStatusEntity = saveQrEnrollmentDirect(rootOrg, org, wfRequest);
-        logger.info("QR enrolment record created with wfId: {}, userId: {}, courseId: {}",
-            wfStatusEntity.getWfId(), userId, courseId);
-
-        // Call enrollment logic directly (no Kafka, no workflow processing)
-        updateEnrolmentDetails(wfRequest);
-        logger.info("User enrolled successfully in blended program. UserId: {}, CourseId: {}, BatchId: {}",
-            userId, courseId, batchId);
-
-        // Build and return success response
-        Response response = new Response();
-        HashMap<String, Object> data = new HashMap<>();
-        data.put(Constants.STATUS, Constants.APPROVED);
-        data.put(Constants.WF_IDS_CONSTANT, wfStatusEntity.getWfId());
-        response.put(Constants.MESSAGE, Constants.STATUS_CHANGE_MESSAGE + Constants.APPROVED);
-        response.put(Constants.DATA, data);
-        response.put(Constants.STATUS, HttpStatus.OK);
-        return response;
-    }
-
-    private void validateQrRequest(QrSelfEnrolRequest qrRequest, String rootOrg, String org) {
-        if (qrRequest == null) {
-            logger.warn("QR enrolment request validation failed: Request body is null");
-            throw new InvalidDataInputException("QR enrolment request cannot be null");
-        }
-
-        if (StringUtils.isBlank(qrRequest.getCourseId())) {
-            logger.warn("QR enrolment request validation failed: Course ID is missing");
-            throw new InvalidDataInputException("Course ID is required for QR enrolment");
-        }
-
-        if (StringUtils.isBlank(qrRequest.getBatchId())) {
-            logger.warn("QR enrolment request validation failed: Batch ID is missing");
-            throw new InvalidDataInputException("Batch ID is required for QR enrolment");
-        }
-
-        if (StringUtils.isBlank(rootOrg)) {
-            logger.warn("QR enrolment request validation failed: Root Organization header is missing");
-            throw new InvalidDataInputException("Root Organization is required");
-        }
-
-        if (StringUtils.isBlank(org)) {
-            logger.warn("QR enrolment request validation failed: Organization header is missing");
-            throw new InvalidDataInputException("Organization is required");
-        }
-    }
-
-    private void validateCourseExists(Map<String, Object> courseDetails, String courseId) {
-        if (MapUtils.isEmpty(courseDetails)) {
-            throw new BadRequestException(String.format("Course not found. CourseId: %s", courseId));
-        }
-    }
-
-    private void validateBatchActive(Map<String, Object> courseBatchDetails, String batchId, String courseId) {
-        if (MapUtils.isEmpty(courseBatchDetails)) {
-            throw new BadRequestException(
-                    String.format("Batch not found. CourseId: %s, BatchId: %s", courseId, batchId)
-            );
-        }
-        Date enrollmentEndDate = (Date) courseBatchDetails.get(Constants.ENROLMENT_END_DATE);
-        if (enrollmentEndDate != null && enrollmentEndDate.before(new Date())) {
-            throw new BadRequestException("Batch enrollment period has ended. QR enrolment is not allowed.");
-        }
-    }
-
-    private void validateQrEnrollmentWindow(Map<String, Object> courseBatchDetails) {
-        Date batchStartDate = (Date) courseBatchDetails.get(Constants.START_DATE);
-        if (batchStartDate == null) {
-            throw new BadRequestException("Batch start date is not available");
-        }
-
-        LocalDate batchStartLocalDate = batchStartDate.toInstant()
-                .atZone(ZoneId.of(configuration.getSunbirdTimeZone()))
-                .toLocalDate();
-        LocalDate currentLocalDate = LocalDate.now(ZoneId.of(configuration.getSunbirdTimeZone()));
-
-        if (!batchStartLocalDate.isEqual(currentLocalDate)) {
-            throw new BadRequestException(
-                    "QR Self-Enrolment is allowed only on the batch start date. " +
-                            "Batch starts on " + batchStartLocalDate + ". Today is " + currentLocalDate
-            );
-        }
-    }
-
-    private void validateNoActiveWorkflow(String userId, String batchId) {
-        logger.debug("Checking for active workflows - userId: {}, batchId: {}", userId, batchId);
-
-        List<WfStatusEntity> existingWorkflows = wfStatusRepo.findByServiceNameAndUserIdAndApplicationId(
-                Constants.BLENDED_PROGRAM_SERVICE_NAME, userId, batchId
-        );
-
-        if (!CollectionUtils.isEmpty(existingWorkflows)) {
-            for (WfStatusEntity workflow : existingWorkflows) {
-                if (!isTerminalStatus(workflow.getCurrentStatus())) {
-                    logger.warn("Active workflow found for userId: {}, batchId: {}, status: {}",
-                        userId, batchId, workflow.getCurrentStatus());
-                    throw new BadRequestException(
-                            "Active workflow already exists for this user and batch. " +
-                                    "Current status: " + workflow.getCurrentStatus()
-                    );
-                } else {
-                    logger.debug("Found terminal status workflow for userId: {}, status: {}", userId, workflow.getCurrentStatus());
-                }
-            }
-        }
-        logger.debug("No active workflows found for userId: {}, batchId: {}", userId, batchId);
-    }
-
-    private boolean isTerminalStatus(String status) {
-        return Constants.APPROVED.equalsIgnoreCase(status) ||
-                Constants.REJECTED.equalsIgnoreCase(status) ||
-                Constants.WITHDRAWN.equalsIgnoreCase(status) ||
-                Constants.REMOVED.equalsIgnoreCase(status);
-    }
-
-    private void validateUniqueBatchEnrollment(String userId, String courseId, String batchId) {
-        logger.debug("Validating single batch enrollment - userId: {}, courseId: {}, batchId: {}", userId, courseId, batchId);
-
-        List<Map<String, Object>> activeEnrollments = getActiveEnrollmentForUserAndCourse(userId, courseId);
-        if (CollectionUtils.isEmpty(activeEnrollments)) {
-            logger.debug("No existing enrollments found for userId: {}, courseId: {}", userId, courseId);
-            return;
-        }
-
-        Map<String, Object> enrollment = activeEnrollments.get(0);
-        String existingBatchId = (String) enrollment.get(Constants.BATCH_ID);
-
-        if (batchId.equals(existingBatchId)) {
-            logger.warn("User already enrolled in same batch - userId: {}, batchId: {}", userId, batchId);
-            throw new BadRequestException("User is already enrolled in this batch.");
-        }
-
-        logger.warn("User already enrolled in different batch - userId: {}, currentBatchId: {}, newBatchId: {}",
-            userId, existingBatchId, batchId);
-        throw new BadRequestException(
-                String.format(
-                        "User is already enrolled in another active batch (%s) for this course. "
-                                + "A learner can be enrolled in only one batch of a course at a time.",
-                        existingBatchId));
-    }
-
-    private WfRequest buildQrEnrolRequest(String userId, String courseId, String batchId,
-                                          Map<String, Object> courseBatchDetails) {
-        WfRequest wfRequest = new WfRequest();
-        wfRequest.setUserId(userId);
-        wfRequest.setCourseId(courseId);
-        wfRequest.setApplicationId(batchId);
-        wfRequest.setBatchName((String) courseBatchDetails.get(Constants.BATCH_NAME));
-        wfRequest.setBatchStartDate((Date) courseBatchDetails.get(Constants.START_DATE));
-        wfRequest.setServiceName(Constants.SELF_ENROLL_BY_QR);
-        wfRequest.setState(Constants.APPROVED);  // QR direct approval, no workflow transition
-        wfRequest.setAction(Constants.INITIATE);
-        wfRequest.setActorUserId(userId);
-
-        List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
-        wfRequest.setUpdateFieldValues(updateFieldValues);
-
-        return wfRequest;
-    }
-
-    private void validateSelfEnrolmentEnabled(Map<String, Object> courseDetails) {
-        if (MapUtils.isEmpty(courseDetails)) {
-            throw new BadRequestException("Course details are not available.");
-        }
-
-        Object selfEnrollment = courseDetails.get(Constants.SELF_ENROLLMENT);
-
-        if (selfEnrollment == null || !"Yes".equalsIgnoreCase(String.valueOf(selfEnrollment))) {
-            throw new BadRequestException("Self-enrolment is not enabled for this course.");
-        }
-    }
-
-
-    /**
-     * Save QR enrollment directly with APPROVED status.
-     * QR self-enrollment is not a workflow, only an audit/history record.
-     *
-     * @param rootOrg - Root organization
-     * @param org - Organization
-     * @param wfRequest - Workflow request containing enrollment details
-     * @return WfStatusEntity - Saved workflow status entity
-     */
-    private WfStatusEntity saveQrEnrollmentDirect(String rootOrg, String org, WfRequest wfRequest) {
-        WfStatusEntity applicationStatus = new WfStatusEntity();
-        String wfId = UUID.randomUUID().toString();
-        logger.debug("Creating QR enrollment record with wfId: {} for user: {}", wfId, wfRequest.getUserId());
-
-        applicationStatus.setWfId(wfId);
-        applicationStatus.setApplicationId(wfRequest.getApplicationId());
-        applicationStatus.setUserId(wfRequest.getUserId());
-        applicationStatus.setInWorkflow(false);  // Terminal state, not in active workflow
-        applicationStatus.setActorUUID(wfRequest.getActorUserId());  // User self-approves
-        applicationStatus.setCreatedOn(new Date());
-        applicationStatus.setCurrentStatus(Constants.APPROVED);  // Direct approval, no intermediate state
-        applicationStatus.setLastUpdatedOn(new Date());
-        applicationStatus.setOrg(org);
-        applicationStatus.setRootOrg(rootOrg);
-        applicationStatus.setServiceName("selfEnrollByQRCode");  // QR-specific service name for audit
-
-        try {
-            applicationStatus.setUpdateFieldValues(mapper.writeValueAsString(wfRequest.getUpdateFieldValues()));
-        } catch (JsonProcessingException e) {
-            logger.error("Error serializing update field values for wfId: {}", wfId, e);
-        }
-
-        applicationStatus.setDeptName(wfRequest.getDeptName());
-        applicationStatus.setComment(wfRequest.getComment());
-        wfRequest.setWfId(wfId);
-
-        wfStatusRepo.save(applicationStatus);
-        logger.info("QR enrolment record created in wf_status with wfId: {}", wfId);
-
-        return applicationStatus;
     }
 
 }

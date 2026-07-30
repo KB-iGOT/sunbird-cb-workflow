@@ -73,6 +73,4 @@ public interface BPWorkFlowService {
 
     public Response nominateUsers(String rootOrg, String org, String actorUserId, Map<String, Object> requestBody);
 
-    public Response enrolQrCodeBPWorkFlow(String rootOrg, String org, String userAuthToken, QrSelfEnrolRequest qrRequest);
-
 }
