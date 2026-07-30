@@ -383,7 +383,7 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
 
         Object selfEnrollment = courseDetails.get(Constants.SELF_ENROLLMENT);
 
-        if (selfEnrollment == null || !"Yes".equalsIgnoreCase(String.valueOf(selfEnrollment))) {
+        if (selfEnrollment == null || !Constants.YES.equalsIgnoreCase(String.valueOf(selfEnrollment))) {
             logger.warn("QR enrolment failed: Self-enrollment not enabled for course");
             Response response = new Response();
             response.put(Constants.ERROR_MESSAGE, Constants.SELF_ENROLLMENT_NOT_ENABLED_ERROR);
