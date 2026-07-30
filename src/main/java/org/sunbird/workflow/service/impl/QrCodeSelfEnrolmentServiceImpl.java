@@ -12,8 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.sunbird.workflow.config.Configuration;
 import org.sunbird.workflow.config.Constants;
-import org.sunbird.workflow.exception.BadRequestException;
-import org.sunbird.workflow.exception.InvalidDataInputException;
 import org.sunbird.workflow.models.QrSelfEnrolRequest;
 import org.sunbird.workflow.models.Response;
 import org.sunbird.workflow.models.WfRequest;
@@ -51,7 +49,9 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
      */
     @Override
     public Response enrolQrCodeBPWorkFlow(String rootOrg, String org, String userAuthToken, QrSelfEnrolRequest qrRequest) {
-        logger.info("QR Code enrolment initiated for course: {}, batch: {}", qrRequest.getCourseId(), qrRequest.getBatchId());
+        logger.info("QR Code enrolment initiated for course: {}, batch: {}",
+            qrRequest != null ? qrRequest.getCourseId() : "null",
+            qrRequest != null ? qrRequest.getBatchId() : "null");
 
         String userId = accessTokenValidator.fetchUserIdFromAccessToken(userAuthToken);
         if (StringUtils.isEmpty(userId)) {
@@ -63,25 +63,46 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
         }
         logger.debug("User ID extracted from token: {}", userId);
 
-        validateQrRequest(qrRequest, rootOrg, org);
+        // Validate QR request
+        Response validationResponse = validateQrRequest(qrRequest, rootOrg, org);
+        if (validationResponse != null) {
+            return validationResponse;
+        }
 
         String courseId = qrRequest.getCourseId();
         String batchId = qrRequest.getBatchId();
 
         // Course validation
         Map<String, Object> courseDetails = contentReadService.getServiceNameDetails(courseId);
-        validateCourseExists(courseDetails, courseId);
-        validateSelfEnrolmentEnabled(courseDetails);
+        validationResponse = validateCourseExists(courseDetails, courseId);
+        if (validationResponse != null) {
+            return validationResponse;
+        }
+
+        validationResponse = validateSelfEnrolmentEnabled(courseDetails);
+        if (validationResponse != null) {
+            return validationResponse;
+        }
         logger.debug("Course validation completed for courseId: {}", courseId);
 
         // Batch validation
         Map<String, Object> courseBatchDetails = bpWorkFlowService.getCurrentBatchAttributes(batchId, courseId);
-        validateBatchActive(courseBatchDetails, batchId, courseId);
-        validateQrEnrollmentWindow(courseBatchDetails);
+        validationResponse = validateBatchActive(courseBatchDetails, batchId, courseId);
+        if (validationResponse != null) {
+            return validationResponse;
+        }
+
+        validationResponse = validateQrEnrollmentWindow(courseBatchDetails);
+        if (validationResponse != null) {
+            return validationResponse;
+        }
         logger.debug("Batch validation completed for batchId: {}", batchId);
 
         // Enrollment rules validation
-        validateUniqueBatchEnrollment(userId, courseId, batchId);
+        validationResponse = validateUniqueBatchEnrollment(userId, courseId, batchId);
+        if (validationResponse != null) {
+            return validationResponse;
+        }
         logger.debug("Single batch enrollment validation passed for userId: {}", userId);
 
         WfRequest wfRequest = buildQrEnrolRequest(userId, courseId, batchId, courseBatchDetails);
@@ -99,7 +120,12 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
             response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
             return response;
         }
-        validateNoActiveWorkflow(userId, batchId);
+
+        validationResponse = validateNoActiveWorkflow(userId, batchId);
+        if (validationResponse != null) {
+            return validationResponse;
+        }
+        logger.info("QR enrollment validation passed for userId: {}", userId);
 
         // QR Direct Approval: Save wf_status with APPROVED status directly
         WfStatusEntity wfStatusEntity = saveQrEnrollmentDirect(rootOrg, org, wfRequest);
@@ -129,38 +155,54 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
      * @param qrRequest - QR self-enrolment request
      * @param rootOrg   - Root organization header
      * @param org       - Organization header
-     * @throws InvalidDataInputException if any required field is missing
+     * @return Response if validation fails, null if validation passes
      */
-    private void validateQrRequest(QrSelfEnrolRequest qrRequest, String rootOrg, String org) {
+    private Response validateQrRequest(QrSelfEnrolRequest qrRequest, String rootOrg, String org) {
         logger.debug("Validating QR enrolment request headers and body");
 
         if (qrRequest == null) {
             logger.warn("QR enrolment request validation failed: Request body is null");
-            throw new InvalidDataInputException(Constants.QR_REQUEST_NULL_ERROR);
+            Response response = new Response();
+            response.put(Constants.ERROR_MESSAGE, Constants.QR_REQUEST_NULL_ERROR);
+            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+            return response;
         }
 
         if (StringUtils.isBlank(qrRequest.getCourseId())) {
             logger.warn("QR enrolment request validation failed: Course ID is missing");
-            throw new InvalidDataInputException(Constants.COURSE_ID_REQUIRED_ERROR);
+            Response response = new Response();
+            response.put(Constants.ERROR_MESSAGE, Constants.COURSE_ID_REQUIRED_ERROR);
+            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+            return response;
         }
 
         if (StringUtils.isBlank(qrRequest.getBatchId())) {
             logger.warn("QR enrolment request validation failed: Batch ID is missing");
-            throw new InvalidDataInputException(Constants.BATCH_ID_REQUIRED_ERROR);
+            Response response = new Response();
+            response.put(Constants.ERROR_MESSAGE, Constants.BATCH_ID_REQUIRED_ERROR);
+            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+            return response;
         }
 
         if (StringUtils.isBlank(rootOrg)) {
             logger.warn("QR enrolment request validation failed: Root Organization header is missing");
-            throw new InvalidDataInputException(Constants.ROOT_ORG_REQUIRED_ERROR);
+            Response response = new Response();
+            response.put(Constants.ERROR_MESSAGE, Constants.ROOT_ORG_REQUIRED_ERROR);
+            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+            return response;
         }
 
         if (StringUtils.isBlank(org)) {
             logger.warn("QR enrolment request validation failed: Organization header is missing");
-            throw new InvalidDataInputException(Constants.ORG_REQUIRED_ERROR);
+            Response response = new Response();
+            response.put(Constants.ERROR_MESSAGE, Constants.ORG_REQUIRED_ERROR);
+            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+            return response;
         }
 
         logger.debug("QR request validation successful. CourseId: {}, BatchId: {}, RootOrg: {}, Org: {}",
                 qrRequest.getCourseId(), qrRequest.getBatchId(), rootOrg, org);
+        return null;
     }
 
     /**
@@ -168,12 +210,17 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
      *
      * @param courseDetails - Course details map
      * @param courseId      - Course ID
-     * @throws BadRequestException if course not found
+     * @return Response if validation fails, null if validation passes
      */
-    private void validateCourseExists(Map<String, Object> courseDetails, String courseId) {
+    private Response validateCourseExists(Map<String, Object> courseDetails, String courseId) {
         if (MapUtils.isEmpty(courseDetails)) {
-            throw new BadRequestException(String.format(Constants.COURSE_NOT_FOUND_ERROR, courseId));
+            logger.warn("QR enrolment failed: Course not found for courseId: {}", courseId);
+            Response response = new Response();
+            response.put(Constants.ERROR_MESSAGE, String.format(Constants.COURSE_NOT_FOUND_ERROR, courseId));
+            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+            return response;
         }
+        return null;
     }
 
     /**
@@ -182,30 +229,41 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
      * @param courseBatchDetails - Batch details map
      * @param batchId            - Batch ID
      * @param courseId           - Course ID
-     * @throws BadRequestException if batch not found or enrollment period closed
+     * @return Response if validation fails, null if validation passes
      */
-    private void validateBatchActive(Map<String, Object> courseBatchDetails, String batchId, String courseId) {
+    private Response validateBatchActive(Map<String, Object> courseBatchDetails, String batchId, String courseId) {
         if (MapUtils.isEmpty(courseBatchDetails)) {
-            throw new BadRequestException(
-                    String.format(Constants.BATCH_NOT_FOUND_ERROR, courseId, batchId)
-            );
+            logger.warn("QR enrolment failed: Batch not found for batchId: {}, courseId: {}", batchId, courseId);
+            Response response = new Response();
+            response.put(Constants.ERROR_MESSAGE, String.format(Constants.BATCH_NOT_FOUND_ERROR, courseId, batchId));
+            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+            return response;
         }
         Date enrollmentEndDate = (Date) courseBatchDetails.get(Constants.ENROLMENT_END_DATE);
         if (enrollmentEndDate != null && enrollmentEndDate.before(new Date())) {
-            throw new BadRequestException(Constants.BATCH_ENROLLMENT_PERIOD_ENDED_ERROR);
+            logger.warn("QR enrolment failed: Batch enrollment period has ended for batchId: {}", batchId);
+            Response response = new Response();
+            response.put(Constants.ERROR_MESSAGE, Constants.BATCH_ENROLLMENT_PERIOD_ENDED_ERROR);
+            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+            return response;
         }
+        return null;
     }
 
     /**
      * Validate QR Code enrollment is only allowed on batch start date
      *
      * @param courseBatchDetails - Batch attributes containing start date
-     * @throws BadRequestException if enrollment is not on the batch start date
+     * @return Response if validation fails, null if validation passes
      */
-    private void validateQrEnrollmentWindow(Map<String, Object> courseBatchDetails) {
+    private Response validateQrEnrollmentWindow(Map<String, Object> courseBatchDetails) {
         Date batchStartDate = (Date) courseBatchDetails.get(Constants.START_DATE);
         if (batchStartDate == null) {
-            throw new BadRequestException(Constants.BATCH_START_DATE_UNAVAILABLE_ERROR);
+            logger.warn("QR enrolment failed: Batch start date is not available");
+            Response response = new Response();
+            response.put(Constants.ERROR_MESSAGE, Constants.BATCH_START_DATE_UNAVAILABLE_ERROR);
+            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+            return response;
         }
 
         LocalDate batchStartLocalDate = batchStartDate.toInstant()
@@ -214,10 +272,15 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
         LocalDate currentLocalDate = LocalDate.now(ZoneId.of(configuration.getSunbirdTimeZone()));
 
         if (!batchStartLocalDate.isEqual(currentLocalDate)) {
-            throw new BadRequestException(
-                    String.format(Constants.QR_ENROLLMENT_DATE_ERROR, batchStartLocalDate, currentLocalDate)
-            );
+            logger.warn("QR enrolment failed: Enrollment not on batch start date. Batch starts on {}, Today is {}",
+                batchStartLocalDate, currentLocalDate);
+            Response response = new Response();
+            response.put(Constants.ERROR_MESSAGE,
+                String.format(Constants.QR_ENROLLMENT_DATE_ERROR, batchStartLocalDate, currentLocalDate));
+            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+            return response;
         }
+        return null;
     }
 
     /**
@@ -226,29 +289,35 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
      * @param userId   - User ID
      * @param courseId - Course ID
      * @param batchId  - Batch ID
-     * @throws BadRequestException if user already enrolled
+     * @return Response if validation fails, null if validation passes
      */
-    private void validateUniqueBatchEnrollment(String userId, String courseId, String batchId) {
+    private Response validateUniqueBatchEnrollment(String userId, String courseId, String batchId) {
         logger.debug("Validating single batch enrollment - userId: {}, courseId: {}, batchId: {}", userId, courseId, batchId);
 
         List<Map<String, Object>> activeEnrollments = bpWorkFlowService.getActiveEnrollmentForUserAndCourse(userId, courseId);
         if (CollectionUtils.isEmpty(activeEnrollments)) {
             logger.debug("No existing enrollments found for userId: {}, courseId: {}", userId, courseId);
-            return;
+            return null;
         }
 
         Map<String, Object> enrollment = activeEnrollments.get(0);
         String existingBatchId = (String) enrollment.get(Constants.BATCH_ID);
 
         if (batchId.equals(existingBatchId)) {
-            logger.warn("User already enrolled in same batch - userId: {}, batchId: {}", userId, batchId);
-            throw new BadRequestException(Constants.USER_ALREADY_ENROLLED_SAME_BATCH_ERROR);
+            logger.warn("QR enrolment failed: User already enrolled in same batch - userId: {}, batchId: {}", userId, batchId);
+            Response response = new Response();
+            response.put(Constants.ERROR_MESSAGE, Constants.USER_ALREADY_ENROLLED_SAME_BATCH_ERROR);
+            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+            return response;
         }
 
-        logger.warn("User already enrolled in different batch - userId: {}, currentBatchId: {}, newBatchId: {}",
+        logger.warn("QR enrolment failed: User already enrolled in different batch - userId: {}, currentBatchId: {}, newBatchId: {}",
                 userId, existingBatchId, batchId);
-        throw new BadRequestException(
-                String.format(Constants.USER_ALREADY_ENROLLED_DIFFERENT_BATCH_ERROR, existingBatchId));
+        Response response = new Response();
+        response.put(Constants.ERROR_MESSAGE,
+            String.format(Constants.USER_ALREADY_ENROLLED_DIFFERENT_BATCH_ERROR, existingBatchId));
+        response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+        return response;
     }
 
     /**
@@ -256,9 +325,9 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
      *
      * @param userId  - User ID
      * @param batchId - Batch ID
-     * @throws BadRequestException if active non-terminal workflow found
+     * @return Response if validation fails, null if validation passes
      */
-    private void validateNoActiveWorkflow(String userId, String batchId) {
+    private Response validateNoActiveWorkflow(String userId, String batchId) {
         logger.debug("Checking for active workflows - userId: {}, batchId: {}", userId, batchId);
 
         List<WfStatusEntity> existingWorkflows = wfStatusRepo.findByServiceNameAndUserIdAndApplicationId(
@@ -268,17 +337,20 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
         if (!CollectionUtils.isEmpty(existingWorkflows)) {
             for (WfStatusEntity workflow : existingWorkflows) {
                 if (!isTerminalStatus(workflow.getCurrentStatus())) {
-                    logger.warn("Active workflow found for userId: {}, batchId: {}, status: {}",
+                    logger.warn("QR enrolment failed: Active workflow found for userId: {}, batchId: {}, status: {}",
                             userId, batchId, workflow.getCurrentStatus());
-                    throw new BadRequestException(
-                            String.format(Constants.ACTIVE_WORKFLOW_EXISTS_ERROR, workflow.getCurrentStatus())
-                    );
+                    Response response = new Response();
+                    response.put(Constants.ERROR_MESSAGE,
+                        String.format(Constants.ACTIVE_WORKFLOW_EXISTS_ERROR, workflow.getCurrentStatus()));
+                    response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+                    return response;
                 } else {
                     logger.debug("Found terminal status workflow for userId: {}, status: {}", userId, workflow.getCurrentStatus());
                 }
             }
         }
         logger.debug("No active workflows found for userId: {}, batchId: {}", userId, batchId);
+        return null;
     }
 
     /**
@@ -298,27 +370,36 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
      * Validate self-enrollment is enabled for the course
      *
      * @param courseDetails - Course details map
-     * @throws BadRequestException if self-enrollment not enabled
+     * @return Response if validation fails, null if validation passes
      */
-    private void validateSelfEnrolmentEnabled(Map<String, Object> courseDetails) {
+    private Response validateSelfEnrolmentEnabled(Map<String, Object> courseDetails) {
         if (MapUtils.isEmpty(courseDetails)) {
-            throw new BadRequestException(Constants.COURSE_DETAILS_UNAVAILABLE_ERROR);
+            logger.warn("QR enrolment failed: Course details are not available");
+            Response response = new Response();
+            response.put(Constants.ERROR_MESSAGE, Constants.COURSE_DETAILS_UNAVAILABLE_ERROR);
+            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+            return response;
         }
 
         Object selfEnrollment = courseDetails.get(Constants.SELF_ENROLLMENT);
 
         if (selfEnrollment == null || !"Yes".equalsIgnoreCase(String.valueOf(selfEnrollment))) {
-            throw new BadRequestException(Constants.SELF_ENROLLMENT_NOT_ENABLED_ERROR);
+            logger.warn("QR enrolment failed: Self-enrollment not enabled for course");
+            Response response = new Response();
+            response.put(Constants.ERROR_MESSAGE, Constants.SELF_ENROLLMENT_NOT_ENABLED_ERROR);
+            response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+            return response;
         }
+        return null;
     }
 
     /**
      * Build WfRequest for QR enrollment with direct approval
      *
-     * @param userId             - User ID
-     * @param courseId           - Course ID
-     * @param batchId            - Batch ID
-     * @param courseBatchDetails - Batch details
+     * @param userId                - User ID
+     * @param courseId              - Course ID
+     * @param batchId               - Batch ID
+     * @param courseBatchDetails    - Batch details
      * @return WfRequest configured for QR enrollment
      */
     private WfRequest buildQrEnrolRequest(String userId, String courseId, String batchId,
@@ -330,7 +411,7 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
         wfRequest.setBatchName((String) courseBatchDetails.get(Constants.BATCH_NAME));
         wfRequest.setBatchStartDate((Date) courseBatchDetails.get(Constants.START_DATE));
         wfRequest.setServiceName(Constants.SELF_ENROLL_BY_QR);
-        wfRequest.setState(Constants.APPROVED);  // QR direct approval, no workflow transition
+        wfRequest.setState(Constants.APPROVED);
         wfRequest.setAction(Constants.INITIATE);
         wfRequest.setActorUserId(userId);
 
@@ -357,14 +438,14 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
         applicationStatus.setWfId(wfId);
         applicationStatus.setApplicationId(wfRequest.getApplicationId());
         applicationStatus.setUserId(wfRequest.getUserId());
-        applicationStatus.setInWorkflow(false);  // Terminal state, not in active workflow
-        applicationStatus.setActorUUID(wfRequest.getActorUserId());  // User self-approves
+        applicationStatus.setInWorkflow(false);
+        applicationStatus.setActorUUID(wfRequest.getActorUserId());
         applicationStatus.setCreatedOn(new Date());
-        applicationStatus.setCurrentStatus(Constants.APPROVED);  // Direct approval, no intermediate state
+        applicationStatus.setCurrentStatus(Constants.APPROVED);
         applicationStatus.setLastUpdatedOn(new Date());
         applicationStatus.setOrg(org);
         applicationStatus.setRootOrg(rootOrg);
-        applicationStatus.setServiceName("selfEnrollByQRCode");  // QR-specific service name for audit
+        applicationStatus.setServiceName("selfEnrollByQRCode");
 
         try {
             applicationStatus.setUpdateFieldValues(mapper.writeValueAsString(wfRequest.getUpdateFieldValues()));

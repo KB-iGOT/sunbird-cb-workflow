@@ -12,8 +12,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.sunbird.workflow.config.Configuration;
 import org.sunbird.workflow.config.Constants;
-import org.sunbird.workflow.exception.BadRequestException;
-import org.sunbird.workflow.exception.InvalidDataInputException;
 import org.sunbird.workflow.models.QrSelfEnrolRequest;
 import org.sunbird.workflow.models.Response;
 import org.sunbird.workflow.postgres.entity.WfStatusEntity;
@@ -161,10 +159,10 @@ class BPWorkFlowServiceQrEnrolIntegrationTest {
                     add(activeWorkflow);
                 }});
 
-        BadRequestException exception = assertThrows(BadRequestException.class,
-                () -> qrCodeSelfEnrolmentService.enrolQrCodeBPWorkFlow(rootOrg, org, userId, qrRequest));
+        Response response = qrCodeSelfEnrolmentService.enrolQrCodeBPWorkFlow(rootOrg, org, userId, qrRequest);
 
-        assertTrue(exception.getMessage().contains("Active workflow already exists"));
+        assertEquals(HttpStatus.BAD_REQUEST, response.get(Constants.STATUS));
+        assertTrue(response.get(Constants.ERROR_MESSAGE).toString().contains("Active workflow already exists"));
     }
 
     @Test
@@ -223,10 +221,10 @@ class BPWorkFlowServiceQrEnrolIntegrationTest {
             lenient().when(wfStatusRepo.findByServiceNameAndUserIdAndApplicationId(anyString(), anyString(), anyString()))
                     .thenReturn(new ArrayList<>());
 
-            BadRequestException exception = assertThrows(BadRequestException.class,
-                    () -> qrCodeSelfEnrolmentService.enrolQrCodeBPWorkFlow(rootOrg, org, userId, qrRequest));
+            Response response = qrCodeSelfEnrolmentService.enrolQrCodeBPWorkFlow(rootOrg, org, userId, qrRequest);
 
-            assertTrue(exception.getMessage().contains("QR Self-Enrolment is allowed only on the batch start date"));
+            assertEquals(HttpStatus.BAD_REQUEST, response.get(Constants.STATUS));
+            assertTrue(response.get(Constants.ERROR_MESSAGE).toString().contains("QR Self-Enrolment is allowed only on the batch start date"));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -235,19 +233,19 @@ class BPWorkFlowServiceQrEnrolIntegrationTest {
     @Test
     void testQrEnrolmentFlow_BothRequestAndHeaderValidation() {
         // Test missing root org
-        InvalidDataInputException ex1 = assertThrows(InvalidDataInputException.class,
-                () -> qrCodeSelfEnrolmentService.enrolQrCodeBPWorkFlow("", org, userId, qrRequest));
-        assertTrue(ex1.getMessage().contains("Root Organization is required"));
+        Response response1 = qrCodeSelfEnrolmentService.enrolQrCodeBPWorkFlow("", org, userId, qrRequest);
+        assertEquals(HttpStatus.BAD_REQUEST, response1.get(Constants.STATUS));
+        assertTrue(response1.get(Constants.ERROR_MESSAGE).toString().contains("Root Organization is required"));
 
         // Test missing org
-        InvalidDataInputException ex2 = assertThrows(InvalidDataInputException.class,
-                () -> qrCodeSelfEnrolmentService.enrolQrCodeBPWorkFlow(rootOrg, "", userId, qrRequest));
-        assertTrue(ex2.getMessage().contains("Organization is required"));
+        Response response2 = qrCodeSelfEnrolmentService.enrolQrCodeBPWorkFlow(rootOrg, "", userId, qrRequest);
+        assertEquals(HttpStatus.BAD_REQUEST, response2.get(Constants.STATUS));
+        assertTrue(response2.get(Constants.ERROR_MESSAGE).toString().contains("Organization is required"));
 
         // Test missing course ID
-        InvalidDataInputException ex3 = assertThrows(InvalidDataInputException.class,
-                () -> qrCodeSelfEnrolmentService.enrolQrCodeBPWorkFlow(rootOrg, org, userId, new QrSelfEnrolRequest("", "batch123")));
-        assertTrue(ex3.getMessage().contains("Course ID is required"));
+        Response response3 = qrCodeSelfEnrolmentService.enrolQrCodeBPWorkFlow(rootOrg, org, userId, new QrSelfEnrolRequest("", "batch123"));
+        assertEquals(HttpStatus.BAD_REQUEST, response3.get(Constants.STATUS));
+        assertTrue(response3.get(Constants.ERROR_MESSAGE).toString().contains("Course ID is required"));
     }
 
     @Test
@@ -291,11 +289,11 @@ class BPWorkFlowServiceQrEnrolIntegrationTest {
         when(contentReadService.getServiceNameDetails("nonexistent-course"))
                 .thenReturn(null);
 
-        BadRequestException exception = assertThrows(BadRequestException.class,
-                () -> qrCodeSelfEnrolmentService.enrolQrCodeBPWorkFlow(rootOrg, org, userId,
-                        new QrSelfEnrolRequest("nonexistent-course", "batch123")));
+        Response response = qrCodeSelfEnrolmentService.enrolQrCodeBPWorkFlow(rootOrg, org, userId,
+                        new QrSelfEnrolRequest("nonexistent-course", "batch123"));
 
-        assertTrue(exception.getMessage().contains("Course not found"));
+        assertEquals(HttpStatus.BAD_REQUEST, response.get(Constants.STATUS));
+        assertTrue(response.get(Constants.ERROR_MESSAGE).toString().contains("Course not found"));
     }
 
     @Test
@@ -306,10 +304,10 @@ class BPWorkFlowServiceQrEnrolIntegrationTest {
         when(contentReadService.getServiceNameDetails("course123"))
                 .thenReturn(courseDetailsNoSelfEnroll);
 
-        BadRequestException exception = assertThrows(BadRequestException.class,
-                () -> qrCodeSelfEnrolmentService.enrolQrCodeBPWorkFlow(rootOrg, org, userId, qrRequest));
+        Response response = qrCodeSelfEnrolmentService.enrolQrCodeBPWorkFlow(rootOrg, org, userId, qrRequest);
 
-        assertTrue(exception.getMessage().contains("Self-enrolment is not enabled for this course"));
+        assertEquals(HttpStatus.BAD_REQUEST, response.get(Constants.STATUS));
+        assertTrue(response.get(Constants.ERROR_MESSAGE).toString().contains("Self-enrolment is not enabled for this course"));
     }
 
     @Test
@@ -319,10 +317,10 @@ class BPWorkFlowServiceQrEnrolIntegrationTest {
         when(cassandraOperation.getRecordsByProperties(anyString(), anyString(), any(), any()))
                 .thenReturn(new ArrayList<>());
 
-        BadRequestException exception = assertThrows(BadRequestException.class,
-                () -> qrCodeSelfEnrolmentService.enrolQrCodeBPWorkFlow(rootOrg, org, userId, qrRequest));
+        Response response = qrCodeSelfEnrolmentService.enrolQrCodeBPWorkFlow(rootOrg, org, userId, qrRequest);
 
-        assertTrue(exception.getMessage().contains("Batch not found"));
+        assertEquals(HttpStatus.BAD_REQUEST, response.get(Constants.STATUS));
+        assertTrue(response.get(Constants.ERROR_MESSAGE).toString().contains("Batch not found"));
     }
 
     @Test

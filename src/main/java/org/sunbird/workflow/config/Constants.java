@@ -514,4 +514,5 @@ public class Constants {
 	public static final String USER_ALREADY_ENROLLED_DIFFERENT_BATCH_ERROR = "User is already enrolled in another active batch (%s) for this course. A learner can be enrolled in only one batch of a course at a time.";
 	public static final String ACTIVE_WORKFLOW_EXISTS_ERROR = "Active workflow already exists for this user and batch. Current status: %s";
 	public static final String INVALID_ACCESS_TOKEN_ERROR = "Invalid access token.";
-}
+	public static final String YES ="Yes";
+ }
