@@ -89,9 +89,6 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
     @Value("${es.org.eligibility.index.type}")
     private String orgeligibilityIndexType;
 
-    @Autowired
-    private AccessTokenValidator accessTokenValidator;
-
 
     @Override
     public Response enrolBPWorkFlow(String rootOrg, String org, WfRequest wfRequest) {
