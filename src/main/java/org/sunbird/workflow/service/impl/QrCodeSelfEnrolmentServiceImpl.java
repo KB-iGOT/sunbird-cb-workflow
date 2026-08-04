@@ -147,7 +147,7 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
         HashMap<String, Object> data = new HashMap<>();
         data.put(Constants.STATUS, Constants.APPROVED);
         data.put(Constants.WF_IDS_CONSTANT, wfStatusEntity.getWfId());
-        response.put(Constants.MESSAGE, String.format(Constants.QR_ENROLLMENT_SUCCESS_MESSAGE, courseId, batchId));
+        response.put(Constants.MESSAGE, String.format(Constants.QR_ENROLLMENT_SUCCESS_MESSAGE));
         response.put(Constants.DATA, data);
         response.put(Constants.STATUS, HttpStatus.OK);
         logger.debug("QR enrolment response built successfully for wfId: {}", wfStatusEntity.getWfId());

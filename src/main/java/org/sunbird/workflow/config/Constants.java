@@ -515,5 +515,5 @@ public class Constants {
 	public static final String ACTIVE_WORKFLOW_EXISTS_ERROR = "Active workflow already exists for this user and batch. Current status: %s";
 	public static final String INVALID_ACCESS_TOKEN_ERROR = "Invalid access token.";
 	public static final String YES ="Yes";
-	public static final String QR_ENROLLMENT_SUCCESS_MESSAGE = "You are successfully enrolled with course %s and batch %s";
+	public static final String QR_ENROLLMENT_SUCCESS_MESSAGE = "You are successfully enrolled into the program";
 }
