@@ -60,7 +60,7 @@ class BPWorkFlowControllerQrEnrolTest {
 
         Response serviceResponse = new Response();
         serviceResponse.put(Constants.STATUS, HttpStatus.OK);
-        serviceResponse.put(Constants.MESSAGE, String.format(Constants.QR_ENROLLMENT_SUCCESS_MESSAGE, courseId, batchId));
+        serviceResponse.put(Constants.MESSAGE, String.format(Constants.QR_ENROLLMENT_SUCCESS_MESSAGE));
         Map<String, Object> data = new HashMap<>();
         data.put(Constants.STATUS, Constants.APPROVED);
         data.put(Constants.WF_IDS_CONSTANT, "wf-id-123");
@@ -128,7 +128,7 @@ class BPWorkFlowControllerQrEnrolTest {
 
         Response serviceResponse = new Response();
         serviceResponse.put(Constants.STATUS, HttpStatus.OK);
-        serviceResponse.put(Constants.MESSAGE, String.format(Constants.QR_ENROLLMENT_SUCCESS_MESSAGE, courseId, batchId));
+        serviceResponse.put(Constants.MESSAGE, String.format(Constants.QR_ENROLLMENT_SUCCESS_MESSAGE));
         Map<String, Object> data = new HashMap<>();
         data.put(Constants.STATUS, Constants.APPROVED);
         data.put(Constants.WF_IDS_CONSTANT, "wf-id-456");
