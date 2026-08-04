@@ -245,26 +245,26 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
             return response;
         }
 
-        Date batchStartDate = (Date) courseBatchDetails.get(Constants.START_DATE);
-        if (batchStartDate == null) {
-            logger.warn("QR enrolment failed: Batch start date is not available");
+        Date enrollmentEndDate = (Date) courseBatchDetails.get(Constants.ENROLMENT_END_DATE);
+
+        if (enrollmentEndDate == null) {
+            logger.warn("QR enrolment failed: Enrollment end date is not available");
             Response response = new Response();
             response.put(Constants.ERROR_MESSAGE, Constants.BATCH_START_DATE_UNAVAILABLE_ERROR);
             response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
             return response;
         }
 
-        LocalDate batchStartLocalDate = batchStartDate.toInstant()
+        LocalDate enrollmentEndLocalDate = enrollmentEndDate.toInstant()
                 .atZone(ZoneId.of(configuration.getSunbirdTimeZone()))
                 .toLocalDate();
         LocalDate currentLocalDate = LocalDate.now(ZoneId.of(configuration.getSunbirdTimeZone()));
 
-        if (!batchStartLocalDate.isEqual(currentLocalDate)) {
-            logger.warn("QR enrolment failed: Enrollment not on batch start date. Batch starts on {}, Today is {}",
-                batchStartLocalDate, currentLocalDate);
+        if (!enrollmentEndLocalDate.isEqual(currentLocalDate)) {
+            logger.warn("QR enrolment failed: Current date is not the enrollment date. Enrollment date: {}, Today is {}",
+                enrollmentEndLocalDate, currentLocalDate);
             Response response = new Response();
-            response.put(Constants.ERROR_MESSAGE,
-                String.format(Constants.QR_ENROLLMENT_DATE_ERROR, batchStartLocalDate, currentLocalDate));
+            response.put(Constants.ERROR_MESSAGE, Constants.BATCH_ENROLLMENT_PERIOD_ENDED_ERROR);
             response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
             return response;
         }
