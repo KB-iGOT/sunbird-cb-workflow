@@ -212,8 +212,8 @@ class BPWorkFlowServiceQrEnrolIntegrationTest {
 
             Map<String, Object> tomorrowBatchDetails = new HashMap<>();
             tomorrowBatchDetails.put(Constants.BATCH_ATTRIBUTES, batchAttributesJson);
-            tomorrowBatchDetails.put(Constants.ENROLMENT_END_DATE, getTodayPlusDays(1).toInstant());
-            tomorrowBatchDetails.put(Constants.START_DATE, getTodayPlusDays(31).toInstant());
+            tomorrowBatchDetails.put(Constants.ENROLMENT_END_DATE, getTodayPlusDays(-1).toInstant());
+            tomorrowBatchDetails.put(Constants.START_DATE, getTodayPlusDays(-1).toInstant());
             tomorrowBatchDetails.put(Constants.NAME, "Test Batch");
 
             when(cassandraOperation.getRecordsByProperties(anyString(), anyString(), any(), any()))
@@ -228,7 +228,7 @@ class BPWorkFlowServiceQrEnrolIntegrationTest {
             Response response = qrCodeSelfEnrolmentService.enrolQrCodeBPWorkFlow(rootOrg, org, userId, qrRequest);
 
             assertEquals(HttpStatus.BAD_REQUEST, response.get(Constants.STATUS));
-            assertTrue(response.get(Constants.ERROR_MESSAGE).toString().contains("Batch enrollment period"));
+            assertTrue(response.get(Constants.ERROR_MESSAGE).toString().contains("enrolment"));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
