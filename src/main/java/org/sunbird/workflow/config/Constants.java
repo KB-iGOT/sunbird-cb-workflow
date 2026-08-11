@@ -505,7 +505,7 @@ public class Constants {
 	public static final String ORG_REQUIRED_ERROR = "Organization is required";
 	public static final String COURSE_NOT_FOUND_ERROR = "Course not found. CourseId: %s";
 	public static final String BATCH_NOT_FOUND_ERROR = "Batch not found. CourseId: %s, BatchId: %s";
-	public static final String BATCH_ENROLLMENT_PERIOD_ENDED_ERROR = "Batch enrollment period has ended. QR enrolment is not allowed.";
+	public static final String BATCH_ENROLLMENT_PERIOD_ENDED_ERROR = "Batch enrolment has not started yet, or the enrolment period has ended. QR enrolment is not allowed.";
 	public static final String QR_ENROLLMENT_DATE_ERROR = "QR Self-Enrolment is allowed only on the batch start date. Batch starts on %s. Today is %s";
 	public static final String BATCH_START_DATE_UNAVAILABLE_ERROR = "Batch start date is not available";
 	public static final String COURSE_DETAILS_UNAVAILABLE_ERROR = "Course details are not available.";

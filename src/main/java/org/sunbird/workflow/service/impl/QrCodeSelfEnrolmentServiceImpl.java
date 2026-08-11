@@ -246,23 +246,24 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
         }
 
         Date enrollmentEndDate = (Date) courseBatchDetails.get(Constants.ENROLMENT_END_DATE);
+        Date batchStartDate = (Date) courseBatchDetails.get(Constants.START_DATE);
 
-        if (enrollmentEndDate == null) {
-            logger.warn("QR enrolment failed: Enrollment end date is not available");
+        if (enrollmentEndDate == null || batchStartDate == null) {
+            logger.warn("QR enrolment failed: Batch enrollment period dates are not available");
             Response response = new Response();
             response.put(Constants.ERROR_MESSAGE, Constants.BATCH_START_DATE_UNAVAILABLE_ERROR);
             response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
             return response;
         }
 
-        LocalDate enrollmentEndLocalDate = enrollmentEndDate.toInstant()
+        LocalDate batchStartLocalDate = batchStartDate.toInstant()
                 .atZone(ZoneId.of(configuration.getSunbirdTimeZone()))
                 .toLocalDate();
         LocalDate currentLocalDate = LocalDate.now(ZoneId.of(configuration.getSunbirdTimeZone()));
 
-        if (!enrollmentEndLocalDate.isEqual(currentLocalDate)) {
-            logger.warn("QR enrolment failed: Current date is not the enrollment date. Enrollment date: {}, Today is {}",
-                enrollmentEndLocalDate, currentLocalDate);
+        if (currentLocalDate.isAfter(batchStartLocalDate)) {
+            logger.warn("QR enrolment failed: Current date is after batch start date. Batch starts on {}, Today is {}",
+                batchStartLocalDate, currentLocalDate);
             Response response = new Response();
             response.put(Constants.ERROR_MESSAGE, Constants.BATCH_ENROLLMENT_PERIOD_ENDED_ERROR);
             response.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
