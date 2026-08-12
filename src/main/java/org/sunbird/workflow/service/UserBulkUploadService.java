@@ -890,7 +890,7 @@ public class UserBulkUploadService {
                     if (!record.get(4).isEmpty()) {
                         String designation = record.get(4).trim();
                         valuesToBeUpdate.put(Constants.DESIGNATION, designation);
-                        if (!ValidationUtil.validateRegexPatternWithNoSpecialCharacter(designation)) {
+                        if (!ValidationUtil.validateCsvDesignationPattern(designation, configuration.getCsvDesignationRegex())) {
                             errList.add("Invalid Designation: Designation should be added from default list and cannot contain special character");
                         }
                         if (this.validateDesignationFieldValue(designation)) {
