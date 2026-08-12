@@ -80,6 +80,10 @@ public class ValidationUtil {
 		return regex.matches("^[a-zA-Z0-9 \\-()&/]*$");
 	}
 
+	public static Boolean validateCsvDesignationPattern(String designation) {
+		return designation.matches("^[a-zA-Z0-9 \\-()&/,+]*$");
+	}
+
 	public static Boolean validatePinCode(String regex) {
 		return regex.matches("^[0-9]{6}$");
 	}
