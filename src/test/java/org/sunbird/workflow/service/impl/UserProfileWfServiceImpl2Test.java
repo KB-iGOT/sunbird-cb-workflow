@@ -19,6 +19,7 @@ import org.sunbird.workflow.config.RedisCacheMgr;
 import org.sunbird.workflow.models.WfRequest;
 import org.sunbird.workflow.postgres.entity.WfStatusEntity;
 import org.sunbird.workflow.postgres.repo.WfStatusRepo;
+import org.sunbird.workflow.producer.Producer;
 import org.sunbird.workflow.service.Workflowservice;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,6 +51,9 @@ class UserProfileWfServiceImpl2Test {
 
     @Mock
     private Logger logger;
+
+    @Mock
+    private Producer producer;
 
     @Mock
     private ObjectMapper mapper;
@@ -199,4 +203,104 @@ class UserProfileWfServiceImpl2Test {
         assertDoesNotThrow(()-> service.updateUserProfileV2(Collections.singletonList(request), USER_ID, null));
 
     }
+
+    // ── KPI 1.4 – VERIFIED_PROFILE karma event via updateUserProfileV2 batch path ─────
+
+    @Test
+    void testUpdateUserProfileV2_publishesKarmaEvent_whenProfileBecomesVerified() {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setApplicationId(APP_ID);
+        wfRequest.setWfId(WF_ID);
+        wfRequest.setServiceName(Constants.PROFILE_SERVICE_NAME);
+        wfRequest.setUserId(USER_ID);
+        wfRequest.setActorUserId("approver1");
+
+        Map<String, Object> professionalDetail = new HashMap<>();
+        professionalDetail.put(Constants.GROUP, "group1");
+        professionalDetail.put(Constants.DESIGNATION, "designation1");
+
+        HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.FIELD_KEY, Constants.PROFESSIONAL_DETAILS);
+        updateField.put(Constants.TO_VALUE, professionalDetail);
+        wfRequest.setUpdateFieldValues(Collections.singletonList(updateField));
+
+        // profileDetails starts empty -> previousProfileStatus is null (not VERIFIED)
+        Map<String, Object> profileDetails = new HashMap<>();
+        Map<String, Object> response = new HashMap<>();
+        response.put(Constants.PROFILE_DETAILS, profileDetails);
+        Map<String, Object> result = new HashMap<>();
+        result.put(Constants.RESPONSE, response);
+        Map<String, Object> readData = new HashMap<>();
+        readData.put(Constants.RESPONSE_CODE, Constants.OK);
+        readData.put(Constants.RESULT, result);
+
+        when(configuration.getLmsServiceHost()).thenReturn("http://lms-host/");
+        when(configuration.getUserProfileReadEndPoint()).thenReturn("/user/read/" + Constants.USER_ID_VALUE);
+        when(configuration.getUserProfileUpdateEndPoint()).thenReturn("/user/update");
+        when(configuration.getKarmaPointsUnifiedEventTopic()).thenReturn("dev.karma.points.unified.v2.event");
+
+        when(requestServiceImpl.fetchResultUsingGet(any())).thenReturn(readData);
+        when(mapper.convertValue(any(), eq(Map.class))).thenReturn(readData);
+
+        WfStatusEntity wfStatusEntity = new WfStatusEntity();
+        wfStatusEntity.setCurrentStatus(Constants.APPROVED_STATE);
+        when(wfStatusRepo.findByApplicationIdAndWfId(APP_ID, WF_ID)).thenReturn(wfStatusEntity);
+
+        Map<String, Object> patchResponse = new HashMap<>();
+        patchResponse.put(Constants.RESPONSE_CODE, Constants.OK);
+        when(requestServiceImpl.fetchResultUsingPatch(anyString(), any(), any())).thenReturn(patchResponse);
+
+        assertDoesNotThrow(() -> service.updateUserProfileV2(Collections.singletonList(wfRequest), USER_ID, null));
+
+        verify(producer, times(1)).pushWithKey(eq("dev.karma.points.unified.v2.event"), any(), eq(USER_ID));
+    }
+
+    @Test
+    void testUpdateUserProfileV2_doesNotPublishKarmaEvent_whenPatchFails() {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setApplicationId(APP_ID);
+        wfRequest.setWfId(WF_ID);
+        wfRequest.setServiceName(Constants.PROFILE_SERVICE_NAME);
+        wfRequest.setUserId(USER_ID);
+        wfRequest.setActorUserId("approver1");
+
+        Map<String, Object> professionalDetail = new HashMap<>();
+        professionalDetail.put(Constants.GROUP, "group1");
+        professionalDetail.put(Constants.DESIGNATION, "designation1");
+
+        HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.FIELD_KEY, Constants.PROFESSIONAL_DETAILS);
+        updateField.put(Constants.TO_VALUE, professionalDetail);
+        wfRequest.setUpdateFieldValues(Collections.singletonList(updateField));
+
+        Map<String, Object> profileDetails = new HashMap<>();
+        Map<String, Object> response = new HashMap<>();
+        response.put(Constants.PROFILE_DETAILS, profileDetails);
+        Map<String, Object> result = new HashMap<>();
+        result.put(Constants.RESPONSE, response);
+        Map<String, Object> readData = new HashMap<>();
+        readData.put(Constants.RESPONSE_CODE, Constants.OK);
+        readData.put(Constants.RESULT, result);
+
+        when(configuration.getLmsServiceHost()).thenReturn("http://lms-host/");
+        when(configuration.getUserProfileReadEndPoint()).thenReturn("/user/read/" + Constants.USER_ID_VALUE);
+        when(configuration.getUserProfileUpdateEndPoint()).thenReturn("/user/update");
+
+        when(requestServiceImpl.fetchResultUsingGet(any())).thenReturn(readData);
+        when(mapper.convertValue(any(), eq(Map.class))).thenReturn(readData);
+
+        WfStatusEntity wfStatusEntity = new WfStatusEntity();
+        wfStatusEntity.setCurrentStatus(Constants.APPROVED_STATE);
+        when(wfStatusRepo.findByApplicationIdAndWfId(APP_ID, WF_ID)).thenReturn(wfStatusEntity);
+
+        Map<String, Object> patchResponse = new HashMap<>();
+        patchResponse.put(Constants.RESPONSE_CODE, "FAILED");
+        patchResponse.put(Constants.PARAMS, Map.of(Constants.ERROR_MESSAGE, "boom"));
+        when(requestServiceImpl.fetchResultUsingPatch(anyString(), any(), any())).thenReturn(patchResponse);
+
+        assertDoesNotThrow(() -> service.updateUserProfileV2(Collections.singletonList(wfRequest), USER_ID, null));
+
+        verify(producer, never()).pushWithKey(anyString(), any(), anyString());
+    }
+
 }
