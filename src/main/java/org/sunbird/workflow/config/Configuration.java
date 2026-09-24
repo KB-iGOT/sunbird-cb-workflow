@@ -341,6 +341,12 @@ public class Configuration {
     @Value("${bp.batch.stats.sync.page.size:100}")
     private int bpBatchStatsSyncPageSize;
 
+    @Value("${kafka.topics.karma.points.unified.event:}")
+    private String karmaPointsUnifiedEventTopic;
+
+    @Value("${karma.points.unified.event.version:1}")
+    private int karmaPointsEventVersion;
+
     public String getAdminBlendedProgramEnrolEndPoint() {
         return adminBlendedProgramEnrolEndPoint;
     }
@@ -1142,4 +1148,12 @@ public class Configuration {
     public String getSunbirdTimeZone() { return sunbirdTimeZone; }
 
     public void setSunbirdTimeZone(String sunbirdTimeZone) { this.sunbirdTimeZone = sunbirdTimeZone; }
+
+    public String getKarmaPointsUnifiedEventTopic() { return karmaPointsUnifiedEventTopic; }
+
+    public void setKarmaPointsUnifiedEventTopic(String karmaPointsUnifiedEventTopic) { this.karmaPointsUnifiedEventTopic = karmaPointsUnifiedEventTopic; }
+
+    public int getKarmaPointsEventVersion() { return karmaPointsEventVersion; }
+
+    public void setKarmaPointsEventVersion(int karmaPointsEventVersion) { this.karmaPointsEventVersion = karmaPointsEventVersion; }
 }

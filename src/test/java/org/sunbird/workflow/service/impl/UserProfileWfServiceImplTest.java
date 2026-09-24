@@ -8,6 +8,7 @@ import org.mockito.*;
 import org.sunbird.workflow.config.Configuration;
 import org.sunbird.workflow.config.Constants;
 import org.sunbird.workflow.config.RedisCacheMgr;
+import org.sunbird.workflow.producer.Producer;
 import org.sunbird.workflow.exception.ApplicationException;
 import org.sunbird.workflow.models.WfRequest;
 import org.sunbird.workflow.postgres.entity.WfStatusEntity;
@@ -39,6 +40,9 @@ class UserProfileWfServiceImplTest {
 
     @Mock
     private RedisCacheMgr redisCacheMgr;
+
+    @Mock
+    private Producer producer;
 
     @BeforeEach
     void setUp() {
@@ -679,15 +683,15 @@ class UserProfileWfServiceImplTest {
         when(mapper.writeValueAsString(any())).thenReturn("{}");
 
         Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
-                "updateUserProfileData", String.class, Map.class, List.class, Map.class);
+                "updateUserProfileData", String.class, Map.class, List.class, Map.class, String.class);
         method.setAccessible(true);
 
         // SUCCESS CASE
-        method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, userDetails);
+        method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, userDetails, (String) null);
         verify(redisCacheMgr).deleteCache("user:basicProfile:userId");
 
         // FAILURE CASE
-        method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, userDetails);
+        method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, userDetails, (String) null);
     }
 
     @Test
@@ -1003,6 +1007,228 @@ class UserProfileWfServiceImplTest {
         assertEquals("Smart Projects Venture", profileDetails.get(Constants.MINISTRYORSTATEORGNAME));
     }
 
+    // ── KPI 1.4 – VERIFIED_PROFILE karma event tests ──────────────────────────────
+
+    @Test
+    void raiseVerifiedProfileKarmaEventIfEligible_shouldPublishEvent_whenTransitioningToVerified() throws Exception {
+        when(configuration.getKarmaPointsUnifiedEventTopic()).thenReturn("dev.karma.points.unified.v2.event");
+        when(configuration.getKarmaPointsEventVersion()).thenReturn(1);
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
+                "raiseVerifiedProfileKarmaEventIfEligible", String.class, String.class, String.class, String.class);
+        method.setAccessible(true);
+
+        method.invoke(userProfileWfServiceImpl, "user123", Constants.NOT_VERIFIED, Constants.VERIFIED, "approver1");
+
+        ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(producer, times(1)).pushWithKey(eq("dev.karma.points.unified.v2.event"), eventCaptor.capture(), eq("user123"));
+
+        Map<String, Object> event = (Map<String, Object>) eventCaptor.getValue();
+        assertEquals(Constants.EVENT_TYPE_VERIFIED_PROFILE, event.get(Constants.EVENT_TYPE));
+        assertEquals(1, event.get(Constants.VERSION));
+        Map<String, Object> data = (Map<String, Object>) event.get(Constants.DATA);
+        Map<String, Object> edata = (Map<String, Object>) data.get(Constants.EDATA);
+        assertEquals("user123", edata.get(Constants.USER_ID));
+    }
+
+    @Test
+    void raiseVerifiedProfileKarmaEventIfEligible_shouldSkip_whenAlreadyVerifiedBeforeApproval() throws Exception {
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
+                "raiseVerifiedProfileKarmaEventIfEligible", String.class, String.class, String.class, String.class);
+        method.setAccessible(true);
+
+        method.invoke(userProfileWfServiceImpl, "user123", Constants.VERIFIED, Constants.VERIFIED, "approver1");
+
+        verify(producer, never()).pushWithKey(anyString(), any(), anyString());
+    }
+
+    @Test
+    void raiseVerifiedProfileKarmaEventIfEligible_shouldSkip_whenCurrentStatusIsNotVerified() throws Exception {
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
+                "raiseVerifiedProfileKarmaEventIfEligible", String.class, String.class, String.class, String.class);
+        method.setAccessible(true);
+
+        method.invoke(userProfileWfServiceImpl, "user123", Constants.NOT_VERIFIED, Constants.NOT_VERIFIED, "approver1");
+
+        verify(producer, never()).pushWithKey(anyString(), any(), anyString());
+    }
+
+    @Test
+    void raiseVerifiedProfileKarmaEventIfEligible_shouldSkip_whenUserIdIsBlank() throws Exception {
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
+                "raiseVerifiedProfileKarmaEventIfEligible", String.class, String.class, String.class, String.class);
+        method.setAccessible(true);
+
+        method.invoke(userProfileWfServiceImpl, "", Constants.NOT_VERIFIED, Constants.VERIFIED, "approver1");
+
+        verify(producer, never()).pushWithKey(anyString(), any(), anyString());
+    }
+
+    @Test
+    void raiseVerifiedProfileKarmaEventIfEligible_shouldSkip_whenTopicNotConfigured() throws Exception {
+        when(configuration.getKarmaPointsUnifiedEventTopic()).thenReturn("");
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
+                "raiseVerifiedProfileKarmaEventIfEligible", String.class, String.class, String.class, String.class);
+        method.setAccessible(true);
+
+        method.invoke(userProfileWfServiceImpl, "user123", Constants.NOT_VERIFIED, Constants.VERIFIED, "approver1");
+
+        verify(producer, never()).pushWithKey(anyString(), any(), anyString());
+    }
+
+    @Test
+    void raiseVerifiedProfileKarmaEventIfEligible_shouldNotThrow_whenProducerFails() throws Exception {
+        when(configuration.getKarmaPointsUnifiedEventTopic()).thenReturn("dev.karma.points.unified.v2.event");
+        doThrow(new RuntimeException("kafka down")).when(producer).pushWithKey(anyString(), any(), anyString());
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
+                "raiseVerifiedProfileKarmaEventIfEligible", String.class, String.class, String.class, String.class);
+        method.setAccessible(true);
+
+        assertDoesNotThrow(() ->
+                method.invoke(userProfileWfServiceImpl, "user123", Constants.NOT_VERIFIED, Constants.VERIFIED, "approver1"));
+    }
+
+    @Test
+    void updateUserProfileData_shouldPublishKarmaEvent_whenPatchSucceedsAndStatusBecomesVerified() throws Exception {
+        String userId = "userId";
+        Map<String, Object> profileDetails = new HashMap<>();
+        profileDetails.put(Constants.PROFILE_STATUS, Constants.VERIFIED);
+        Map<String, Object> userDetails = new HashMap<>();
+
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setApplicationId("appId");
+        wfRequest.setWfId("wfId");
+        List<WfRequest> wfRequests = Collections.singletonList(wfRequest);
+
+        when(configuration.getLmsServiceHost()).thenReturn("http://lms/");
+        when(configuration.getUserProfileUpdateEndPoint()).thenReturn("update");
+        when(configuration.getKarmaPointsUnifiedEventTopic()).thenReturn("dev.karma.points.unified.v2.event");
+
+        Map<String, Object> successfulResponse = Map.of("responseCode", "OK");
+        when(requestServiceImpl.fetchResultUsingPatch(anyString(), any(), any())).thenReturn(successfulResponse);
+        when(mapper.writeValueAsString(any())).thenReturn("{}");
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
+                "updateUserProfileData", String.class, Map.class, List.class, Map.class, String.class);
+        method.setAccessible(true);
+
+        method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, userDetails, Constants.NOT_VERIFIED);
+
+        verify(producer, times(1)).pushWithKey(eq("dev.karma.points.unified.v2.event"), any(), eq(userId));
+    }
+
+    @Test
+    void updateUserProfileData_shouldNotPublishKarmaEvent_whenProfileWasAlreadyVerified() throws Exception {
+        String userId = "userId";
+        Map<String, Object> profileDetails = new HashMap<>();
+        profileDetails.put(Constants.PROFILE_STATUS, Constants.VERIFIED);
+        Map<String, Object> userDetails = new HashMap<>();
+
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setApplicationId("appId");
+        wfRequest.setWfId("wfId");
+        List<WfRequest> wfRequests = Collections.singletonList(wfRequest);
+
+        when(configuration.getLmsServiceHost()).thenReturn("http://lms/");
+        when(configuration.getUserProfileUpdateEndPoint()).thenReturn("update");
+
+        Map<String, Object> successfulResponse = Map.of("responseCode", "OK");
+        when(requestServiceImpl.fetchResultUsingPatch(anyString(), any(), any())).thenReturn(successfulResponse);
+        when(mapper.writeValueAsString(any())).thenReturn("{}");
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
+                "updateUserProfileData", String.class, Map.class, List.class, Map.class, String.class);
+        method.setAccessible(true);
+
+        // previousProfileStatus already VERIFIED -> event must be skipped
+        method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, userDetails, Constants.VERIFIED);
+
+        verify(producer, never()).pushWithKey(anyString(), any(), anyString());
+    }
+
+    @Test
+    void updateUserProfileData_shouldNotPublishKarmaEvent_whenPatchFails() throws Exception {
+        String userId = "userId";
+        Map<String, Object> profileDetails = new HashMap<>();
+        profileDetails.put(Constants.PROFILE_STATUS, Constants.VERIFIED);
+        Map<String, Object> userDetails = new HashMap<>();
+
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setApplicationId("appId");
+        wfRequest.setWfId("wfId");
+        List<WfRequest> wfRequests = Collections.singletonList(wfRequest);
+
+        when(configuration.getLmsServiceHost()).thenReturn("http://lms/");
+        when(configuration.getUserProfileUpdateEndPoint()).thenReturn("update");
+
+        Map<String, Object> failedResponse = Map.of("responseCode", "FAILED", "params", Map.of("err", "Some error"));
+        when(requestServiceImpl.fetchResultUsingPatch(anyString(), any(), any())).thenReturn(failedResponse);
+        when(mapper.writeValueAsString(any())).thenReturn("{}");
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
+                "updateUserProfileData", String.class, Map.class, List.class, Map.class, String.class);
+        method.setAccessible(true);
+
+        method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, userDetails, Constants.NOT_VERIFIED);
+
+        verify(producer, never()).pushWithKey(anyString(), any(), anyString());
+    }
+
+    @Test
+    void updateUserProfile_shouldPublishKarmaEvent_whenGroupAndDesignationBothVerified() {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setApplicationId("appId");
+        wfRequest.setWfId("wfId");
+        wfRequest.setServiceName(Constants.PROFILE_SERVICE_NAME);
+        wfRequest.setActorUserId("approver1");
+
+        Map<String, Object> professionalDetail = new HashMap<>();
+        professionalDetail.put(Constants.GROUP, "group1");
+        professionalDetail.put(Constants.DESIGNATION, "designation1");
+
+        HashMap<String, Object> updateFieldValues = new HashMap<>();
+        updateFieldValues.put(Constants.FIELD_KEY, Constants.PROFESSIONAL_DETAILS);
+        updateFieldValues.put(Constants.TO_VALUE, professionalDetail);
+        updateFieldValues.put(Constants.FROM_VALUE, new HashMap<>());
+        wfRequest.setUpdateFieldValues(List.of(updateFieldValues));
+
+        WfStatusEntity wfStatusEntity = new WfStatusEntity();
+        wfStatusEntity.setCurrentStatus(Constants.APPROVED_STATE);
+        when(wfStatusRepo.findByApplicationIdAndWfId("appId", "wfId")).thenReturn(wfStatusEntity);
+
+        when(configuration.getLmsServiceHost()).thenReturn("http://lms-host/");
+        when(configuration.getUserProfileReadEndPoint()).thenReturn("/user/read/" + Constants.USER_ID_VALUE);
+        when(configuration.getKarmaPointsUnifiedEventTopic()).thenReturn("dev.karma.points.unified.v2.event");
+
+        Map<String, Object> mockedResponse = new HashMap<>();
+        Map<String, Object> result = new HashMap<>();
+        Map<String, Object> profileDetails = new HashMap<>();
+        Map<String, Object> responseMap = new HashMap<>();
+        Map<String, Object> rootOrgs = new HashMap<>();
+        // No prior status set -> previousProfileStatus == null (not VERIFIED)
+        rootOrgs.put(Constants.ROOT_ORG_ID, "id");
+        responseMap.put(Constants.USER_ID, "user123");
+        responseMap.put(Constants.PROFILE_DETAILS, profileDetails);
+        responseMap.put(Constants.ROOT_ORG_CONSTANT, rootOrgs);
+        result.put("response", responseMap);
+
+        mockedResponse.put("id", "user123");
+        mockedResponse.put("responseCode", "OK");
+        mockedResponse.put("result", result);
+
+        Map<String, Object> mockedRes = new HashMap<>();
+        mockedRes.put(Constants.RESPONSE_CODE, Constants.OK);
+
+        when(requestServiceImpl.fetchResultUsingGet(any(StringBuilder.class))).thenReturn(mockedResponse);
+        when(mapper.convertValue(mockedResponse, Map.class)).thenReturn(mockedResponse);
+        when(requestServiceImpl.fetchResultUsingPatch(anyString(), any(), any())).thenReturn(mockedRes);
+
+        userProfileWfServiceImpl.updateUserProfile(wfRequest);
+
+        verify(producer, times(1)).pushWithKey(eq("dev.karma.points.unified.v2.event"), any(), eq("user123"));
+    }
 
 
 }

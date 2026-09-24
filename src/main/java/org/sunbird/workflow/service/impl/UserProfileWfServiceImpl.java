@@ -27,6 +27,7 @@ import org.sunbird.workflow.exception.ApplicationException;
 import org.sunbird.workflow.models.WfRequest;
 import org.sunbird.workflow.postgres.entity.WfStatusEntity;
 import org.sunbird.workflow.postgres.repo.WfStatusRepo;
+import org.sunbird.workflow.producer.Producer;
 import org.sunbird.workflow.service.UserProfileWfService;
 import org.sunbird.workflow.service.Workflowservice;
 
@@ -65,6 +66,9 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 
 	@Autowired
 	private RedisCacheMgr redisCacheMgr;
+
+	@Autowired
+	private Producer producer;
 
     private final List<String> stateOrMinistry = Arrays.asList("16", "2048");
 	/**
@@ -111,6 +115,8 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 				employmentDetails.put(Constants.DEPARTMENT_NAME, deptNameUpdated);
 			}
 
+			String previousProfileStatus = profileDetails == null ? null
+					: (String) profileDetails.get(Constants.PROFILE_STATUS);
 			Map<String, Object> updateRequest = updateRequestWithWF(wfRequest.getApplicationId(), wfRequest.getUpdateFieldValues(), profileDetails);
 			if (null == updateRequest) {
 				logger.error("user profile datatype error");
@@ -132,9 +138,46 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 				String cacheKey = Constants.USER_BASIC_PROFILE_REDIS_KEY_PREFIX + existingUserResponse.get(Constants.USER_ID);
 				logger.info("User profile updated. Invalidating basicProfile cache for userId: {}", existingUserResponse.get(Constants.USER_ID));
 				redisCacheMgr.deleteCache(cacheKey);
+				raiseVerifiedProfileKarmaEventIfEligible(
+						(String) existingUserResponse.get(Constants.USER_ID),
+						previousProfileStatus,
+						(String) updateRequest.get(Constants.PROFILE_STATUS),
+						wfRequest.getActorUserId());
 			}
 		} catch (Exception e) {
 			logger.error("Exception occurred : ", e);
+		}
+	}
+
+	/**
+	 * KPI 1.4 – VERIFIED_PROFILE: publishes the karma event when the MDO approval moves a
+	 * profile into VERIFIED for the first time. Must not throw; a failure must not fail the approval.
+	 */
+	private void raiseVerifiedProfileKarmaEventIfEligible(String userId, String previousStatus,
+			String currentStatus, String approvedBy) {
+		try {
+			if (StringUtils.isBlank(userId) || !Constants.VERIFIED.equalsIgnoreCase(currentStatus)) return;
+			if (Constants.VERIFIED.equalsIgnoreCase(previousStatus)) {
+				logger.info("[KARMA_POINTS][VERIFIED_PROFILE][skipped] userId={} already VERIFIED before approval", userId);
+				return;
+			}
+			String topic = configuration.getKarmaPointsUnifiedEventTopic();
+			if (StringUtils.isBlank(topic)) {
+				logger.warn("[KARMA_POINTS][VERIFIED_PROFILE][skipped] karma topic not configured");
+				return;
+			}
+			Map<String, Object> edata = new HashMap<>();
+			edata.put(Constants.USER_ID, userId);
+			Map<String, Object> data = new HashMap<>();
+			data.put(Constants.EDATA, edata);
+			Map<String, Object> event = new HashMap<>();
+			event.put(Constants.EVENT_TYPE, Constants.EVENT_TYPE_VERIFIED_PROFILE);
+			event.put(Constants.DATA, data);
+			event.put(Constants.VERSION, configuration.getKarmaPointsEventVersion());
+			producer.pushWithKey(topic, event, userId);
+			logger.info("[KARMA_POINTS][VERIFIED_PROFILE][published] userId={}, previousStatus={}, verifiedBy=WORKFLOW_APPROVAL, approvedBy={}", userId, previousStatus, approvedBy);
+		} catch (Exception e) {
+			logger.error("[KARMA_POINTS][VERIFIED_PROFILE][failed] userId=" + userId, e);
 		}
 	}
 
@@ -597,6 +640,8 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 			Map<String, Object> existingUserResults = (Map<String, Object>) readData.get(Constants.RESULT);
 			Map<String, Object> existingUserResponse = (Map<String, Object>) existingUserResults.get(Constants.RESPONSE);
 			Map<String, Object> profileDetails = (Map<String, Object>) existingUserResponse.get(Constants.PROFILE_DETAILS);
+			String previousProfileStatus = profileDetails == null ? null
+					: (String) profileDetails.get(Constants.PROFILE_STATUS);
 			boolean isUpdateRequired = false;
 			for (WfRequest wfRequest : wfRequests) {
 				WfStatusEntity wfStatusEntity = wfStatusRepo.findByApplicationIdAndWfId(wfRequest.getApplicationId(),
@@ -622,14 +667,14 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 				}
 			}
 			if (isUpdateRequired) {
-				updateUserProfileData(userId, profileDetails, wfRequests, existingUserResponse);
+				updateUserProfileData(userId, profileDetails, wfRequests, existingUserResponse, previousProfileStatus);
 			}
 		} catch (Exception e) {
 			logger.error("Exception occurred : ", e);
 		}
 	}
 
-	private void updateUserProfileData(String userId, Map<String, Object> profileDetails, List<WfRequest> wfRequests, Map<String, Object> userDetails) {
+	private void updateUserProfileData(String userId, Map<String, Object> profileDetails, List<WfRequest> wfRequests, Map<String, Object> userDetails, String previousProfileStatus) {
 		try {
 			Map<String, Object> profileUpdateRequest = new HashMap<>();
 			profileUpdateRequest.put(Constants.USER_ID, userId);
@@ -651,6 +696,11 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 				String cacheKey = Constants.USER_BASIC_PROFILE_REDIS_KEY_PREFIX + userId;
 				logger.info("User profile updated. Invalidating basicProfile cache for userId: {}", userId);
 				redisCacheMgr.deleteCache(cacheKey);
+				raiseVerifiedProfileKarmaEventIfEligible(
+						userId,
+						previousProfileStatus,
+						(String) profileDetails.get(Constants.PROFILE_STATUS),
+						wfRequests.isEmpty() ? null : wfRequests.get(0).getActorUserId());
 			}
 		} catch (Exception e) {
 			logger.error("Error updating user profile for userId: {}", userId, e);
