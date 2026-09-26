@@ -194,6 +194,7 @@ public class Constants {
 	public static final String SEND_FOR_MDO_APPROVAL = "SEND_FOR_MDO_APPROVAL";
 	public static final String SEND_FOR_PC_APPROVAL = "SEND_FOR_PC_APPROVAL";
 	public static final String PROGRAM_COORDINATOR = "PROGRAM_COORDINATOR";
+	public static final String BP_PROGRAM_TRAINER = "BP_PROGRAM_TRAINER";
 	public static final String TEMPLATE = "template";
 	public static final String TABLE_EMAIL_TEMPLATE = "email_template";
 	public static final String MISSING_APPLICATION_IDS_ERROR_MESSAGE = "Application Ids are missing in the request";
