@@ -1894,7 +1894,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                     List<String> roles = (List<String>) org.get(Constants.ROLES);
                     if (roles != null) {
 
-                        if (roles.contains(Constants.PROGRAM_COORDINATOR)) {
+                        if (roles.contains(Constants.PROGRAM_COORDINATOR) || roles.contains(Constants.BP_PROGRAM_TRAINER)) {
                             return Constants.PC;
                         }
 
