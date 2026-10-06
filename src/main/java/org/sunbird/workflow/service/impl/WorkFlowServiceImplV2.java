@@ -18,7 +18,8 @@ import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import org.sunbird.workflow.config.Configuration;
 import org.sunbird.workflow.config.Constants;
-import org.sunbird.workflow.config.RedisCacheMgr;
+import org.sunbird.workflow.config.UserProfileRedisCacheMgr;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.sunbird.workflow.exception.ApplicationException;
 import org.sunbird.workflow.exception.BadRequestException;
 import org.sunbird.workflow.exception.InvalidDataInputException;
@@ -61,7 +62,8 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
     private Producer producer;
 
     @Autowired
-    private RedisCacheMgr redisCacheMgr;
+    @Qualifier("userBasicProfileRedisCacheMgr")
+    private UserProfileRedisCacheMgr redisCacheMgr;
 
     @Autowired
     private NotificationTriggerService notificationTriggerService;

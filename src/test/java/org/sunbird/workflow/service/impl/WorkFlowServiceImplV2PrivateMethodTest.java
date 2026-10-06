@@ -17,7 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.sunbird.workflow.config.Configuration;
 import org.sunbird.workflow.config.Constants;
-import org.sunbird.workflow.config.RedisCacheMgr;
+import org.sunbird.workflow.config.UserProfileRedisCacheMgr;
 import org.sunbird.workflow.exception.BadRequestException;
 import org.sunbird.workflow.exception.InvalidDataInputException;
 import org.sunbird.workflow.models.Response;
@@ -58,7 +58,7 @@ class WorkFlowServiceImplV2PrivateMethodTest {
     private CassandraOperation cassandraOperation;
 
     @Mock
-    private RedisCacheMgr redisCacheMgr;
+    private UserProfileRedisCacheMgr redisCacheMgr;
 
     WfStatusEntity applicationStatus;
 

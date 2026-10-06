@@ -7,7 +7,7 @@ import org.junit.jupiter.api.function.Executable;
 import org.mockito.*;
 import org.sunbird.workflow.config.Configuration;
 import org.sunbird.workflow.config.Constants;
-import org.sunbird.workflow.config.RedisCacheMgr;
+import org.sunbird.workflow.config.UserProfileRedisCacheMgr;
 import org.sunbird.workflow.exception.ApplicationException;
 import org.sunbird.workflow.models.WfRequest;
 import org.sunbird.workflow.postgres.entity.WfStatusEntity;
@@ -38,7 +38,7 @@ class UserProfileWfServiceImplTest {
     private WorkflowServiceImpl workflowService;
 
     @Mock
-    private RedisCacheMgr redisCacheMgr;
+    private UserProfileRedisCacheMgr redisCacheMgr;
 
     @BeforeEach
     void setUp() {
