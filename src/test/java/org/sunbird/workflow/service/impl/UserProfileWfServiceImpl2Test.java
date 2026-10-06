@@ -15,7 +15,7 @@ import org.slf4j.Logger;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.sunbird.workflow.config.Configuration;
 import org.sunbird.workflow.config.Constants;
-import org.sunbird.workflow.config.RedisCacheMgr;
+import org.sunbird.workflow.config.UserProfileRedisCacheMgr;
 import org.sunbird.workflow.models.WfRequest;
 import org.sunbird.workflow.postgres.entity.WfStatusEntity;
 import org.sunbird.workflow.postgres.repo.WfStatusRepo;
@@ -46,7 +46,7 @@ class UserProfileWfServiceImpl2Test {
     private WorkflowAuditProcessingServiceImpl workflowAuditProcessingService;
 
     @Mock
-    private RedisCacheMgr redisCacheMgr;
+    private UserProfileRedisCacheMgr redisCacheMgr;
 
     @Mock
     private Logger logger;

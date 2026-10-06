@@ -1,6 +1,6 @@
 package org.sunbird.workflow.config;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,8 +11,11 @@ import redis.clients.jedis.JedisPoolConfig;
 @EnableCaching
 public class RedisConfig {
 
-	@Autowired
-	RedisConfiguration redisConfiguration;
+	private final RedisConfiguration redisConfiguration;
+
+	public RedisConfig(RedisConfiguration redisConfiguration) {
+		this.redisConfiguration = redisConfiguration;
+	}
 
 	@Bean
 	public JedisPool jedisPool() {
@@ -31,6 +34,19 @@ public class RedisConfig {
 	}
 
 
+	@Bean(name = "jedisPoolUserBasicProfile")
+	public JedisPool jedisPoolUserBasicProfile() {
+		final JedisPoolConfig poolConfig = buildPoolConfig();
+		return new JedisPool(poolConfig, redisConfiguration.getUserBasicProfileRedisHost(),
+				redisConfiguration.getUserBasicProfileRedisPort());
+	}
+
+	@Bean(name = "userBasicProfileRedisCacheMgr")
+	public UserProfileRedisCacheMgr userBasicProfileRedisCacheMgr(
+			@Qualifier("jedisPoolUserBasicProfile") JedisPool jedisPoolUserBasicProfile) {
+		return new UserProfileRedisCacheMgr(jedisPoolUserBasicProfile, redisConfiguration.getUserBasicProfileRedisDbIndex());
+	}
+
 	private JedisPoolConfig buildPoolConfig() {
 		final JedisPoolConfig poolConfig = new JedisPoolConfig();
 		poolConfig.setMaxIdle(128);
@@ -43,6 +59,7 @@ public class RedisConfig {
 		poolConfig.setTimeBetweenEvictionRunsMillis(30000);
 		poolConfig.setNumTestsPerEvictionRun(3);
 		poolConfig.setBlockWhenExhausted(true);
+		poolConfig.setJmxEnabled(false);
 		return poolConfig;
 	}
 }

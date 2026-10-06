@@ -18,6 +18,27 @@ public class RedisConfiguration {
     @Value("${redis.data.port}")
     private String redisDataPort;
 
+    @Value("${userBasicProfile.redis.host:localhost}")
+    private String userBasicProfileRedisHost;
+
+    @Value("${userBasicProfile.redis.port:6379}")
+    private int userBasicProfileRedisPort;
+
+    @Value("${userBasicProfile.redis.db.index:0}")
+    private int userBasicProfileRedisDbIndex;
+
+    public String getUserBasicProfileRedisHost() {
+        return userBasicProfileRedisHost;
+    }
+
+    public int getUserBasicProfileRedisPort() {
+        return userBasicProfileRedisPort;
+    }
+
+    public int getUserBasicProfileRedisDbIndex() {
+        return userBasicProfileRedisDbIndex;
+    }
+
     public String getGetRedisHostName() {
         return getRedisHostName;
     }

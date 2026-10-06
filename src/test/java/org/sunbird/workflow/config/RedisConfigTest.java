@@ -16,13 +16,15 @@ class RedisConfigTest {
     @BeforeEach
     void setUp() {
         redisConfiguration = mock(RedisConfiguration.class);
-        redisConfig = new RedisConfig();
-        redisConfig.redisConfiguration = redisConfiguration;
+        redisConfig = new RedisConfig(redisConfiguration);
 
         when(redisConfiguration.getGetRedisHostName()).thenReturn("localhost");
         when(redisConfiguration.getRedisPort()).thenReturn("6379");
         when(redisConfiguration.getRedisDataHostName()).thenReturn("localhost");
         when(redisConfiguration.getRedisDataPort()).thenReturn("6380");
+        when(redisConfiguration.getUserBasicProfileRedisHost()).thenReturn("localhost");
+        when(redisConfiguration.getUserBasicProfileRedisPort()).thenReturn(6379);
+        when(redisConfiguration.getUserBasicProfileRedisDbIndex()).thenReturn(0);
     }
 
     @Test
@@ -53,5 +55,19 @@ class RedisConfigTest {
         assertTrue(poolConfig.getTestWhileIdle());
         assertEquals(3, poolConfig.getNumTestsPerEvictionRun());
         assertTrue(poolConfig.getBlockWhenExhausted());
+        assertFalse(poolConfig.getJmxEnabled());
+    }
+
+    @Test
+    void testJedisPoolUserBasicProfileCreation() {
+        JedisPool jedisPool = redisConfig.jedisPoolUserBasicProfile();
+        assertNotNull(jedisPool);
+    }
+
+    @Test
+    void testUserBasicProfileRedisCacheMgrCreation() {
+        JedisPool jedisPool = redisConfig.jedisPoolUserBasicProfile();
+        UserProfileRedisCacheMgr cacheMgr = redisConfig.userBasicProfileRedisCacheMgr(jedisPool);
+        assertNotNull(cacheMgr);
     }
 }

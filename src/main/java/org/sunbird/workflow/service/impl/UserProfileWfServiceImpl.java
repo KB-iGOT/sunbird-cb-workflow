@@ -22,7 +22,7 @@ import org.springframework.util.ObjectUtils;
 import org.springframework.web.client.RestTemplate;
 import org.sunbird.workflow.config.Configuration;
 import org.sunbird.workflow.config.Constants;
-import org.sunbird.workflow.config.RedisCacheMgr;
+import org.sunbird.workflow.config.UserProfileRedisCacheMgr;
 import org.sunbird.workflow.exception.ApplicationException;
 import org.sunbird.workflow.models.WfRequest;
 import org.sunbird.workflow.postgres.entity.WfStatusEntity;
@@ -64,7 +64,8 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 	private WorkflowAuditProcessingServiceImpl workflowAuditProcessingService;
 
 	@Autowired
-	private RedisCacheMgr redisCacheMgr;
+	@Qualifier("userBasicProfileRedisCacheMgr")
+	private UserProfileRedisCacheMgr redisCacheMgr;
 
     private final List<String> stateOrMinistry = Arrays.asList("16", "2048");
 	/**
