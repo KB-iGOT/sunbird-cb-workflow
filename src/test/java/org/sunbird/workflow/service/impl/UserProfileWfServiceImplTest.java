@@ -655,12 +655,6 @@ class UserProfileWfServiceImplTest {
     void testUpdateUserProfileData_successAndFailure() throws Exception {
         String userId = "userId";
         Map<String, Object> profileDetails = new HashMap<>();
-        Map<String, Object> userDetails = new HashMap<>();
-        userDetails.put("rootOrgId", "rootOrg");
-        userDetails.put("firstName", "fname");
-        userDetails.put("id", "id");
-        userDetails.put("channel", "channel");
-        userDetails.put("userName", "uname");
 
         WfRequest wfRequest = new WfRequest();
         wfRequest.setApplicationId("appId");
@@ -683,15 +677,15 @@ class UserProfileWfServiceImplTest {
         when(mapper.writeValueAsString(any())).thenReturn("{}");
 
         Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
-                "updateUserProfileData", String.class, Map.class, List.class, Map.class, String.class);
+                "updateUserProfileData", String.class, Map.class, List.class, String.class);
         method.setAccessible(true);
 
         // SUCCESS CASE
-        method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, userDetails, (String) null);
+        method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, (String) null);
         verify(redisCacheMgr).deleteCache("user:basicProfile:userId");
 
         // FAILURE CASE
-        method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, userDetails, (String) null);
+        method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, (String) null);
     }
 
     @Test
@@ -1095,7 +1089,6 @@ class UserProfileWfServiceImplTest {
         String userId = "userId";
         Map<String, Object> profileDetails = new HashMap<>();
         profileDetails.put(Constants.PROFILE_STATUS, Constants.VERIFIED);
-        Map<String, Object> userDetails = new HashMap<>();
 
         WfRequest wfRequest = new WfRequest();
         wfRequest.setApplicationId("appId");
@@ -1111,10 +1104,10 @@ class UserProfileWfServiceImplTest {
         when(mapper.writeValueAsString(any())).thenReturn("{}");
 
         Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
-                "updateUserProfileData", String.class, Map.class, List.class, Map.class, String.class);
+                "updateUserProfileData", String.class, Map.class, List.class, String.class);
         method.setAccessible(true);
 
-        method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, userDetails, Constants.NOT_VERIFIED);
+        method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, Constants.NOT_VERIFIED);
 
         verify(producer, times(1)).pushWithKey(eq("dev.karma.points.unified.v2.event"), any(), eq(userId));
     }
@@ -1124,7 +1117,6 @@ class UserProfileWfServiceImplTest {
         String userId = "userId";
         Map<String, Object> profileDetails = new HashMap<>();
         profileDetails.put(Constants.PROFILE_STATUS, Constants.VERIFIED);
-        Map<String, Object> userDetails = new HashMap<>();
 
         WfRequest wfRequest = new WfRequest();
         wfRequest.setApplicationId("appId");
@@ -1139,11 +1131,11 @@ class UserProfileWfServiceImplTest {
         when(mapper.writeValueAsString(any())).thenReturn("{}");
 
         Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
-                "updateUserProfileData", String.class, Map.class, List.class, Map.class, String.class);
+                "updateUserProfileData", String.class, Map.class, List.class, String.class);
         method.setAccessible(true);
 
         // previousProfileStatus already VERIFIED -> event must be skipped
-        method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, userDetails, Constants.VERIFIED);
+        method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, Constants.VERIFIED);
 
         verify(producer, never()).pushWithKey(anyString(), any(), anyString());
     }
@@ -1153,7 +1145,6 @@ class UserProfileWfServiceImplTest {
         String userId = "userId";
         Map<String, Object> profileDetails = new HashMap<>();
         profileDetails.put(Constants.PROFILE_STATUS, Constants.VERIFIED);
-        Map<String, Object> userDetails = new HashMap<>();
 
         WfRequest wfRequest = new WfRequest();
         wfRequest.setApplicationId("appId");
@@ -1168,10 +1159,10 @@ class UserProfileWfServiceImplTest {
         when(mapper.writeValueAsString(any())).thenReturn("{}");
 
         Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
-                "updateUserProfileData", String.class, Map.class, List.class, Map.class, String.class);
+                "updateUserProfileData", String.class, Map.class, List.class, String.class);
         method.setAccessible(true);
 
-        method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, userDetails, Constants.NOT_VERIFIED);
+        method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, Constants.NOT_VERIFIED);
 
         verify(producer, never()).pushWithKey(anyString(), any(), anyString());
     }

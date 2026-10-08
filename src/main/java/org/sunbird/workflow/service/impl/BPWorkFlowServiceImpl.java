@@ -1889,24 +1889,31 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
     private String extractUserRole(Map<String, Object> profile) {
         try {
             List<Map<String, Object>> orgs = (List<Map<String, Object>>) profile.get(Constants.ORGANISATIONS);
-            if (orgs != null) {
-                for (Map<String, Object> org : orgs) {
-                    List<String> roles = (List<String>) org.get(Constants.ROLES);
-                    if (roles != null) {
-
-                        if (roles.contains(Constants.PROGRAM_COORDINATOR) || roles.contains(Constants.BP_PROGRAM_TRAINER)) {
-                            return Constants.PC;
-                        }
-
-                        if (roles.contains(Constants.MDO_ADMIN) || roles.contains(Constants.MDO_LEADER)) {
-                            return Constants.MDO;
-                        }
-                    }
+            if (orgs == null) {
+                return Constants.SELF;
+            }
+            for (Map<String, Object> org : orgs) {
+                String role = resolveRoleFromOrg((List<String>) org.get(Constants.ROLES));
+                if (role != null) {
+                    return role;
                 }
             }
         } catch (Exception ignore) {}
 
         return Constants.SELF;
+    }
+
+    private String resolveRoleFromOrg(List<String> roles) {
+        if (roles == null) {
+            return null;
+        }
+        if (roles.contains(Constants.PROGRAM_COORDINATOR) || roles.contains(Constants.BP_PROGRAM_TRAINER)) {
+            return Constants.PC;
+        }
+        if (roles.contains(Constants.MDO_ADMIN) || roles.contains(Constants.MDO_LEADER)) {
+            return Constants.MDO;
+        }
+        return null;
     }
 
     private boolean shouldOverride(String existingRole, String incomingRole) {
