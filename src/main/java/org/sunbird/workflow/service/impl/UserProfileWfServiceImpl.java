@@ -1,8 +1,8 @@
 package org.sunbird.workflow.service.impl;
 
-import java.text.SimpleDateFormat;
-import java.util.*;
-
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -15,10 +15,8 @@ import org.json.JSONTokener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
-import org.springframework.web.client.RestTemplate;
 import org.sunbird.workflow.config.Configuration;
 import org.sunbird.workflow.config.Constants;
 import org.sunbird.workflow.config.RedisCacheMgr;
@@ -28,12 +26,9 @@ import org.sunbird.workflow.postgres.entity.WfStatusEntity;
 import org.sunbird.workflow.postgres.repo.WfStatusRepo;
 import org.sunbird.workflow.producer.Producer;
 import org.sunbird.workflow.service.UserProfileWfService;
-import org.sunbird.workflow.service.Workflowservice;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
 @Service
 public class UserProfileWfServiceImpl implements UserProfileWfService {
@@ -45,15 +40,11 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 
 	private final Configuration configuration;
 
-	private final RestTemplate restTemplate;
-
 	private final ObjectMapper mapper;
 
 	private final WfStatusRepo wfStatusRepo;
 
 	final WorkflowServiceImpl workflowService;
-
-	private final WorkflowAuditProcessingServiceImpl workflowAuditProcessingService;
 
 	private final RedisCacheMgr redisCacheMgr;
 
@@ -61,20 +52,16 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 
 	public UserProfileWfServiceImpl(RequestServiceImpl requestServiceImpl,
 			Configuration configuration,
-			RestTemplate restTemplate,
 			ObjectMapper mapper,
 			WfStatusRepo wfStatusRepo,
 			@Qualifier("workflowServiceImpl") WorkflowServiceImpl workflowService,
-			WorkflowAuditProcessingServiceImpl workflowAuditProcessingService,
 			RedisCacheMgr redisCacheMgr,
 			Producer producer) {
 		this.requestServiceImpl = requestServiceImpl;
 		this.configuration = configuration;
-		this.restTemplate = restTemplate;
 		this.mapper = mapper;
 		this.wfStatusRepo = wfStatusRepo;
 		this.workflowService = workflowService;
-		this.workflowAuditProcessingService = workflowAuditProcessingService;
 		this.redisCacheMgr = redisCacheMgr;
 		this.producer = producer;
 	}
