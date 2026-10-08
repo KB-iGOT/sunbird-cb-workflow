@@ -1,6 +1,7 @@
 package org.sunbird.workflow.service.impl;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -207,7 +208,7 @@ class UserProfileWfServiceImplV2CoverageTest {
         assertTrue(processWfRequest(request, "token", profileDetails));
 
         verify(wfStatusRepo).save(entity);
-        assertTrue(Constants.FAILED.equals(entity.getCurrentStatus()));
+        assertEquals(Constants.FAILED, entity.getCurrentStatus());
     }
 
     // ---------- updateUserProfileV2 (end to end) ----------
