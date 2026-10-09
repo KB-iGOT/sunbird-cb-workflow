@@ -264,4 +264,13 @@ class ConfigurationTest {
         assertEquals("UTC", config.getSunbirdTimeZone());
     }
 
+    @Test
+    void testKarmaPointsConfiguration() {
+        config.setKarmaPointsUnifiedEventTopic("dev.karma.points.unified.v2.event");
+        assertEquals("dev.karma.points.unified.v2.event", config.getKarmaPointsUnifiedEventTopic());
+
+        config.setKarmaPointsEventVersion(2);
+        assertEquals(2, config.getKarmaPointsEventVersion());
+    }
+
 }

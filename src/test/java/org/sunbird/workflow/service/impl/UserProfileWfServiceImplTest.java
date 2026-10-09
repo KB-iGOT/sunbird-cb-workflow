@@ -1230,5 +1230,78 @@ class UserProfileWfServiceImplTest {
         verify(producer, times(1)).pushWithKey(eq("dev.karma.points.unified.v2.event"), any(), eq("user123"));
     }
 
+    @Test
+    void updateUserProfile_doesNotPublishKarmaEventOrThrow_whenProfileDetailsMissing() {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setApplicationId("appId");
+        wfRequest.setWfId("wfId");
+        wfRequest.setServiceName(Constants.PROFILE_SERVICE_NAME);
+        wfRequest.setActorUserId("approver1");
+
+        Map<String, Object> professionalDetail = new HashMap<>();
+        professionalDetail.put(Constants.GROUP, "group1");
+        professionalDetail.put(Constants.DESIGNATION, "designation1");
+
+        HashMap<String, Object> updateFieldValues = new HashMap<>();
+        updateFieldValues.put(Constants.FIELD_KEY, Constants.PROFESSIONAL_DETAILS);
+        updateFieldValues.put(Constants.TO_VALUE, professionalDetail);
+        updateFieldValues.put(Constants.FROM_VALUE, new HashMap<>());
+        wfRequest.setUpdateFieldValues(List.of(updateFieldValues));
+
+        WfStatusEntity wfStatusEntity = new WfStatusEntity();
+        wfStatusEntity.setCurrentStatus(Constants.APPROVED_STATE);
+        when(wfStatusRepo.findByApplicationIdAndWfId("appId", "wfId")).thenReturn(wfStatusEntity);
+
+        when(configuration.getLmsServiceHost()).thenReturn("http://lms-host/");
+        when(configuration.getUserProfileReadEndPoint()).thenReturn("/user/read/" + Constants.USER_ID_VALUE);
+
+        Map<String, Object> mockedResponse = new HashMap<>();
+        Map<String, Object> result = new HashMap<>();
+        Map<String, Object> responseMap = new HashMap<>();
+        Map<String, Object> rootOrgs = new HashMap<>();
+        rootOrgs.put(Constants.ROOT_ORG_ID, "id");
+        responseMap.put(Constants.USER_ID, "user123");
+        // Deliberately no PROFILE_DETAILS entry -> profileDetails resolves to null
+        responseMap.put(Constants.ROOT_ORG_CONSTANT, rootOrgs);
+        result.put("response", responseMap);
+
+        mockedResponse.put("id", "user123");
+        mockedResponse.put("responseCode", "OK");
+        mockedResponse.put("result", result);
+
+        when(requestServiceImpl.fetchResultUsingGet(any(StringBuilder.class))).thenReturn(mockedResponse);
+        when(mapper.convertValue(mockedResponse, Map.class)).thenReturn(mockedResponse);
+
+        assertDoesNotThrow(() -> userProfileWfServiceImpl.updateUserProfile(wfRequest));
+
+        verify(producer, never()).pushWithKey(anyString(), any(), anyString());
+    }
+
+    @Test
+    void updateUserProfileData_shouldPublishKarmaEvent_whenWfRequestsListIsEmpty() throws Exception {
+        String userId = "userId";
+        Map<String, Object> profileDetails = new HashMap<>();
+        profileDetails.put(Constants.PROFILE_STATUS, Constants.VERIFIED);
+        Map<String, Object> userDetails = new HashMap<>();
+
+        List<WfRequest> wfRequests = Collections.emptyList();
+
+        when(configuration.getLmsServiceHost()).thenReturn("http://lms/");
+        when(configuration.getUserProfileUpdateEndPoint()).thenReturn("update");
+        when(configuration.getKarmaPointsUnifiedEventTopic()).thenReturn("dev.karma.points.unified.v2.event");
+
+        Map<String, Object> successfulResponse = Map.of("responseCode", "OK");
+        when(requestServiceImpl.fetchResultUsingPatch(anyString(), any(), any())).thenReturn(successfulResponse);
+        when(mapper.writeValueAsString(any())).thenReturn("{}");
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
+                "updateUserProfileData", String.class, Map.class, List.class, Map.class, String.class);
+        method.setAccessible(true);
+
+        // wfRequests is empty -> exercises the wfRequests.isEmpty() ? null : ... branch
+        method.invoke(userProfileWfServiceImpl, userId, profileDetails, wfRequests, userDetails, Constants.NOT_VERIFIED);
+
+        verify(producer, times(1)).pushWithKey(eq("dev.karma.points.unified.v2.event"), any(), eq(userId));
+    }
 
 }
