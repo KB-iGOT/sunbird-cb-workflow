@@ -59,6 +59,36 @@ class ProducerTest {
         verify(kafkaTemplate, never()).send(anyString(), anyString());
     }
 
+    @Test
+    void testPushWithKey_success() throws JsonProcessingException {
+        String topic = "test-topic";
+        String key = "user-1";
+        DummyObject obj = new DummyObject("Ajay", 101);
+        String json = "{\"name\":\"Ajay\",\"id\":101}";
+
+        when(mapper.writeValueAsString(obj)).thenReturn(json);
+
+        producer.pushWithKey(topic, obj, key);
+
+        verify(mapper, times(1)).writeValueAsString(obj);
+        verify(kafkaTemplate, times(1)).send(topic, key, json);
+    }
+
+    @Test
+    void testPushWithKey_jsonProcessingException() throws JsonProcessingException {
+        String topic = "test-topic";
+        String key = "user-1";
+        DummyObject obj = new DummyObject("Ajay", 101);
+
+        when(mapper.writeValueAsString(obj)).thenThrow(new JsonProcessingException("JSON Error") {
+        });
+
+        producer.pushWithKey(topic, obj, key);
+
+        verify(mapper, times(1)).writeValueAsString(obj);
+        verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
+    }
+
     // Dummy object for testing serialization
     static class DummyObject {
         public String name;

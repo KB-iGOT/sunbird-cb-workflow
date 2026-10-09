@@ -1572,4 +1572,46 @@ class BPWorkFlowServiceImplTest {
         verify(wfStatusRepo).save(entity);
     }
 
+    @Test
+    void extractUserRole_shouldReturnPC_whenProgramCoordinatorRole() throws Exception {
+        Map<String, Object> profile = new HashMap<>();
+        Map<String, Object> org = new HashMap<>();
+        org.put(Constants.ROLES, List.of(Constants.PROGRAM_COORDINATOR));
+        profile.put(Constants.ORGANISATIONS, List.of(org));
+
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("extractUserRole", Map.class);
+        method.setAccessible(true);
+        String role = (String) method.invoke(bpWorkFlowService, profile);
+
+        assertEquals(Constants.PC, role);
+    }
+
+    @Test
+    void extractUserRole_shouldReturnPC_whenBpProgramTrainerRole() throws Exception {
+        Map<String, Object> profile = new HashMap<>();
+        Map<String, Object> org = new HashMap<>();
+        org.put(Constants.ROLES, List.of(Constants.BP_PROGRAM_TRAINER));
+        profile.put(Constants.ORGANISATIONS, List.of(org));
+
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("extractUserRole", Map.class);
+        method.setAccessible(true);
+        String role = (String) method.invoke(bpWorkFlowService, profile);
+
+        assertEquals(Constants.PC, role);
+    }
+
+    @Test
+    void extractUserRole_shouldReturnSelf_whenNeitherCoordinatorNorTrainerNorAdminRole() throws Exception {
+        Map<String, Object> profile = new HashMap<>();
+        Map<String, Object> org = new HashMap<>();
+        org.put(Constants.ROLES, List.of("SOME_OTHER_ROLE"));
+        profile.put(Constants.ORGANISATIONS, List.of(org));
+
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("extractUserRole", Map.class);
+        method.setAccessible(true);
+        String role = (String) method.invoke(bpWorkFlowService, profile);
+
+        assertEquals(Constants.SELF, role);
+    }
+
 }
