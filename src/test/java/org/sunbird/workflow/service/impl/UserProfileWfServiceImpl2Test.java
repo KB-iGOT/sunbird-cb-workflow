@@ -303,4 +303,47 @@ class UserProfileWfServiceImpl2Test {
         verify(producer, never()).pushWithKey(anyString(), any(), anyString());
     }
 
+    @Test
+    void testUpdateUserProfileV2_profileDetailsNull_doesNotPublishKarmaEventAndDoesNotThrow() {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setApplicationId(APP_ID);
+        wfRequest.setWfId(WF_ID);
+        wfRequest.setServiceName(Constants.PROFILE_SERVICE_NAME);
+        wfRequest.setUserId(USER_ID);
+        wfRequest.setActorUserId("approver1");
+
+        Map<String, Object> professionalDetail = new HashMap<>();
+        professionalDetail.put(Constants.GROUP, "group1");
+        professionalDetail.put(Constants.DESIGNATION, "designation1");
+
+        HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.FIELD_KEY, Constants.PROFESSIONAL_DETAILS);
+        updateField.put(Constants.TO_VALUE, professionalDetail);
+        wfRequest.setUpdateFieldValues(Collections.singletonList(updateField));
+
+        // response has no PROFILE_DETAILS entry -> profileDetails resolves to null
+        Map<String, Object> response = new HashMap<>();
+        Map<String, Object> result = new HashMap<>();
+        result.put(Constants.RESPONSE, response);
+        Map<String, Object> readData = new HashMap<>();
+        readData.put(Constants.RESPONSE_CODE, Constants.OK);
+        readData.put(Constants.RESULT, result);
+
+        when(configuration.getLmsServiceHost()).thenReturn("http://lms-host/");
+        when(configuration.getUserProfileReadEndPoint()).thenReturn("/user/read/" + Constants.USER_ID_VALUE);
+
+        when(requestServiceImpl.fetchResultUsingGet(any())).thenReturn(readData);
+        when(mapper.convertValue(any(), eq(Map.class))).thenReturn(readData);
+
+        WfStatusEntity wfStatusEntity = new WfStatusEntity();
+        wfStatusEntity.setCurrentStatus(Constants.APPROVED_STATE);
+        when(wfStatusRepo.findByApplicationIdAndWfId(APP_ID, WF_ID)).thenReturn(wfStatusEntity);
+
+        // profileDetails is null -> updateRequestWithWF NPEs internally, caught by the
+        // outer try/catch, so the method must exit quietly without publishing a karma event.
+        assertDoesNotThrow(() -> service.updateUserProfileV2(Collections.singletonList(wfRequest), USER_ID, null));
+
+        verify(producer, never()).pushWithKey(anyString(), any(), anyString());
+    }
+
 }
