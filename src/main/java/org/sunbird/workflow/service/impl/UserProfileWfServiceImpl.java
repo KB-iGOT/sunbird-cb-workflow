@@ -14,7 +14,6 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -41,36 +40,45 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 
 	private Logger logger = LoggerFactory.getLogger(UserProfileWfServiceImpl.class);
 
+	private final RequestServiceImpl requestServiceImpl;
 
-	@Autowired
-	private RequestServiceImpl requestServiceImpl;
+	private final Configuration configuration;
 
-	@Autowired
-	private Configuration configuration;
+	private final RestTemplate restTemplate;
 
-	@Autowired
-	private RestTemplate restTemplate;
+	private final ObjectMapper mapper;
 
-	@Autowired
-	private ObjectMapper mapper;
+	private final WfStatusRepo wfStatusRepo;
 
-	@Autowired
-	private WfStatusRepo wfStatusRepo;
+	private final WorkflowServiceImpl workflowService;
 
-	@Autowired
-	@Qualifier("workflowServiceImpl")
-	WorkflowServiceImpl workflowService;
+	private final WorkflowAuditProcessingServiceImpl workflowAuditProcessingService;
 
-	@Autowired
-	private WorkflowAuditProcessingServiceImpl workflowAuditProcessingService;
+	private final RedisCacheMgr redisCacheMgr;
 
-	@Autowired
-	private RedisCacheMgr redisCacheMgr;
-
-	@Autowired
-	private Producer producer;
+	private final Producer producer;
 
     private final List<String> stateOrMinistry = Arrays.asList("16", "2048");
+
+	public UserProfileWfServiceImpl(RequestServiceImpl requestServiceImpl,
+			Configuration configuration,
+			RestTemplate restTemplate,
+			ObjectMapper mapper,
+			WfStatusRepo wfStatusRepo,
+			@Qualifier("workflowServiceImpl") WorkflowServiceImpl workflowService,
+			WorkflowAuditProcessingServiceImpl workflowAuditProcessingService,
+			RedisCacheMgr redisCacheMgr,
+			Producer producer) {
+		this.requestServiceImpl = requestServiceImpl;
+		this.configuration = configuration;
+		this.restTemplate = restTemplate;
+		this.mapper = mapper;
+		this.wfStatusRepo = wfStatusRepo;
+		this.workflowService = workflowService;
+		this.workflowAuditProcessingService = workflowAuditProcessingService;
+		this.redisCacheMgr = redisCacheMgr;
+		this.producer = producer;
+	}
 	/**
 	 * Update user profile based on wf request
 	 *
@@ -630,11 +638,7 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 		try {
 			Map<String, Object> readData = (Map<String, Object>) userProfileRead(userId);
 			if (readData != null && !Constants.OK.equals(readData.get(Constants.RESPONSE_CODE))) {
-				Map<String, Object> params = (Map<String, Object>) readData.getOrDefault(Constants.PARAMS, Collections.emptyMap());
-				String detailedError = (String) params.getOrDefault(Constants.ERROR_MESSAGE, "No additional details provided.");
-				String errorMessage = "User not found: " + detailedError;
-				logger.error(errorMessage);
-				wfRequests.forEach(wfRequest -> failedCase(wfRequest, errorMessage));
+				handleUserProfileReadFailure(wfRequests, readData);
 				return;
 			}
 			Map<String, Object> existingUserResults = (Map<String, Object>) readData.get(Constants.RESULT);
@@ -644,37 +648,54 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 					: (String) profileDetails.get(Constants.PROFILE_STATUS);
 			boolean isUpdateRequired = false;
 			for (WfRequest wfRequest : wfRequests) {
-				WfStatusEntity wfStatusEntity = wfStatusRepo.findByApplicationIdAndWfId(wfRequest.getApplicationId(),
-						wfRequest.getWfId());
-				if ((Constants.PROFILE_SERVICE_NAME.equals(wfRequest.getServiceName()) && Constants.APPROVED_STATE.equals(wfStatusEntity.getCurrentStatus()))
-						|| (Constants.USER_PROFILE_FLAG_SERVICE.equals(wfRequest.getServiceName()) && Constants.PROCESSED_STATE.equals(wfStatusEntity.getCurrentStatus()))) {
-
-					List<HashMap<String, Object>> updatedFieldValues = wfRequest.getUpdateFieldValues();
-					HashMap<String, Object> updatedFieldValueElement = updatedFieldValues.get(0);
-					HashMap<String, Object> toValueList = (HashMap<String, Object>) updatedFieldValueElement.get(Constants.TO_VALUE);
-					for (String key : toValueList.keySet()) {
-						if (Constants.NAME.equals(key) && StringUtils.isNotEmpty((String) toValueList.get(Constants.NAME))) {
-							updateProfile(wfRequest, userToken);
-						} else {
-							Map<String, Object> updateRequest = updateRequestWithWF(wfRequest.getUserId(), wfRequest.getUpdateFieldValues(), profileDetails);
-							isUpdateRequired = true;
-							if (updateRequest == null) {
-								logger.error("User profile data type error for request: {}", wfRequest.getWfId());
-								failedCase(wfRequest, "User profile data type error.");
-							}
-						}
-					}
+				if (isProfileUpdateApplicable(wfRequest)) {
+					isUpdateRequired |= processProfileUpdateRequest(wfRequest, userToken, profileDetails);
 				}
 			}
 			if (isUpdateRequired) {
-				updateUserProfileData(userId, profileDetails, wfRequests, existingUserResponse, previousProfileStatus);
+				updateUserProfileData(userId, profileDetails, wfRequests, previousProfileStatus);
 			}
 		} catch (Exception e) {
 			logger.error("Exception occurred : ", e);
 		}
 	}
 
-	private void updateUserProfileData(String userId, Map<String, Object> profileDetails, List<WfRequest> wfRequests, Map<String, Object> userDetails, String previousProfileStatus) {
+	private void handleUserProfileReadFailure(List<WfRequest> wfRequests, Map<String, Object> readData) {
+		Map<String, Object> params = (Map<String, Object>) readData.getOrDefault(Constants.PARAMS, Collections.emptyMap());
+		String detailedError = (String) params.getOrDefault(Constants.ERROR_MESSAGE, "No additional details provided.");
+		String errorMessage = "User not found: " + detailedError;
+		logger.error(errorMessage);
+		wfRequests.forEach(wfRequest -> failedCase(wfRequest, errorMessage));
+	}
+
+	private boolean isProfileUpdateApplicable(WfRequest wfRequest) {
+		WfStatusEntity wfStatusEntity = wfStatusRepo.findByApplicationIdAndWfId(wfRequest.getApplicationId(),
+				wfRequest.getWfId());
+		return (Constants.PROFILE_SERVICE_NAME.equals(wfRequest.getServiceName()) && Constants.APPROVED_STATE.equals(wfStatusEntity.getCurrentStatus()))
+				|| (Constants.USER_PROFILE_FLAG_SERVICE.equals(wfRequest.getServiceName()) && Constants.PROCESSED_STATE.equals(wfStatusEntity.getCurrentStatus()));
+	}
+
+	private boolean processProfileUpdateRequest(WfRequest wfRequest, String userToken, Map<String, Object> profileDetails) {
+		boolean updateRequired = false;
+		List<HashMap<String, Object>> updatedFieldValues = wfRequest.getUpdateFieldValues();
+		HashMap<String, Object> updatedFieldValueElement = updatedFieldValues.get(0);
+		HashMap<String, Object> toValueList = (HashMap<String, Object>) updatedFieldValueElement.get(Constants.TO_VALUE);
+		for (String key : toValueList.keySet()) {
+			if (Constants.NAME.equals(key) && StringUtils.isNotEmpty((String) toValueList.get(Constants.NAME))) {
+				updateProfile(wfRequest, userToken);
+			} else {
+				Map<String, Object> updateRequest = updateRequestWithWF(wfRequest.getUserId(), wfRequest.getUpdateFieldValues(), profileDetails);
+				updateRequired = true;
+				if (updateRequest == null) {
+					logger.error("User profile data type error for request: {}", wfRequest.getWfId());
+					failedCase(wfRequest, "User profile data type error.");
+				}
+			}
+		}
+		return updateRequired;
+	}
+
+	private void updateUserProfileData(String userId, Map<String, Object> profileDetails, List<WfRequest> wfRequests, String previousProfileStatus) {
 		try {
 			Map<String, Object> profileUpdateRequest = new HashMap<>();
 			profileUpdateRequest.put(Constants.USER_ID, userId);
