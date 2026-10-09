@@ -1349,6 +1349,65 @@ class UserProfileWfServiceImplTest {
     }
 
     @Test
+    void isProfileUpdateApplicable_shouldReturnFalse_whenProfileServiceNotApproved() throws Exception {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setApplicationId("appId");
+        wfRequest.setWfId("wfId");
+        wfRequest.setServiceName(Constants.PROFILE_SERVICE_NAME);
+
+        WfStatusEntity wfStatusEntity = new WfStatusEntity();
+        wfStatusEntity.setCurrentStatus("PENDING");
+        when(wfStatusRepo.findByApplicationIdAndWfId("appId", "wfId")).thenReturn(wfStatusEntity);
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod("isProfileUpdateApplicable", WfRequest.class);
+        method.setAccessible(true);
+        boolean result = (boolean) method.invoke(userProfileWfServiceImpl, wfRequest);
+
+        assertFalse(result);
+    }
+
+    @Test
+    void isProfileUpdateApplicable_shouldReturnFalse_whenUserProfileFlagNotProcessed() throws Exception {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setApplicationId("appId");
+        wfRequest.setWfId("wfId");
+        wfRequest.setServiceName(Constants.USER_PROFILE_FLAG_SERVICE);
+
+        WfStatusEntity wfStatusEntity = new WfStatusEntity();
+        wfStatusEntity.setCurrentStatus("PENDING");
+        when(wfStatusRepo.findByApplicationIdAndWfId("appId", "wfId")).thenReturn(wfStatusEntity);
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod("isProfileUpdateApplicable", WfRequest.class);
+        method.setAccessible(true);
+        boolean result = (boolean) method.invoke(userProfileWfServiceImpl, wfRequest);
+
+        assertFalse(result);
+    }
+
+    @Test
+    void processProfileUpdateRequest_shouldTreatBlankNameAsNonNameUpdate() throws Exception {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setUserId("user1");
+
+        Map<String, Object> toValue = new HashMap<>();
+        toValue.put(Constants.NAME, "");
+        HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.FIELD_KEY, Constants.PROFESSIONAL_DETAILS);
+        updateField.put(Constants.TO_VALUE, toValue);
+        wfRequest.setUpdateFieldValues(Collections.singletonList(updateField));
+
+        Map<String, Object> profileDetails = new HashMap<>();
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
+                "processProfileUpdateRequest", WfRequest.class, String.class, Map.class);
+        method.setAccessible(true);
+        boolean result = (boolean) method.invoke(userProfileWfServiceImpl, wfRequest, null, profileDetails);
+
+        // Blank NAME value -> falls to the else branch (updateRequestWithWF), not updateProfile
+        assertTrue(result);
+    }
+
+    @Test
     void handleUserProfileReadFailure_shouldMarkAllRequestsFailed() throws Exception {
         WfRequest wfRequest = new WfRequest();
         wfRequest.setApplicationId("appId");
