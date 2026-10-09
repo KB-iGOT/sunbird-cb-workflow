@@ -1614,4 +1614,62 @@ class BPWorkFlowServiceImplTest {
         assertEquals(Constants.SELF, role);
     }
 
+    @Test
+    void extractUserRole_shouldReturnMDO_whenMdoAdminRole() throws Exception {
+        Map<String, Object> profile = new HashMap<>();
+        Map<String, Object> orgMap = new HashMap<>();
+        orgMap.put(Constants.ROLES, List.of(Constants.MDO_ADMIN));
+        profile.put(Constants.ORGANISATIONS, List.of(orgMap));
+
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("extractUserRole", Map.class);
+        method.setAccessible(true);
+        String role = (String) method.invoke(bpWorkFlowService, profile);
+
+        assertEquals(Constants.MDO, role);
+    }
+
+    @Test
+    void extractUserRole_shouldReturnMDO_whenMdoLeaderRole() throws Exception {
+        Map<String, Object> profile = new HashMap<>();
+        Map<String, Object> orgMap = new HashMap<>();
+        orgMap.put(Constants.ROLES, List.of(Constants.MDO_LEADER));
+        profile.put(Constants.ORGANISATIONS, List.of(orgMap));
+
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("extractUserRole", Map.class);
+        method.setAccessible(true);
+        String role = (String) method.invoke(bpWorkFlowService, profile);
+
+        assertEquals(Constants.MDO, role);
+    }
+
+    @Test
+    void extractUserRole_shouldReturnSelf_whenOrgRolesIsNullOrEmpty() throws Exception {
+        Map<String, Object> profile = new HashMap<>();
+        Map<String, Object> orgWithNullRoles = new HashMap<>();
+        orgWithNullRoles.put(Constants.ROLES, null);
+        Map<String, Object> orgWithEmptyRoles = new HashMap<>();
+        orgWithEmptyRoles.put(Constants.ROLES, Collections.emptyList());
+        profile.put(Constants.ORGANISATIONS, List.of(orgWithNullRoles, orgWithEmptyRoles));
+
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("extractUserRole", Map.class);
+        method.setAccessible(true);
+        String role = (String) method.invoke(bpWorkFlowService, profile);
+
+        assertEquals(Constants.SELF, role);
+    }
+
+    @Test
+    void extractUserRole_shouldReturnSelf_whenOrganisationsIsMalformed() throws Exception {
+        Map<String, Object> profile = new HashMap<>();
+        // Not a List -> triggers a ClassCastException inside the try block, caught and logged,
+        // falling back to SELF instead of propagating.
+        profile.put(Constants.ORGANISATIONS, "not-a-list");
+
+        Method method = BPWorkFlowServiceImpl.class.getDeclaredMethod("extractUserRole", Map.class);
+        method.setAccessible(true);
+        String role = (String) method.invoke(bpWorkFlowService, profile);
+
+        assertEquals(Constants.SELF, role);
+    }
+
 }

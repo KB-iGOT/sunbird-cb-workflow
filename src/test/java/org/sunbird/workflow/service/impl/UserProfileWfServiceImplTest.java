@@ -1294,4 +1294,83 @@ class UserProfileWfServiceImplTest {
         verify(producer, times(1)).pushWithKey(eq("dev.karma.points.unified.v2.event"), any(), eq(userId));
     }
 
+    @Test
+    void isProfileUpdateApplicable_shouldReturnTrue_whenProfileServiceApproved() throws Exception {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setApplicationId("appId");
+        wfRequest.setWfId("wfId");
+        wfRequest.setServiceName(Constants.PROFILE_SERVICE_NAME);
+
+        WfStatusEntity wfStatusEntity = new WfStatusEntity();
+        wfStatusEntity.setCurrentStatus(Constants.APPROVED_STATE);
+        when(wfStatusRepo.findByApplicationIdAndWfId("appId", "wfId")).thenReturn(wfStatusEntity);
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod("isProfileUpdateApplicable", WfRequest.class);
+        method.setAccessible(true);
+        boolean result = (boolean) method.invoke(userProfileWfServiceImpl, wfRequest);
+
+        assertTrue(result);
+    }
+
+    @Test
+    void isProfileUpdateApplicable_shouldReturnTrue_whenUserProfileFlagProcessed() throws Exception {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setApplicationId("appId");
+        wfRequest.setWfId("wfId");
+        wfRequest.setServiceName(Constants.USER_PROFILE_FLAG_SERVICE);
+
+        WfStatusEntity wfStatusEntity = new WfStatusEntity();
+        wfStatusEntity.setCurrentStatus(Constants.PROCESSED_STATE);
+        when(wfStatusRepo.findByApplicationIdAndWfId("appId", "wfId")).thenReturn(wfStatusEntity);
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod("isProfileUpdateApplicable", WfRequest.class);
+        method.setAccessible(true);
+        boolean result = (boolean) method.invoke(userProfileWfServiceImpl, wfRequest);
+
+        assertTrue(result);
+    }
+
+    @Test
+    void isProfileUpdateApplicable_shouldReturnFalse_whenNeitherConditionMatches() throws Exception {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setApplicationId("appId");
+        wfRequest.setWfId("wfId");
+        wfRequest.setServiceName("SomeOtherService");
+
+        WfStatusEntity wfStatusEntity = new WfStatusEntity();
+        wfStatusEntity.setCurrentStatus("DRAFT");
+        when(wfStatusRepo.findByApplicationIdAndWfId("appId", "wfId")).thenReturn(wfStatusEntity);
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod("isProfileUpdateApplicable", WfRequest.class);
+        method.setAccessible(true);
+        boolean result = (boolean) method.invoke(userProfileWfServiceImpl, wfRequest);
+
+        assertFalse(result);
+    }
+
+    @Test
+    void handleUserProfileReadFailure_shouldMarkAllRequestsFailed() throws Exception {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setApplicationId("appId");
+        wfRequest.setWfId("wfId");
+        List<WfRequest> wfRequests = Collections.singletonList(wfRequest);
+
+        Map<String, Object> params = new HashMap<>();
+        params.put(Constants.ERROR_MESSAGE, "user not found upstream");
+        Map<String, Object> readData = new HashMap<>();
+        readData.put(Constants.PARAMS, params);
+
+        WfStatusEntity wfStatusEntity = new WfStatusEntity();
+        when(wfStatusRepo.findByApplicationIdAndWfId("appId", "wfId")).thenReturn(wfStatusEntity);
+        when(wfStatusRepo.save(any())).thenReturn(wfStatusEntity);
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod("handleUserProfileReadFailure", List.class, Map.class);
+        method.setAccessible(true);
+        method.invoke(userProfileWfServiceImpl, wfRequests, readData);
+
+        verify(wfStatusRepo).save(wfStatusEntity);
+        assert "FAILED".equals(wfRequest.getState());
+        assert "FAILED".equals(wfStatusEntity.getCurrentStatus());
+    }
+
 }
