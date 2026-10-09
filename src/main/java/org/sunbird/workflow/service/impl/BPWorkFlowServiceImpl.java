@@ -1897,7 +1897,9 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
                     }
                 }
             }
-        } catch (Exception ignore) {}
+        } catch (Exception e) {
+            logger.warn("Unable to extract user role from profile, defaulting to SELF: {}", e.getMessage());
+        }
 
         return Constants.SELF;
     }
@@ -1905,7 +1907,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
     @SuppressWarnings("unchecked")
     private String resolveRoleFromOrg(Map<String, Object> org) {
         List<String> roles = (List<String>) org.get(Constants.ROLES);
-        if (roles == null) {
+        if (CollectionUtils.isEmpty(roles)) {
             return null;
         }
 

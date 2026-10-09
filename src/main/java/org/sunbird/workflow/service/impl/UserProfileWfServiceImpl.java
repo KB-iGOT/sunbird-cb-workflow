@@ -18,7 +18,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
-import org.springframework.web.client.RestTemplate;
 import org.sunbird.workflow.config.Configuration;
 import org.sunbird.workflow.config.Constants;
 import org.sunbird.workflow.config.RedisCacheMgr;
@@ -44,15 +43,11 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 
 	private final Configuration configuration;
 
-	private final RestTemplate restTemplate;
-
 	private final ObjectMapper mapper;
 
 	private final WfStatusRepo wfStatusRepo;
 
 	private final WorkflowServiceImpl workflowService;
-
-	private final WorkflowAuditProcessingServiceImpl workflowAuditProcessingService;
 
 	private final RedisCacheMgr redisCacheMgr;
 
@@ -62,20 +57,16 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 
 	public UserProfileWfServiceImpl(RequestServiceImpl requestServiceImpl,
 			Configuration configuration,
-			RestTemplate restTemplate,
 			ObjectMapper mapper,
 			WfStatusRepo wfStatusRepo,
 			@Qualifier("workflowServiceImpl") WorkflowServiceImpl workflowService,
-			WorkflowAuditProcessingServiceImpl workflowAuditProcessingService,
 			RedisCacheMgr redisCacheMgr,
 			Producer producer) {
 		this.requestServiceImpl = requestServiceImpl;
 		this.configuration = configuration;
-		this.restTemplate = restTemplate;
 		this.mapper = mapper;
 		this.wfStatusRepo = wfStatusRepo;
 		this.workflowService = workflowService;
-		this.workflowAuditProcessingService = workflowAuditProcessingService;
 		this.redisCacheMgr = redisCacheMgr;
 		this.producer = producer;
 	}
