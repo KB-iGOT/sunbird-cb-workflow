@@ -13,7 +13,6 @@ import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -54,39 +53,51 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
 
     private Logger logger = LoggerFactory.getLogger(BPWorkFlowServiceImpl.class);
 
-    @Autowired
-    @Qualifier("workflowServiceImpl")
-    private Workflowservice workflowService;
+    private final Workflowservice workflowService;
 
-    @Autowired
-    private CassandraOperation cassandraOperation;
+    private final CassandraOperation cassandraOperation;
 
-    @Autowired
-    private RequestServiceImpl requestServiceImpl;
+    private final RequestServiceImpl requestServiceImpl;
 
-    @Autowired
-    private Configuration configuration;
+    private final Configuration configuration;
 
-    @Autowired
-    private WfStatusRepo wfStatusRepo;
+    private final WfStatusRepo wfStatusRepo;
 
-    @Autowired
-    private AccessTokenValidator accessTokenValidator;
+    private final AccessTokenValidator accessTokenValidator;
 
-    @Autowired
-    private ObjectMapper mapper;
+    private final ObjectMapper mapper;
 
-    @Autowired
-    private Producer producer;
+    private final Producer producer;
 
-    @Autowired
-    private ContentReadService contentReadService;
+    private final ContentReadService contentReadService;
 
-    @Autowired
-    private UserUtil userUtils;
+    private final UserUtil userUtils;
 
-    @Autowired
-    ElasticsearchServiceManager elasticsearchServiceManager;
+    private final ElasticsearchServiceManager elasticsearchServiceManager;
+
+    public BPWorkFlowServiceImpl(@Qualifier("workflowServiceImpl") Workflowservice workflowService,
+                                 CassandraOperation cassandraOperation,
+                                 RequestServiceImpl requestServiceImpl,
+                                 Configuration configuration,
+                                 WfStatusRepo wfStatusRepo,
+                                 AccessTokenValidator accessTokenValidator,
+                                 ObjectMapper mapper,
+                                 Producer producer,
+                                 ContentReadService contentReadService,
+                                 UserUtil userUtils,
+                                 ElasticsearchServiceManager elasticsearchServiceManager) {
+        this.workflowService = workflowService;
+        this.cassandraOperation = cassandraOperation;
+        this.requestServiceImpl = requestServiceImpl;
+        this.configuration = configuration;
+        this.wfStatusRepo = wfStatusRepo;
+        this.accessTokenValidator = accessTokenValidator;
+        this.mapper = mapper;
+        this.producer = producer;
+        this.contentReadService = contentReadService;
+        this.userUtils = userUtils;
+        this.elasticsearchServiceManager = elasticsearchServiceManager;
+    }
 
     @Value("${es.org.eligibility.index}")
     private String orgeligibilityIndex;

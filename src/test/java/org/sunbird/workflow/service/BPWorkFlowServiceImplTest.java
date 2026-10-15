@@ -129,7 +129,7 @@ class BPWorkFlowServiceImplTest {
     @Test
     void testGenerateUserApprovalCsv_IOException() throws Exception {
         SearchCriteria criteria = new SearchCriteria();
-        BPWorkFlowServiceImpl spyService = Mockito.spy(new BPWorkFlowServiceImpl());
+        BPWorkFlowServiceImpl spyService = Mockito.spy(newService());
         ReflectionTestUtils.setField(spyService, "workflowService", workflowservice);
 
         Map<String, Object> userInfo = Map.of("email", "test@example.com", "firstName", "John");
@@ -210,6 +210,10 @@ class BPWorkFlowServiceImplTest {
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         SBApiResponse body = (SBApiResponse) response.getBody();
         assertEquals("FAILED", body.getParams().getStatus());
+    }
+
+    private static BPWorkFlowServiceImpl newService() {
+        return new BPWorkFlowServiceImpl(null, null, null, null, null, null, null, null, null, null, null);
     }
 
     private WfRequest getRequest() {
