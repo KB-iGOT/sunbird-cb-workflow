@@ -71,6 +71,9 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
     private WfStatusRepo wfStatusRepo;
 
     @Autowired
+    private AccessTokenValidator accessTokenValidator;
+
+    @Autowired
     private ObjectMapper mapper;
 
     @Autowired
@@ -616,6 +619,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         }
         applicationStatus.setDeptName(wfRequest.getDeptName());
         applicationStatus.setComment(wfRequest.getComment());
+        applicationStatus.setContentId(wfRequest.getCourseId());
         wfRequest.setWfId(wfId);
         wfStatusRepo.save(applicationStatus);
 
@@ -978,6 +982,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         }
         applicationStatus.setDeptName(wfRequest.getDeptName());
         applicationStatus.setComment(wfRequest.getComment());
+        applicationStatus.setContentId(wfRequest.getCourseId());
         wfRequest.setWfId(wfId);
         wfStatusRepo.save(applicationStatus);
         Response response = new Response();
@@ -1798,6 +1803,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
             logger.warn("Failed to serialize updateFieldValues", e);
         }
         entity.setComment("Auto-approved via nomination wrapper (PC final)");
+        entity.setContentId(wfRequest.getCourseId());
 
         WfStatusEntity saved = wfStatusRepo.save(entity);
         return saved;
@@ -1988,6 +1994,30 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         logger.info("courseIds in orgEligibilityIndex -> " + courseIds.toString());
         return !CollectionUtils.isEmpty(courseIds)
                 && courseIds.contains(courseId);
+    }
+
+    @Override
+    public Response getWorkflowDetailsByContentId(String contentId, String serviceName, String userAuthToken) {
+        Response response = new Response();
+        String userId = accessTokenValidator.fetchUserIdFromAccessToken(userAuthToken);
+        if (StringUtils.isBlank(userId)) {
+            return errorResponse(Constants.INVALID_USER_TOKEN, HttpStatus.BAD_REQUEST);
+        }
+        if (StringUtils.isBlank(contentId) || StringUtils.isBlank(serviceName)) {
+            return errorResponse(Constants.CONTENT_ID_SERVICE_NAME_MANDATORY, HttpStatus.BAD_REQUEST);
+        }
+        List<String> serviceNames = new ArrayList<>();
+        if (Constants.BLENDED_PROGRAM_SERVICE_NAME.equalsIgnoreCase(serviceName)) {
+            serviceNames.addAll(configuration.getBpWorkflowServiceNames());
+        } else {
+            serviceNames.add(serviceName);
+        }
+        List<WfStatusEntity> wfStatusEntities = wfStatusRepo.findByContentIdAndServiceNameInAndUserId(
+                contentId, serviceNames, userId);
+        response.put(Constants.MESSAGE, Constants.SUCCESSFUL);
+        response.put(Constants.DATA, wfStatusEntities);
+        response.put(Constants.STATUS, HttpStatus.OK);
+        return response;
     }
 
 }

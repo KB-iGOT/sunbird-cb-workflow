@@ -178,4 +178,30 @@ class BPWorkFlowControllerTest {
         verify(bPWorkFlowService, times(1)).removeApprovedUser(wfRequest, isPc);
     }
 
+    @Test
+    void testGetWorkflowDetails_passesTokenContentIdAndServiceNameToService() {
+        Map<String, Object> body = new HashMap<>();
+        body.put(Constants.CONTENT_ID, "do_123");
+        body.put(Constants.SERVICE_NAME, Constants.BLENDED_PROGRAM_SERVICE_NAME);
+        when(bPWorkFlowService.getWorkflowDetailsByContentId("do_123", Constants.BLENDED_PROGRAM_SERVICE_NAME, "token"))
+                .thenReturn(mockResponse);
+
+        ResponseEntity<Response> res = controller.getWorkflowDetails("token", body);
+
+        assertEquals(HttpStatus.OK, res.getStatusCode());
+        assertSame(mockResponse, res.getBody());
+        verify(bPWorkFlowService).getWorkflowDetailsByContentId("do_123", Constants.BLENDED_PROGRAM_SERVICE_NAME, "token");
+    }
+
+    @Test
+    void testGetWorkflowDetails_returnsServiceErrorStatus() {
+        Response error = new Response();
+        error.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+        when(bPWorkFlowService.getWorkflowDetailsByContentId(null, null, "bad")).thenReturn(error);
+
+        ResponseEntity<Response> res = controller.getWorkflowDetails("bad", new HashMap<>());
+
+        assertEquals(HttpStatus.BAD_REQUEST, res.getStatusCode());
+    }
+
 }

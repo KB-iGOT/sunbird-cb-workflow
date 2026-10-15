@@ -191,4 +191,14 @@ public class BPWorkFlowController {
         return new ResponseEntity<>(response, statusCode);
     }
 
+    @PostMapping(path = "/details", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Response> getWorkflowDetails(
+            @RequestHeader(Constants.X_AUTH_TOKEN) String userAuthToken,
+            @RequestBody Map<String, Object> requestBody) {
+        String contentId = (String) requestBody.get(Constants.CONTENT_ID);
+        String serviceName = (String) requestBody.get(Constants.SERVICE_NAME);
+        Response response = bPWorkFlowService.getWorkflowDetailsByContentId(contentId, serviceName, userAuthToken);
+        return new ResponseEntity<>(response, (HttpStatus) response.get(Constants.STATUS));
+    }
+
 }

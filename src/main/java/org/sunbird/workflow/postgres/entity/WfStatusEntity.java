@@ -61,6 +61,9 @@ public class WfStatusEntity {
 	@Column(name = "request_type")
 	private String requestType;
 
+	@Column(name = "content_id")
+	private String contentId;
+
 	@Transient
 	private boolean isOrgTansferRequest = false;
 
@@ -206,5 +209,13 @@ public class WfStatusEntity {
 
 	public void setRequestType(String requestType) {
 		this.requestType = requestType;
+	}
+
+	public String getContentId() {
+		return contentId;
+	}
+
+	public void setContentId(String contentId) {
+		this.contentId = contentId;
 	}
 }

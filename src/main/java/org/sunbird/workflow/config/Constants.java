@@ -361,6 +361,9 @@ public class Constants {
 	public static final String WITHDRAWN = "WITHDRAWN";
 	public static final String WORKFLOW_REQUESTS = "workflowRequests";
 	public static final String SERVICE_NAME = "serviceName";
+	public static final String CONTENT_ID = "contentId";
+	public static final String INVALID_USER_TOKEN = "Invalid User Token";
+	public static final String CONTENT_ID_SERVICE_NAME_MANDATORY = "contentId and serviceName are mandatory";
 	public static final String QUERY = "query";
 	public static final String LIMIT = "limit";
 	public static final String OFFSET = "offset";

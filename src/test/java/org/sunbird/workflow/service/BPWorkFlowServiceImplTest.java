@@ -27,6 +27,7 @@ import org.sunbird.workflow.postgres.repo.WfStatusRepo;
 import org.sunbird.workflow.producer.Producer;
 import org.sunbird.workflow.service.impl.BPWorkFlowServiceImpl;
 import org.sunbird.workflow.service.impl.RequestServiceImpl;
+import org.sunbird.workflow.utils.AccessTokenValidator;
 import org.sunbird.workflow.utils.CassandraOperation;
 import org.sunbird.workflow.utils.UserUtil;
 
@@ -52,6 +53,9 @@ class BPWorkFlowServiceImplTest {
 
     @Mock
     private WfStatusRepo wfStatusRepo;
+
+    @Mock
+    private AccessTokenValidator accessTokenValidator;
 
     @Spy
     private Logger logger = LoggerFactory.getLogger(BPWorkFlowServiceImplTest.class);
@@ -1670,6 +1674,131 @@ class BPWorkFlowServiceImplTest {
         String role = (String) method.invoke(bpWorkFlowService, profile);
 
         assertEquals(Constants.SELF, role);
+    }
+
+    private static final String DETAILS_CONTENT_ID = "do_details_123";
+    private static final String DETAILS_TOKEN = "details-token";
+    private static final String DETAILS_USER_ID = "details-user-1";
+
+    @Test
+    void getWorkflowDetailsByContentId_blendedProgramUsesConfiguredServiceNames() {
+        List<String> names = Arrays.asList(Constants.BLENDED_PROGRAM_SERVICE_NAME, Constants.ONE_STEP_MDO_APPROVAL);
+        WfStatusEntity entity = new WfStatusEntity();
+        entity.setContentId(DETAILS_CONTENT_ID);
+        when(accessTokenValidator.fetchUserIdFromAccessToken(DETAILS_TOKEN)).thenReturn(DETAILS_USER_ID);
+        when(configuration.getBpWorkflowServiceNames()).thenReturn(names);
+        when(wfStatusRepo.findByContentIdAndServiceNameInAndUserId(DETAILS_CONTENT_ID, names, DETAILS_USER_ID))
+                .thenReturn(Collections.singletonList(entity));
+
+        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(
+                DETAILS_CONTENT_ID, Constants.BLENDED_PROGRAM_SERVICE_NAME, DETAILS_TOKEN);
+
+        assertEquals(HttpStatus.OK, response.get(Constants.STATUS));
+        assertEquals(Constants.SUCCESSFUL, response.get(Constants.MESSAGE));
+        assertEquals(Collections.singletonList(entity), response.get(Constants.DATA));
+    }
+
+    @Test
+    void getWorkflowDetailsByContentId_serviceNameMatchIsCaseInsensitive() {
+        List<String> names = Collections.singletonList(Constants.BLENDED_PROGRAM_SERVICE_NAME);
+        when(accessTokenValidator.fetchUserIdFromAccessToken(DETAILS_TOKEN)).thenReturn(DETAILS_USER_ID);
+        when(configuration.getBpWorkflowServiceNames()).thenReturn(names);
+        when(wfStatusRepo.findByContentIdAndServiceNameInAndUserId(DETAILS_CONTENT_ID, names, DETAILS_USER_ID))
+                .thenReturn(new ArrayList<>());
+
+        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(
+                DETAILS_CONTENT_ID, "BlendedProgram", DETAILS_TOKEN);
+
+        assertEquals(HttpStatus.OK, response.get(Constants.STATUS));
+        verify(configuration).getBpWorkflowServiceNames();
+    }
+
+    @Test
+    void getWorkflowDetailsByContentId_otherServiceNameIsQueriedAsIs() {
+        List<String> expected = Collections.singletonList("someOtherService");
+        when(accessTokenValidator.fetchUserIdFromAccessToken(DETAILS_TOKEN)).thenReturn(DETAILS_USER_ID);
+        when(wfStatusRepo.findByContentIdAndServiceNameInAndUserId(DETAILS_CONTENT_ID, expected, DETAILS_USER_ID))
+                .thenReturn(new ArrayList<>());
+
+        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(
+                DETAILS_CONTENT_ID, "someOtherService", DETAILS_TOKEN);
+
+        assertEquals(HttpStatus.OK, response.get(Constants.STATUS));
+        assertTrue(((List<?>) response.get(Constants.DATA)).isEmpty());
+        verify(configuration, never()).getBpWorkflowServiceNames();
+    }
+
+    @Test
+    void getWorkflowDetailsByContentId_invalidTokenReturnsBadRequest() {
+        when(accessTokenValidator.fetchUserIdFromAccessToken(DETAILS_TOKEN)).thenReturn(null);
+
+        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(
+                DETAILS_CONTENT_ID, Constants.BLENDED_PROGRAM_SERVICE_NAME, DETAILS_TOKEN);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.get(Constants.STATUS));
+        assertEquals(Constants.INVALID_USER_TOKEN, response.get(Constants.ERROR_MESSAGE));
+        verifyNoInteractions(wfStatusRepo);
+    }
+
+    @Test
+    void getWorkflowDetailsByContentId_blankContentIdReturnsBadRequest() {
+        when(accessTokenValidator.fetchUserIdFromAccessToken(DETAILS_TOKEN)).thenReturn(DETAILS_USER_ID);
+
+        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(
+                "", Constants.BLENDED_PROGRAM_SERVICE_NAME, DETAILS_TOKEN);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.get(Constants.STATUS));
+        assertEquals(Constants.CONTENT_ID_SERVICE_NAME_MANDATORY, response.get(Constants.ERROR_MESSAGE));
+        verifyNoInteractions(wfStatusRepo);
+    }
+
+    @Test
+    void getWorkflowDetailsByContentId_blankServiceNameReturnsBadRequest() {
+        when(accessTokenValidator.fetchUserIdFromAccessToken(DETAILS_TOKEN)).thenReturn(DETAILS_USER_ID);
+
+        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(DETAILS_CONTENT_ID, null, DETAILS_TOKEN);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.get(Constants.STATUS));
+        verifyNoInteractions(wfStatusRepo);
+    }
+
+    @Test
+    void saveEnrollUserIntoWfStatus_storesCourseIdAsContentId() {
+        WfRequest request = getRequest();
+        ArgumentCaptor<WfStatusEntity> captor = ArgumentCaptor.forClass(WfStatusEntity.class);
+
+        ReflectionTestUtils.invokeMethod(bpWorkFlowService, "saveEnrollUserIntoWfStatus", "rootOrg", "org", request);
+
+        verify(wfStatusRepo).save(captor.capture());
+        assertEquals(request.getCourseId(), captor.getValue().getContentId());
+        assertEquals(request.getApplicationId(), captor.getValue().getApplicationId());
+    }
+
+    @Test
+    void saveAdminEnrollUserIntoWfStatus_storesCourseIdAsContentId() {
+        WfRequest request = getRequest();
+        request.setServiceName(Constants.BLENDED_PROGRAM_SERVICE_NAME);
+        ArgumentCaptor<WfStatusEntity> captor = ArgumentCaptor.forClass(WfStatusEntity.class);
+
+        ReflectionTestUtils.invokeMethod(bpWorkFlowService, "saveAdminEnrollUserIntoWfStatus", "rootOrg", "org", request);
+
+        verify(wfStatusRepo).save(captor.capture());
+        assertEquals(request.getCourseId(), captor.getValue().getContentId());
+        assertEquals(Constants.BLENDED_PROGRAM_SERVICE_NAME, captor.getValue().getServiceName());
+    }
+
+    @Test
+    void persistApprovedStateDirectly_storesCourseIdAsContentId() {
+        WfRequest request = getRequest();
+        request.setServiceName(Constants.BLENDED_PROGRAM_SERVICE_NAME);
+        ArgumentCaptor<WfStatusEntity> captor = ArgumentCaptor.forClass(WfStatusEntity.class);
+        when(wfStatusRepo.save(any(WfStatusEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ReflectionTestUtils.invokeMethod(bpWorkFlowService, "persistApprovedStateDirectly", request, "rootOrg", "org");
+
+        verify(wfStatusRepo).save(captor.capture());
+        assertEquals(request.getCourseId(), captor.getValue().getContentId());
+        assertEquals(Constants.APPROVED, captor.getValue().getCurrentStatus());
     }
 
 }

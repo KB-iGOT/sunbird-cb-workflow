@@ -73,4 +73,6 @@ public interface BPWorkFlowService {
 
     public Response nominateUsers(String rootOrg, String org, String actorUserId, Map<String, Object> requestBody);
 
+    Response getWorkflowDetailsByContentId(String contentId, String serviceName, String userAuthToken);
+
 }

@@ -134,6 +134,9 @@ public class Configuration {
     @Value("${bp.batch.full.validation.exclude.states}")
     private String bpBatchFullValidationExcludeStates;
 
+    @Value("${bp.workflow.service.names}")
+    private String bpWorkflowServiceNames;
+
     @Value("${bp.batch.enrol.limit.buffer.size}")
     private Integer bpBatchEnrolLimitBufferSize;
 
@@ -720,6 +723,14 @@ public class Configuration {
 
     public void setBpAprroveAndRejectEmailTemplate(String bpAprroveAndRejectEmailTemplate) {
         this.bpAprroveAndRejectEmailTemplate = bpAprroveAndRejectEmailTemplate;
+    }
+
+    public List<String> getBpWorkflowServiceNames() {
+        return Arrays.asList(bpWorkflowServiceNames.split(",", -1));
+    }
+
+    public void setBpWorkflowServiceNames(String bpWorkflowServiceNames) {
+        this.bpWorkflowServiceNames = bpWorkflowServiceNames;
     }
 
     public List<String> getBpBatchFullValidationExcludeStates() {
