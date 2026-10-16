@@ -1767,6 +1767,34 @@ class BPWorkFlowServiceImplTest {
     }
 
     @Test
+    void getWorkflowDetailsByContentId_databaseErrorReturnsInternalServerError() {
+        when(accessTokenValidator.fetchUserIdFromAccessToken(DETAILS_TOKEN)).thenReturn(DETAILS_USER_ID);
+        when(configuration.getBpWorkflowServiceNames()).thenReturn(Collections.singletonList(Constants.BLENDED_PROGRAM_SERVICE_NAME));
+        when(wfStatusRepo.findByContentIdAndServiceNameInAndUserId(anyString(), anyList(), anyString()))
+                .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("db down"));
+
+        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(
+                DETAILS_CONTENT_ID, Constants.BLENDED_PROGRAM_SERVICE_NAME, DETAILS_TOKEN);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.get(Constants.STATUS));
+        assertEquals(Constants.WORKFLOW_DETAILS_FETCH_ERROR, response.get(Constants.ERROR_MESSAGE));
+    }
+
+    @Test
+    void getWorkflowDetailsByContentId_connectionFailureReturnsInternalServerError() {
+        when(accessTokenValidator.fetchUserIdFromAccessToken(DETAILS_TOKEN)).thenReturn(DETAILS_USER_ID);
+        when(configuration.getBpWorkflowServiceNames()).thenReturn(Collections.singletonList(Constants.BLENDED_PROGRAM_SERVICE_NAME));
+        when(wfStatusRepo.findByContentIdAndServiceNameInAndUserId(anyString(), anyList(), anyString()))
+                .thenThrow(new org.springframework.transaction.CannotCreateTransactionException("no connection"));
+
+        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(
+                DETAILS_CONTENT_ID, Constants.BLENDED_PROGRAM_SERVICE_NAME, DETAILS_TOKEN);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.get(Constants.STATUS));
+        assertEquals(Constants.WORKFLOW_DETAILS_FETCH_ERROR, response.get(Constants.ERROR_MESSAGE));
+    }
+
+    @Test
     void saveEnrollUserIntoWfStatus_storesCourseIdAsContentId() {
         WfRequest request = getRequest();
         ArgumentCaptor<WfStatusEntity> captor = ArgumentCaptor.forClass(WfStatusEntity.class);

@@ -16,11 +16,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionException;
 
 import org.springframework.util.ObjectUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -2023,8 +2025,13 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         } else {
             serviceNames.add(serviceName);
         }
-        List<WfStatusEntity> wfStatusEntities = wfStatusRepo.findByContentIdAndServiceNameInAndUserId(
-                contentId, serviceNames, userId);
+        List<WfStatusEntity> wfStatusEntities;
+        try {
+            wfStatusEntities = wfStatusRepo.findByContentIdAndServiceNameInAndUserId(contentId, serviceNames, userId);
+        } catch (DataAccessException | TransactionException e) {
+            logger.error("Failed to fetch workflow details for contentId: {}, userId: {}", contentId, userId, e);
+            return errorResponse(Constants.WORKFLOW_DETAILS_FETCH_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
         response.put(Constants.MESSAGE, Constants.SUCCESSFUL);
         response.put(Constants.DATA, wfStatusEntities);
         response.put(Constants.STATUS, HttpStatus.OK);

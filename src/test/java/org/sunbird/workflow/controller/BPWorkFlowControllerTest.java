@@ -204,4 +204,19 @@ class BPWorkFlowControllerTest {
         assertEquals(HttpStatus.BAD_REQUEST, res.getStatusCode());
     }
 
+    @Test
+    void testGetWorkflowDetails_nonStringValuesArePassedAsNull() {
+        Map<String, Object> body = new HashMap<>();
+        body.put(Constants.CONTENT_ID, 123);
+        body.put(Constants.SERVICE_NAME, List.of("blendedprogram"));
+        Response error = new Response();
+        error.put(Constants.STATUS, HttpStatus.BAD_REQUEST);
+        when(bPWorkFlowService.getWorkflowDetailsByContentId(null, null, "token")).thenReturn(error);
+
+        ResponseEntity<Response> res = controller.getWorkflowDetails("token", body);
+
+        assertEquals(HttpStatus.BAD_REQUEST, res.getStatusCode());
+        verify(bPWorkFlowService).getWorkflowDetailsByContentId(null, null, "token");
+    }
+
 }

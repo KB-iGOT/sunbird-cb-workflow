@@ -364,6 +364,7 @@ public class Constants {
 	public static final String CONTENT_ID = "contentId";
 	public static final String INVALID_USER_TOKEN = "Invalid User Token";
 	public static final String CONTENT_ID_SERVICE_NAME_MANDATORY = "contentId and serviceName are mandatory";
+	public static final String WORKFLOW_DETAILS_FETCH_ERROR = "Failed to fetch workflow details";
 	public static final String QUERY = "query";
 	public static final String LIMIT = "limit";
 	public static final String OFFSET = "offset";
