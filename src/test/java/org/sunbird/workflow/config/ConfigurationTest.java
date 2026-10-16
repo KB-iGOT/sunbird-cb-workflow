@@ -273,4 +273,13 @@ class ConfigurationTest {
         assertEquals(2, config.getKarmaPointsEventVersion());
     }
 
+    @Test
+    void testBpWorkflowServiceNames() {
+        config.setBpWorkflowServiceNames("blendedprogram,oneStepMDOApproval");
+        assertEquals(List.of("blendedprogram", "oneStepMDOApproval"), config.getBpWorkflowServiceNames());
+
+        config.setBpWorkflowServiceNames("blendedprogram");
+        assertEquals(List.of("blendedprogram"), config.getBpWorkflowServiceNames());
+    }
+
 }

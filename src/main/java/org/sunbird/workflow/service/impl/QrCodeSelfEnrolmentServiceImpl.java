@@ -444,6 +444,7 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
 
         applicationStatus.setDeptName(wfRequest.getDeptName());
         applicationStatus.setComment(wfRequest.getComment());
+        applicationStatus.setContentId(wfRequest.getCourseId());
         wfRequest.setWfId(wfId);
 
         wfStatusRepo.save(applicationStatus);

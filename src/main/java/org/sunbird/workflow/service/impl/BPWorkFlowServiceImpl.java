@@ -13,15 +13,16 @@ import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionException;
 
 import org.springframework.util.ObjectUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -54,36 +55,51 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
 
     private Logger logger = LoggerFactory.getLogger(BPWorkFlowServiceImpl.class);
 
-    @Autowired
-    @Qualifier("workflowServiceImpl")
-    private Workflowservice workflowService;
+    private final Workflowservice workflowService;
 
-    @Autowired
-    private CassandraOperation cassandraOperation;
+    private final CassandraOperation cassandraOperation;
 
-    @Autowired
-    private RequestServiceImpl requestServiceImpl;
+    private final RequestServiceImpl requestServiceImpl;
 
-    @Autowired
-    private Configuration configuration;
+    private final Configuration configuration;
 
-    @Autowired
-    private WfStatusRepo wfStatusRepo;
+    private final WfStatusRepo wfStatusRepo;
 
-    @Autowired
-    private ObjectMapper mapper;
+    private final AccessTokenValidator accessTokenValidator;
 
-    @Autowired
-    private Producer producer;
+    private final ObjectMapper mapper;
 
-    @Autowired
-    private ContentReadService contentReadService;
+    private final Producer producer;
 
-    @Autowired
-    private UserUtil userUtils;
+    private final ContentReadService contentReadService;
 
-    @Autowired
-    ElasticsearchServiceManager elasticsearchServiceManager;
+    private final UserUtil userUtils;
+
+    private final ElasticsearchServiceManager elasticsearchServiceManager;
+
+    public BPWorkFlowServiceImpl(@Qualifier("workflowServiceImpl") Workflowservice workflowService,
+                                 CassandraOperation cassandraOperation,
+                                 RequestServiceImpl requestServiceImpl,
+                                 Configuration configuration,
+                                 WfStatusRepo wfStatusRepo,
+                                 AccessTokenValidator accessTokenValidator,
+                                 ObjectMapper mapper,
+                                 Producer producer,
+                                 ContentReadService contentReadService,
+                                 UserUtil userUtils,
+                                 ElasticsearchServiceManager elasticsearchServiceManager) {
+        this.workflowService = workflowService;
+        this.cassandraOperation = cassandraOperation;
+        this.requestServiceImpl = requestServiceImpl;
+        this.configuration = configuration;
+        this.wfStatusRepo = wfStatusRepo;
+        this.accessTokenValidator = accessTokenValidator;
+        this.mapper = mapper;
+        this.producer = producer;
+        this.contentReadService = contentReadService;
+        this.userUtils = userUtils;
+        this.elasticsearchServiceManager = elasticsearchServiceManager;
+    }
 
     @Value("${es.org.eligibility.index}")
     private String orgeligibilityIndex;
@@ -616,6 +632,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         }
         applicationStatus.setDeptName(wfRequest.getDeptName());
         applicationStatus.setComment(wfRequest.getComment());
+        applicationStatus.setContentId(wfRequest.getCourseId());
         wfRequest.setWfId(wfId);
         wfStatusRepo.save(applicationStatus);
 
@@ -978,6 +995,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         }
         applicationStatus.setDeptName(wfRequest.getDeptName());
         applicationStatus.setComment(wfRequest.getComment());
+        applicationStatus.setContentId(wfRequest.getCourseId());
         wfRequest.setWfId(wfId);
         wfStatusRepo.save(applicationStatus);
         Response response = new Response();
@@ -1798,6 +1816,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
             logger.warn("Failed to serialize updateFieldValues", e);
         }
         entity.setComment("Auto-approved via nomination wrapper (PC final)");
+        entity.setContentId(wfRequest.getCourseId());
 
         WfStatusEntity saved = wfStatusRepo.save(entity);
         return saved;
@@ -1988,6 +2007,36 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         logger.info("courseIds in orgEligibilityIndex -> " + courseIds.toString());
         return !CollectionUtils.isEmpty(courseIds)
                 && courseIds.contains(courseId);
+    }
+
+    @Override
+    public Response getWorkflowDetailsByContentId(String contentId, String serviceName, String userAuthToken) {
+        Response response = new Response();
+        String userId = accessTokenValidator.fetchUserIdFromAccessToken(userAuthToken);
+        if (StringUtils.isBlank(userId)) {
+            return errorResponse(Constants.INVALID_USER_TOKEN, HttpStatus.BAD_REQUEST);
+        }
+        if (StringUtils.isBlank(contentId)) {
+            return errorResponse(Constants.CONTENT_ID_MANDATORY, HttpStatus.BAD_REQUEST);
+        }
+        List<String> serviceNames = new ArrayList<>();
+        if (StringUtils.isBlank(serviceName) || Constants.BLENDED_PROGRAM_SERVICE_NAME.equalsIgnoreCase(serviceName)) {
+            serviceNames.addAll(configuration.getBpWorkflowServiceNames());
+        } else {
+            serviceNames.add(serviceName);
+        }
+        List<WfStatusEntity> wfStatusEntities;
+        try {
+            wfStatusEntities = wfStatusRepo.findByContentIdAndUserIdAndServiceNames(
+                    contentId, userId, serviceNames);
+        } catch (DataAccessException | TransactionException e) {
+            logger.error("Failed to fetch workflow details for contentId: {}, userId: {}", contentId, userId, e);
+            return errorResponse(Constants.WORKFLOW_DETAILS_FETCH_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        response.put(Constants.MESSAGE, Constants.SUCCESSFUL);
+        response.put(Constants.DATA, wfStatusEntities);
+        response.put(Constants.STATUS, HttpStatus.OK);
+        return response;
     }
 
 }

@@ -35,9 +35,13 @@ class BPWorkFlowServiceImplPrivateMethodTest {
     private static final ZoneId APPLICATION_TIMEZONE = ZoneId.of("Asia/Kolkata");
     private static final String TIMEZONE_STRING = "Asia/Kolkata";
 
+    private static BPWorkFlowServiceImpl newService() {
+        return new BPWorkFlowServiceImpl(null, null, null, null, null, null, null, null, null, null, null);
+    }
+
     @BeforeEach
     void setUp() {
-        bpWorkFlowService = new BPWorkFlowServiceImpl();
+        bpWorkFlowService = newService();
         configuration = mock(Configuration.class);
         when(configuration.getSunbirdTimeZone()).thenReturn(TIMEZONE_STRING);
         try {
@@ -62,7 +66,7 @@ class BPWorkFlowServiceImplPrivateMethodTest {
     @Test
     void testProcessApprovalStatus_okStatus_returnsUpdated() throws Exception {
         // Setup
-        BPWorkFlowServiceImpl service = new BPWorkFlowServiceImpl();
+        BPWorkFlowServiceImpl service = newService();
         ObjectMapper newMapper = new ObjectMapper();
         setField(service, "mapper", newMapper);
 
@@ -464,7 +468,7 @@ class BPWorkFlowServiceImplPrivateMethodTest {
     @Test
     void testSaveAdminEnrollUserIntoWfStatus() throws Exception {
         // Create instance of class under test
-        BPWorkFlowServiceImpl service = new BPWorkFlowServiceImpl();
+        BPWorkFlowServiceImpl service = newService();
 
         // Mock dependencies
         WfStatusRepo wfStatusRepo = mock(WfStatusRepo.class);

@@ -170,5 +170,10 @@ public interface WfStatusRepo extends JpaRepository<WfStatusEntity, String> {
      */
     @Query(value = "SELECT current_status, COUNT(*) FROM wingspan.wf_status WHERE application_id = :applicationId GROUP BY current_status", nativeQuery = true)
     List<Object[]> countGroupedByStatusForApplicationId(@Param("applicationId") String applicationId);
+
+    @Query(value = "SELECT * FROM wingspan.wf_status WHERE content_id = :contentId AND userid = :userId AND service_name IN :serviceNames ORDER BY lastupdated_on DESC", nativeQuery = true)
+    List<WfStatusEntity> findByContentIdAndUserIdAndServiceNames(@Param("contentId") String contentId,
+                                                                @Param("userId") String userId,
+                                                                @Param("serviceNames") List<String> serviceNames);
 }
 
