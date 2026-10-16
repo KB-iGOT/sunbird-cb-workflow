@@ -137,6 +137,7 @@ class BPWorkFlowServiceQrEnrolIntegrationTest {
         assertEquals(org, savedEntity.getOrg());
         assertFalse(savedEntity.getInWorkflow());
         assertEquals(Constants.BLENDED_PROGRAM_SERVICE_NAME, savedEntity.getServiceName());
+        assertEquals("course123", savedEntity.getContentId());
     }
 
     @Test
