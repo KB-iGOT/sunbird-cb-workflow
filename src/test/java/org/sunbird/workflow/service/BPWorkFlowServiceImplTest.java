@@ -1683,52 +1683,66 @@ class BPWorkFlowServiceImplTest {
     private static final String DETAILS_CONTENT_ID = "do_details_123";
     private static final String DETAILS_TOKEN = "details-token";
     private static final String DETAILS_USER_ID = "details-user-1";
+    private static final List<String> DETAILS_SERVICE_NAMES =
+            Arrays.asList(Constants.BLENDED_PROGRAM_SERVICE_NAME, Constants.ONE_STEP_MDO_APPROVAL);
 
     @Test
-    void getWorkflowDetailsByContentId_blendedProgramUsesConfiguredServiceNames() {
-        List<String> names = Arrays.asList(Constants.BLENDED_PROGRAM_SERVICE_NAME, Constants.ONE_STEP_MDO_APPROVAL);
-        WfStatusEntity entity = new WfStatusEntity();
-        entity.setContentId(DETAILS_CONTENT_ID);
+    void getWorkflowDetailsByContentId_returnsUserRecordsForContentLatestFirst() {
+        WfStatusEntity latest = new WfStatusEntity();
+        latest.setContentId(DETAILS_CONTENT_ID);
+        WfStatusEntity older = new WfStatusEntity();
+        older.setContentId(DETAILS_CONTENT_ID);
+        List<WfStatusEntity> records = Arrays.asList(latest, older);
         when(accessTokenValidator.fetchUserIdFromAccessToken(DETAILS_TOKEN)).thenReturn(DETAILS_USER_ID);
-        when(configuration.getBpWorkflowServiceNames()).thenReturn(names);
-        when(wfStatusRepo.findByContentIdAndServiceNameInAndUserId(DETAILS_CONTENT_ID, names, DETAILS_USER_ID))
-                .thenReturn(Collections.singletonList(entity));
+        when(configuration.getBpWorkflowServiceNames()).thenReturn(DETAILS_SERVICE_NAMES);
+        when(wfStatusRepo.findByContentIdAndUserIdAndServiceNames(DETAILS_CONTENT_ID, DETAILS_USER_ID, DETAILS_SERVICE_NAMES))
+                .thenReturn(records);
 
-        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(
-                DETAILS_CONTENT_ID, Constants.BLENDED_PROGRAM_SERVICE_NAME, DETAILS_TOKEN);
+        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(DETAILS_CONTENT_ID, null, DETAILS_TOKEN);
 
         assertEquals(HttpStatus.OK, response.get(Constants.STATUS));
         assertEquals(Constants.SUCCESSFUL, response.get(Constants.MESSAGE));
-        assertEquals(Collections.singletonList(entity), response.get(Constants.DATA));
+        assertEquals(records, response.get(Constants.DATA));
     }
 
     @Test
-    void getWorkflowDetailsByContentId_serviceNameMatchIsCaseInsensitive() {
-        List<String> names = Collections.singletonList(Constants.BLENDED_PROGRAM_SERVICE_NAME);
+    void getWorkflowDetailsByContentId_returnsEmptyDataWhenNoWorkflow() {
         when(accessTokenValidator.fetchUserIdFromAccessToken(DETAILS_TOKEN)).thenReturn(DETAILS_USER_ID);
-        when(configuration.getBpWorkflowServiceNames()).thenReturn(names);
-        when(wfStatusRepo.findByContentIdAndServiceNameInAndUserId(DETAILS_CONTENT_ID, names, DETAILS_USER_ID))
+        when(configuration.getBpWorkflowServiceNames()).thenReturn(DETAILS_SERVICE_NAMES);
+        when(wfStatusRepo.findByContentIdAndUserIdAndServiceNames(DETAILS_CONTENT_ID, DETAILS_USER_ID, DETAILS_SERVICE_NAMES))
+                .thenReturn(new ArrayList<>());
+
+        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(DETAILS_CONTENT_ID, null, DETAILS_TOKEN);
+
+        assertEquals(HttpStatus.OK, response.get(Constants.STATUS));
+        assertTrue(((List<?>) response.get(Constants.DATA)).isEmpty());
+    }
+
+    @Test
+    void getWorkflowDetailsByContentId_blendedProgramServiceNameUsesConfiguredList() {
+        when(accessTokenValidator.fetchUserIdFromAccessToken(DETAILS_TOKEN)).thenReturn(DETAILS_USER_ID);
+        when(configuration.getBpWorkflowServiceNames()).thenReturn(DETAILS_SERVICE_NAMES);
+        when(wfStatusRepo.findByContentIdAndUserIdAndServiceNames(DETAILS_CONTENT_ID, DETAILS_USER_ID, DETAILS_SERVICE_NAMES))
                 .thenReturn(new ArrayList<>());
 
         Response response = bpWorkFlowService.getWorkflowDetailsByContentId(
                 DETAILS_CONTENT_ID, "BlendedProgram", DETAILS_TOKEN);
 
         assertEquals(HttpStatus.OK, response.get(Constants.STATUS));
-        verify(configuration).getBpWorkflowServiceNames();
+        verify(wfStatusRepo).findByContentIdAndUserIdAndServiceNames(DETAILS_CONTENT_ID, DETAILS_USER_ID, DETAILS_SERVICE_NAMES);
     }
 
     @Test
-    void getWorkflowDetailsByContentId_otherServiceNameIsQueriedAsIs() {
-        List<String> expected = Collections.singletonList("someOtherService");
+    void getWorkflowDetailsByContentId_otherServiceNameIsUsedAsIs() {
+        List<String> expected = Collections.singletonList(Constants.ONE_STEP_PC_APPROVAL);
         when(accessTokenValidator.fetchUserIdFromAccessToken(DETAILS_TOKEN)).thenReturn(DETAILS_USER_ID);
-        when(wfStatusRepo.findByContentIdAndServiceNameInAndUserId(DETAILS_CONTENT_ID, expected, DETAILS_USER_ID))
+        when(wfStatusRepo.findByContentIdAndUserIdAndServiceNames(DETAILS_CONTENT_ID, DETAILS_USER_ID, expected))
                 .thenReturn(new ArrayList<>());
 
         Response response = bpWorkFlowService.getWorkflowDetailsByContentId(
-                DETAILS_CONTENT_ID, "someOtherService", DETAILS_TOKEN);
+                DETAILS_CONTENT_ID, Constants.ONE_STEP_PC_APPROVAL, DETAILS_TOKEN);
 
         assertEquals(HttpStatus.OK, response.get(Constants.STATUS));
-        assertTrue(((List<?>) response.get(Constants.DATA)).isEmpty());
         verify(configuration, never()).getBpWorkflowServiceNames();
     }
 
@@ -1736,31 +1750,30 @@ class BPWorkFlowServiceImplTest {
     void getWorkflowDetailsByContentId_invalidTokenReturnsBadRequest() {
         when(accessTokenValidator.fetchUserIdFromAccessToken(DETAILS_TOKEN)).thenReturn(null);
 
-        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(
-                DETAILS_CONTENT_ID, Constants.BLENDED_PROGRAM_SERVICE_NAME, DETAILS_TOKEN);
+        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(DETAILS_CONTENT_ID, null, DETAILS_TOKEN);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.get(Constants.STATUS));
         assertEquals(Constants.INVALID_USER_TOKEN, response.get(Constants.ERROR_MESSAGE));
         verifyNoInteractions(wfStatusRepo);
     }
 
-    @Test
-    void getWorkflowDetailsByContentId_blankContentIdReturnsBadRequest() {
+    @ParameterizedTest
+    @ValueSource(strings = {"", "  "})
+    void getWorkflowDetailsByContentId_blankContentIdReturnsBadRequest(String contentId) {
         when(accessTokenValidator.fetchUserIdFromAccessToken(DETAILS_TOKEN)).thenReturn(DETAILS_USER_ID);
 
-        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(
-                "", Constants.BLENDED_PROGRAM_SERVICE_NAME, DETAILS_TOKEN);
+        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(contentId, null, DETAILS_TOKEN);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.get(Constants.STATUS));
-        assertEquals(Constants.CONTENT_ID_SERVICE_NAME_MANDATORY, response.get(Constants.ERROR_MESSAGE));
+        assertEquals(Constants.CONTENT_ID_MANDATORY, response.get(Constants.ERROR_MESSAGE));
         verifyNoInteractions(wfStatusRepo);
     }
 
     @Test
-    void getWorkflowDetailsByContentId_blankServiceNameReturnsBadRequest() {
+    void getWorkflowDetailsByContentId_nullContentIdReturnsBadRequest() {
         when(accessTokenValidator.fetchUserIdFromAccessToken(DETAILS_TOKEN)).thenReturn(DETAILS_USER_ID);
 
-        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(DETAILS_CONTENT_ID, null, DETAILS_TOKEN);
+        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(null, null, DETAILS_TOKEN);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.get(Constants.STATUS));
         verifyNoInteractions(wfStatusRepo);
@@ -1769,12 +1782,11 @@ class BPWorkFlowServiceImplTest {
     @Test
     void getWorkflowDetailsByContentId_databaseErrorReturnsInternalServerError() {
         when(accessTokenValidator.fetchUserIdFromAccessToken(DETAILS_TOKEN)).thenReturn(DETAILS_USER_ID);
-        when(configuration.getBpWorkflowServiceNames()).thenReturn(Collections.singletonList(Constants.BLENDED_PROGRAM_SERVICE_NAME));
-        when(wfStatusRepo.findByContentIdAndServiceNameInAndUserId(anyString(), anyList(), anyString()))
+        when(configuration.getBpWorkflowServiceNames()).thenReturn(DETAILS_SERVICE_NAMES);
+        when(wfStatusRepo.findByContentIdAndUserIdAndServiceNames(anyString(), anyString(), anyList()))
                 .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("db down"));
 
-        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(
-                DETAILS_CONTENT_ID, Constants.BLENDED_PROGRAM_SERVICE_NAME, DETAILS_TOKEN);
+        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(DETAILS_CONTENT_ID, null, DETAILS_TOKEN);
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.get(Constants.STATUS));
         assertEquals(Constants.WORKFLOW_DETAILS_FETCH_ERROR, response.get(Constants.ERROR_MESSAGE));
@@ -1783,12 +1795,11 @@ class BPWorkFlowServiceImplTest {
     @Test
     void getWorkflowDetailsByContentId_connectionFailureReturnsInternalServerError() {
         when(accessTokenValidator.fetchUserIdFromAccessToken(DETAILS_TOKEN)).thenReturn(DETAILS_USER_ID);
-        when(configuration.getBpWorkflowServiceNames()).thenReturn(Collections.singletonList(Constants.BLENDED_PROGRAM_SERVICE_NAME));
-        when(wfStatusRepo.findByContentIdAndServiceNameInAndUserId(anyString(), anyList(), anyString()))
+        when(configuration.getBpWorkflowServiceNames()).thenReturn(DETAILS_SERVICE_NAMES);
+        when(wfStatusRepo.findByContentIdAndUserIdAndServiceNames(anyString(), anyString(), anyList()))
                 .thenThrow(new org.springframework.transaction.CannotCreateTransactionException("no connection"));
 
-        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(
-                DETAILS_CONTENT_ID, Constants.BLENDED_PROGRAM_SERVICE_NAME, DETAILS_TOKEN);
+        Response response = bpWorkFlowService.getWorkflowDetailsByContentId(DETAILS_CONTENT_ID, null, DETAILS_TOKEN);
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.get(Constants.STATUS));
         assertEquals(Constants.WORKFLOW_DETAILS_FETCH_ERROR, response.get(Constants.ERROR_MESSAGE));

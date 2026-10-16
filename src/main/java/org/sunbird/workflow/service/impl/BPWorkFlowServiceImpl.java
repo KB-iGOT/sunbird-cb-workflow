@@ -2016,18 +2016,19 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         if (StringUtils.isBlank(userId)) {
             return errorResponse(Constants.INVALID_USER_TOKEN, HttpStatus.BAD_REQUEST);
         }
-        if (StringUtils.isBlank(contentId) || StringUtils.isBlank(serviceName)) {
-            return errorResponse(Constants.CONTENT_ID_SERVICE_NAME_MANDATORY, HttpStatus.BAD_REQUEST);
+        if (StringUtils.isBlank(contentId)) {
+            return errorResponse(Constants.CONTENT_ID_MANDATORY, HttpStatus.BAD_REQUEST);
         }
         List<String> serviceNames = new ArrayList<>();
-        if (Constants.BLENDED_PROGRAM_SERVICE_NAME.equalsIgnoreCase(serviceName)) {
+        if (StringUtils.isBlank(serviceName) || Constants.BLENDED_PROGRAM_SERVICE_NAME.equalsIgnoreCase(serviceName)) {
             serviceNames.addAll(configuration.getBpWorkflowServiceNames());
         } else {
             serviceNames.add(serviceName);
         }
         List<WfStatusEntity> wfStatusEntities;
         try {
-            wfStatusEntities = wfStatusRepo.findByContentIdAndServiceNameInAndUserId(contentId, serviceNames, userId);
+            wfStatusEntities = wfStatusRepo.findByContentIdAndUserIdAndServiceNames(
+                    contentId, userId, serviceNames);
         } catch (DataAccessException | TransactionException e) {
             logger.error("Failed to fetch workflow details for contentId: {}, userId: {}", contentId, userId, e);
             return errorResponse(Constants.WORKFLOW_DETAILS_FETCH_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
