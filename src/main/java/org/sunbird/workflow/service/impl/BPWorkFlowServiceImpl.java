@@ -1786,7 +1786,7 @@ public class BPWorkFlowServiceImpl implements BPWorkFlowService {
         }
     }
 
-    private List<HashMap<String, Object>> buildUpdateFieldValuesWithFirstName(String userId) {
+    List<HashMap<String, Object>> buildUpdateFieldValuesWithFirstName(String userId) {
         HashMap<String, Object> toValue = new HashMap<>();
         HashMap<String, Object> updateField = new HashMap<>();
         String firstName = getFirstName(userId);

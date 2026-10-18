@@ -20,6 +20,7 @@ import org.sunbird.workflow.producer.Producer;
 import org.sunbird.workflow.service.ContentReadService;
 import org.sunbird.workflow.utils.AccessTokenValidator;
 import org.sunbird.workflow.utils.CassandraOperation;
+import org.sunbird.workflow.utils.UserUtil;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -60,6 +61,9 @@ class BPWorkFlowServiceQrEnrolIntegrationTest {
     @Mock
     private WorkflowAuditProcessingServiceImpl workflowAuditProcessingService;
 
+    @Mock
+    private UserUtil userUtils;
+
     @InjectMocks
     private BPWorkFlowServiceImpl bpWorkFlowService;
 
@@ -78,6 +82,7 @@ class BPWorkFlowServiceQrEnrolIntegrationTest {
         qrRequest = new QrSelfEnrolRequest("course123", "batch123");
 
         lenient().when(configuration.getSunbirdTimeZone()).thenReturn("Asia/Kolkata");
+        lenient().when(userUtils.userProfileRead(anyString())).thenReturn(Map.of(Constants.FIRST_NAME_CAMEL_CASE, "Ravi"));
         lenient().when(accessTokenValidator.fetchUserIdFromAccessToken(anyString())).thenReturn(userId);
         lenient().when(configuration.getCourseServiceHost()).thenReturn("http://course-service:8080");
         lenient().when(configuration.getAdminEnrolEndPoint()).thenReturn("/api/v1/user/enroll");
@@ -138,6 +143,7 @@ class BPWorkFlowServiceQrEnrolIntegrationTest {
         assertFalse(savedEntity.getInWorkflow());
         assertEquals(Constants.BLENDED_PROGRAM_SERVICE_NAME, savedEntity.getServiceName());
         assertEquals("course123", savedEntity.getContentId());
+        assertEquals("[{\"toValue\":{\"name\":\"Ravi\"}}]", savedEntity.getUpdateFieldValues());
     }
 
     @Test

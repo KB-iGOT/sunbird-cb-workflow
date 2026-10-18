@@ -404,8 +404,7 @@ public class QrCodeSelfEnrolmentServiceImpl implements QrCodeSelfEnrolmentServic
         wfRequest.setAction(Constants.INITIATE);
         wfRequest.setActorUserId(userId);
 
-        List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
-        wfRequest.setUpdateFieldValues(updateFieldValues);
+        wfRequest.setUpdateFieldValues(bpWorkFlowService.buildUpdateFieldValuesWithFirstName(userId));
 
         return wfRequest;
     }
