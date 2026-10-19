@@ -173,7 +173,7 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 			event.put(Constants.EVENT_TYPE, Constants.EVENT_TYPE_VERIFIED_PROFILE);
 			event.put(Constants.DATA, data);
 			event.put(Constants.VERSION, configuration.getKarmaPointsEventVersion());
-			//producer.pushWithKey(topic, event, userId);
+			producer.pushWithKey(topic, event, userId);
 			logger.info("[KARMA_POINTS][VERIFIED_PROFILE][published] userId={}, previousStatus={}, verifiedBy=WORKFLOW_APPROVAL, approvedBy={}", userId, previousStatus, approvedBy);
 		} catch (Exception e) {
 			logger.error("[KARMA_POINTS][VERIFIED_PROFILE][failed] userId=" + userId, e);
