@@ -283,9 +283,9 @@ class ConfigurationTest {
     }
 
     @Test
-    void testWorkflowDesignationApprovalTopic() {
-        config.setWorkflowDesignationApprovalTopic("workflowDesignationApprovalTopic");
-        assertEquals("workflowDesignationApprovalTopic", config.getWorkflowDesignationApprovalTopic());
+    void testWorkflowServiceHistoryTopic() {
+        config.setWorkflowServiceHistoryTopic("workflowServiceHistoryTopic");
+        assertEquals("workflowServiceHistoryTopic", config.getWorkflowServiceHistoryTopic());
     }
 
 }

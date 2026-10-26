@@ -818,14 +818,14 @@ class WorkFlowServiceImplV2PrivateMethodTest {
         WfRequest wfRequest = buildDesignationWfRequest("Agriculture Supervisor");
         wfRequest.setDeptName("Health Dept");
 
-        when(configuration.getWorkflowDesignationApprovalTopic()).thenReturn("designationApprovalTopic");
+        when(configuration.getWorkflowServiceHistoryTopic()).thenReturn("workflowServiceHistoryTopic");
 
         Method method = WorkFlowServiceImplV2.class.getDeclaredMethod("publishDesignationApprovalEvent", WfRequest.class);
         method.setAccessible(true);
         method.invoke(workFlowService, wfRequest);
 
         ArgumentCaptor<WorkflowApprovalEvent> captor = ArgumentCaptor.forClass(WorkflowApprovalEvent.class);
-        verify(producer).push(eq("designationApprovalTopic"), captor.capture());
+        verify(producer).push(eq("workflowServiceHistoryTopic"), captor.capture());
 
         WorkflowApprovalEvent event = captor.getValue();
         assertEquals("user123", event.getUserId());
@@ -936,7 +936,7 @@ class WorkFlowServiceImplV2PrivateMethodTest {
 
         WfRequest wfRequest = buildDesignationWfRequest("Agriculture Supervisor");
 
-        when(configuration.getWorkflowDesignationApprovalTopic()).thenReturn("designationApprovalTopic");
+        when(configuration.getWorkflowServiceHistoryTopic()).thenReturn("workflowServiceHistoryTopic");
         doThrow(new RuntimeException("kafka down")).when(producer).push(anyString(), any());
 
         Method method = WorkFlowServiceImplV2.class.getDeclaredMethod("publishDesignationApprovalEvent", WfRequest.class);
@@ -944,7 +944,7 @@ class WorkFlowServiceImplV2PrivateMethodTest {
 
         assertDoesNotThrow(() -> method.invoke(workFlowService, wfRequest));
 
-        verify(producer).push(eq("designationApprovalTopic"), any());
+        verify(producer).push(eq("workflowServiceHistoryTopic"), any());
     }
 
     @Test
@@ -990,7 +990,7 @@ class WorkFlowServiceImplV2PrivateMethodTest {
         when(mapper.writeValueAsString(any())).thenReturn("[]");
         when(configuration.getModificationRecordAllowActions()).thenReturn("");
         when(wfStatusRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(configuration.getWorkflowDesignationApprovalTopic()).thenReturn("designationApprovalTopic");
+        when(configuration.getWorkflowServiceHistoryTopic()).thenReturn("workflowServiceHistoryTopic");
 
         Method method = WorkFlowServiceImplV2.class.getDeclaredMethod("changeStatus",
                 String.class, String.class, WfRequest.class, String.class, String.class, String.class);
@@ -1002,7 +1002,7 @@ class WorkFlowServiceImplV2PrivateMethodTest {
         assertEquals("APPROVED", result.get(Constants.STATUS));
 
         ArgumentCaptor<WorkflowApprovalEvent> captor = ArgumentCaptor.forClass(WorkflowApprovalEvent.class);
-        verify(producer).push(eq("designationApprovalTopic"), captor.capture());
+        verify(producer).push(eq("workflowServiceHistoryTopic"), captor.capture());
         WorkflowApprovalEvent event = captor.getValue();
         assertEquals("Agriculture Supervisor", event.getDesignation());
         assertEquals("Health Dept", event.getOrgName());

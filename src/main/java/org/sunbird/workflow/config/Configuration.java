@@ -354,8 +354,8 @@ public class Configuration {
     @Value("${karma.points.unified.event.version:1}")
     private int karmaPointsEventVersion;
 
-    @Value("${kafka.topics.workflow.designation.approval}")
-    private String workflowDesignationApprovalTopic;
+    @Value("${kafka.topics.workflow.service.history}")
+    private String workflowServiceHistoryTopic;
 
     public String getAdminBlendedProgramEnrolEndPoint() {
         return adminBlendedProgramEnrolEndPoint;

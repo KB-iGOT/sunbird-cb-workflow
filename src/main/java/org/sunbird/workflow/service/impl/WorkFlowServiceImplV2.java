@@ -746,7 +746,7 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
                         String designation = (String) toValue.get(Constants.DESIGNATION);
                         WorkflowApprovalEvent event = new WorkflowApprovalEvent(wfRequest.getUserId(), wfRequest.getWfId(),
                                 Constants.APPROVAL_TYPE_DESIGNATION, Constants.DESIGNATION_CHANGE, designation, wfRequest.getDeptName());
-                        producer.push(configuration.getWorkflowDesignationApprovalTopic(), event);
+                        producer.push(configuration.getWorkflowServiceHistoryTopic(), event);
                         logger.info("Published designation approval event for userId: {}, wfId: {}",
                                 wfRequest.getUserId(), wfRequest.getWfId());
                     });
