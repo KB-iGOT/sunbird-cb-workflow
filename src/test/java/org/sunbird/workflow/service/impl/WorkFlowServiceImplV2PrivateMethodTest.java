@@ -815,7 +815,7 @@ class WorkFlowServiceImplV2PrivateMethodTest {
         ReflectionTestUtils.setField(workFlowService, "producer", producer);
         ReflectionTestUtils.setField(workFlowService, "configuration", configuration);
 
-        WfRequest wfRequest = buildDesignationWfRequest("Agriculture Supervisor");
+        WfRequest wfRequest = buildDesignationWfRequest("Assistant Engineer Mechanic", "Additional Advocate");
         wfRequest.setDeptName("Health Dept");
 
         when(configuration.getWorkflowServiceHistoryTopic()).thenReturn("workflowServiceHistoryTopic");
@@ -832,7 +832,8 @@ class WorkFlowServiceImplV2PrivateMethodTest {
         assertEquals("wfId456", event.getWfId());
         assertEquals(Constants.APPROVAL_TYPE_DESIGNATION, event.getApprovalType());
         assertEquals(Constants.DESIGNATION_CHANGE, event.getRequestType());
-        assertEquals("Agriculture Supervisor", event.getDesignation());
+        assertEquals("Assistant Engineer Mechanic", event.getDesignation(),
+                "service history must record the PREVIOUS designation (fromValue), not the newly approved one");
         assertEquals("Health Dept", event.getOrgName());
         assertNotNull(event.getEventId());
         assertNotNull(event.getTimestamp());
@@ -930,11 +931,66 @@ class WorkFlowServiceImplV2PrivateMethodTest {
     }
 
     @Test
+    void testPublishDesignationApprovalEvent_fromValueNotMap_doesNotPublish() throws Exception {
+        ReflectionTestUtils.setField(workFlowService, "producer", producer);
+        ReflectionTestUtils.setField(workFlowService, "configuration", configuration);
+
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setUserId("user123");
+
+        Map<String, Object> toValue = new HashMap<>();
+        toValue.put(Constants.DESIGNATION, "Additional Advocate");
+
+        HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.TO_VALUE, toValue);
+        updateField.put(Constants.FROM_VALUE, "not-a-map");
+
+        List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
+        updateFieldValues.add(updateField);
+        wfRequest.setUpdateFieldValues(updateFieldValues);
+
+        Method method = WorkFlowServiceImplV2.class.getDeclaredMethod("publishDesignationApprovalEvent", WfRequest.class);
+        method.setAccessible(true);
+        method.invoke(workFlowService, wfRequest);
+
+        verifyNoInteractions(producer);
+    }
+
+    @Test
+    void testPublishDesignationApprovalEvent_fromValueDesignationNotString_doesNotPublish() throws Exception {
+        ReflectionTestUtils.setField(workFlowService, "producer", producer);
+        ReflectionTestUtils.setField(workFlowService, "configuration", configuration);
+
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setUserId("user123");
+
+        Map<String, Object> toValue = new HashMap<>();
+        toValue.put(Constants.DESIGNATION, "Additional Advocate");
+
+        Map<String, Object> fromValue = new HashMap<>();
+        fromValue.put(Constants.DESIGNATION, 123);
+
+        HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.TO_VALUE, toValue);
+        updateField.put(Constants.FROM_VALUE, fromValue);
+
+        List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
+        updateFieldValues.add(updateField);
+        wfRequest.setUpdateFieldValues(updateFieldValues);
+
+        Method method = WorkFlowServiceImplV2.class.getDeclaredMethod("publishDesignationApprovalEvent", WfRequest.class);
+        method.setAccessible(true);
+        method.invoke(workFlowService, wfRequest);
+
+        verifyNoInteractions(producer);
+    }
+
+    @Test
     void testPublishDesignationApprovalEvent_producerThrows_exceptionIsCaught() throws Exception {
         ReflectionTestUtils.setField(workFlowService, "producer", producer);
         ReflectionTestUtils.setField(workFlowService, "configuration", configuration);
 
-        WfRequest wfRequest = buildDesignationWfRequest("Agriculture Supervisor");
+        WfRequest wfRequest = buildDesignationWfRequest("Assistant Engineer Mechanic", "Additional Advocate");
 
         when(configuration.getWorkflowServiceHistoryTopic()).thenReturn("workflowServiceHistoryTopic");
         doThrow(new RuntimeException("kafka down")).when(producer).push(anyString(), any());
@@ -957,7 +1013,7 @@ class WorkFlowServiceImplV2PrivateMethodTest {
         ReflectionTestUtils.setField(workFlowService, "producer", producer);
         ReflectionTestUtils.setField(workFlowService, "redisCacheMgr", redisCacheMgr);
 
-        WfRequest wfRequest = buildDesignationWfRequest("Agriculture Supervisor");
+        WfRequest wfRequest = buildDesignationWfRequest("Assistant Engineer Mechanic", "Additional Advocate");
         wfRequest.setApplicationId("app-1");
         wfRequest.setActorUserId("actor-1");
         wfRequest.setUserId("user-1");
@@ -1004,7 +1060,8 @@ class WorkFlowServiceImplV2PrivateMethodTest {
         ArgumentCaptor<WorkflowApprovalEvent> captor = ArgumentCaptor.forClass(WorkflowApprovalEvent.class);
         verify(producer).push(eq("workflowServiceHistoryTopic"), captor.capture());
         WorkflowApprovalEvent event = captor.getValue();
-        assertEquals("Agriculture Supervisor", event.getDesignation());
+        assertEquals("Assistant Engineer Mechanic", event.getDesignation(),
+                "service history must record the PREVIOUS designation (fromValue), not the newly approved one");
         assertEquals("Health Dept", event.getOrgName());
         assertEquals(Constants.APPROVAL_TYPE_DESIGNATION, event.getApprovalType());
     }
@@ -1019,7 +1076,7 @@ class WorkFlowServiceImplV2PrivateMethodTest {
         ReflectionTestUtils.setField(workFlowService, "producer", producer);
         ReflectionTestUtils.setField(workFlowService, "redisCacheMgr", redisCacheMgr);
 
-        WfRequest wfRequest = buildDesignationWfRequest("Agriculture Supervisor");
+        WfRequest wfRequest = buildDesignationWfRequest("Assistant Engineer Mechanic", "Additional Advocate");
         wfRequest.setApplicationId("app-1");
         wfRequest.setActorUserId("actor-1");
         wfRequest.setUserId("user-1");
@@ -1073,7 +1130,7 @@ class WorkFlowServiceImplV2PrivateMethodTest {
         ReflectionTestUtils.setField(workFlowService, "producer", producer);
         ReflectionTestUtils.setField(workFlowService, "redisCacheMgr", redisCacheMgr);
 
-        WfRequest wfRequest = buildDesignationWfRequest("Agriculture Supervisor");
+        WfRequest wfRequest = buildDesignationWfRequest("Assistant Engineer Mechanic", "Additional Advocate");
         wfRequest.setApplicationId("app-1");
         wfRequest.setActorUserId("actor-1");
         wfRequest.setUserId("user-1");
@@ -1150,15 +1207,19 @@ class WorkFlowServiceImplV2PrivateMethodTest {
         return workFlowModel;
     }
 
-    private WfRequest buildDesignationWfRequest(String designation) {
+    private WfRequest buildDesignationWfRequest(String previousDesignation, String newDesignation) {
         WfRequest wfRequest = new WfRequest();
         wfRequest.setUserId("user123");
         wfRequest.setWfId("wfId456");
 
+        Map<String, Object> fromValue = new HashMap<>();
+        fromValue.put(Constants.DESIGNATION, previousDesignation);
+
         Map<String, Object> toValue = new HashMap<>();
-        toValue.put(Constants.DESIGNATION, designation);
+        toValue.put(Constants.DESIGNATION, newDesignation);
 
         HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.FROM_VALUE, fromValue);
         updateField.put(Constants.TO_VALUE, toValue);
 
         List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();

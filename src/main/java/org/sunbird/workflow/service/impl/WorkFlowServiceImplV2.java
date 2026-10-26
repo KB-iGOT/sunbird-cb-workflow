@@ -723,13 +723,16 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
     }
 
     /**
-     * Publishes a {@link WorkflowApprovalEvent} to the service-history-approval Kafka
-     * topic once a DESIGNATION_CHANGE workflow request has been approved, so that
-     * cb-ext-userprofile-service can append the new designation into the user's
-     * service history without this service calling that service's REST API directly.
+     * Publishes a {@link WorkflowApprovalEvent} to the service-history Kafka topic once a
+     * DESIGNATION_CHANGE workflow request has been approved, so that
+     * cb-ext-userprofile-service can append the designation the user is moving away from
+     * into their service history, without this service calling that service's REST API
+     * directly. The designation persisted is the {@code fromValue} (the role being left),
+     * not the {@code toValue} (the newly approved role) — service history records what the
+     * user previously held, not their current designation.
      *
-     * @param wfRequest the approved workflow request carrying the new designation in
-     *                  its updateFieldValues and the user's org name in deptName
+     * @param wfRequest the approved workflow request carrying the previous designation in
+     *                  its updateFieldValues' fromValue and the user's org name in deptName
      */
     private void publishDesignationApprovalEvent(WfRequest wfRequest) {
         if (CollectionUtils.isEmpty(wfRequest.getUpdateFieldValues())) {
@@ -738,14 +741,16 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
         }
         try {
             wfRequest.getUpdateFieldValues().stream()
-                    .filter(updatedValue -> updatedValue.get(Constants.TO_VALUE) instanceof Map)
-                    .map(updatedValue -> (Map<String, Object>) updatedValue.get(Constants.TO_VALUE))
-                    .filter(toValue -> toValue.get(Constants.DESIGNATION) instanceof String)
+                    .filter(updatedValue -> updatedValue.get(Constants.TO_VALUE) instanceof Map
+                            && ((Map<String, Object>) updatedValue.get(Constants.TO_VALUE)).get(Constants.DESIGNATION) instanceof String)
+                    .filter(updatedValue -> updatedValue.get(Constants.FROM_VALUE) instanceof Map)
+                    .map(updatedValue -> (Map<String, Object>) updatedValue.get(Constants.FROM_VALUE))
+                    .filter(fromValue -> fromValue.get(Constants.DESIGNATION) instanceof String)
                     .findFirst()
-                    .ifPresent(toValue -> {
-                        String designation = (String) toValue.get(Constants.DESIGNATION);
+                    .ifPresent(fromValue -> {
+                        String previousDesignation = (String) fromValue.get(Constants.DESIGNATION);
                         WorkflowApprovalEvent event = new WorkflowApprovalEvent(wfRequest.getUserId(), wfRequest.getWfId(),
-                                Constants.APPROVAL_TYPE_DESIGNATION, Constants.DESIGNATION_CHANGE, designation, wfRequest.getDeptName());
+                                Constants.APPROVAL_TYPE_DESIGNATION, Constants.DESIGNATION_CHANGE, previousDesignation, wfRequest.getDeptName());
                         producer.push(configuration.getWorkflowServiceHistoryTopic(), event);
                         logger.info("Published designation approval event for userId: {}, wfId: {}",
                                 wfRequest.getUserId(), wfRequest.getWfId());
