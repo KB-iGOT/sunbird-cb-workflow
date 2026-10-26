@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -21,9 +22,11 @@ import org.sunbird.workflow.config.RedisCacheMgr;
 import org.sunbird.workflow.exception.BadRequestException;
 import org.sunbird.workflow.exception.InvalidDataInputException;
 import org.sunbird.workflow.models.Response;
+import org.sunbird.workflow.models.WfAction;
 import org.sunbird.workflow.models.WfRequest;
 import org.sunbird.workflow.models.WfStatus;
 import org.sunbird.workflow.models.WorkFlowModel;
+import org.sunbird.workflow.models.WorkflowApprovalEvent;
 import org.sunbird.workflow.postgres.entity.WfStatusEntity;
 import org.sunbird.workflow.postgres.repo.WfStatusRepo;
 import org.sunbird.workflow.producer.Producer;
@@ -803,6 +806,364 @@ class WorkFlowServiceImplV2PrivateMethodTest {
         updateMap.put(Constants.TO_VALUE, toValue);
 
         wfRequest.setUpdateFieldValues(List.of(updateMap));
+
+        return wfRequest;
+    }
+
+    @Test
+    void testPublishDesignationApprovalEvent_success() throws Exception {
+        ReflectionTestUtils.setField(workFlowService, "producer", producer);
+        ReflectionTestUtils.setField(workFlowService, "configuration", configuration);
+
+        WfRequest wfRequest = buildDesignationWfRequest("Agriculture Supervisor");
+        wfRequest.setDeptName("Health Dept");
+
+        when(configuration.getWorkflowDesignationApprovalTopic()).thenReturn("designationApprovalTopic");
+
+        Method method = WorkFlowServiceImplV2.class.getDeclaredMethod("publishDesignationApprovalEvent", WfRequest.class);
+        method.setAccessible(true);
+        method.invoke(workFlowService, wfRequest);
+
+        ArgumentCaptor<WorkflowApprovalEvent> captor = ArgumentCaptor.forClass(WorkflowApprovalEvent.class);
+        verify(producer).push(eq("designationApprovalTopic"), captor.capture());
+
+        WorkflowApprovalEvent event = captor.getValue();
+        assertEquals("user123", event.getUserId());
+        assertEquals("wfId456", event.getWfId());
+        assertEquals(Constants.APPROVAL_TYPE_DESIGNATION, event.getApprovalType());
+        assertEquals(Constants.DESIGNATION_CHANGE, event.getRequestType());
+        assertEquals("Agriculture Supervisor", event.getDesignation());
+        assertEquals("Health Dept", event.getOrgName());
+        assertNotNull(event.getEventId());
+        assertNotNull(event.getTimestamp());
+        assertEquals("wfId456", event.getCorrelationId());
+        assertEquals(Constants.WORKFLOW_SOURCE_SERVICE, event.getSource());
+        assertEquals(Constants.WORKFLOW_APPROVAL_EVENT_TYPE, event.getEventType());
+    }
+
+    @Test
+    void testPublishDesignationApprovalEvent_emptyUpdateFieldValues_doesNotPublish() throws Exception {
+        ReflectionTestUtils.setField(workFlowService, "producer", producer);
+        ReflectionTestUtils.setField(workFlowService, "configuration", configuration);
+
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setUserId("user123");
+        wfRequest.setUpdateFieldValues(Collections.emptyList());
+
+        Method method = WorkFlowServiceImplV2.class.getDeclaredMethod("publishDesignationApprovalEvent", WfRequest.class);
+        method.setAccessible(true);
+        method.invoke(workFlowService, wfRequest);
+
+        verifyNoInteractions(producer);
+    }
+
+    @Test
+    void testPublishDesignationApprovalEvent_noDesignationKey_doesNotPublish() throws Exception {
+        ReflectionTestUtils.setField(workFlowService, "producer", producer);
+        ReflectionTestUtils.setField(workFlowService, "configuration", configuration);
+
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setUserId("user123");
+
+        Map<String, Object> toValue = new HashMap<>();
+        toValue.put(Constants.GROUP, "HR");
+
+        HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.TO_VALUE, toValue);
+
+        List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
+        updateFieldValues.add(updateField);
+        wfRequest.setUpdateFieldValues(updateFieldValues);
+
+        Method method = WorkFlowServiceImplV2.class.getDeclaredMethod("publishDesignationApprovalEvent", WfRequest.class);
+        method.setAccessible(true);
+        method.invoke(workFlowService, wfRequest);
+
+        verifyNoInteractions(producer);
+    }
+
+    @Test
+    void testPublishDesignationApprovalEvent_toValueNotMap_doesNotPublish() throws Exception {
+        ReflectionTestUtils.setField(workFlowService, "producer", producer);
+        ReflectionTestUtils.setField(workFlowService, "configuration", configuration);
+
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setUserId("user123");
+
+        HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.TO_VALUE, "not-a-map");
+
+        List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
+        updateFieldValues.add(updateField);
+        wfRequest.setUpdateFieldValues(updateFieldValues);
+
+        Method method = WorkFlowServiceImplV2.class.getDeclaredMethod("publishDesignationApprovalEvent", WfRequest.class);
+        method.setAccessible(true);
+        method.invoke(workFlowService, wfRequest);
+
+        verifyNoInteractions(producer);
+    }
+
+    @Test
+    void testPublishDesignationApprovalEvent_designationNotString_doesNotPublish() throws Exception {
+        ReflectionTestUtils.setField(workFlowService, "producer", producer);
+        ReflectionTestUtils.setField(workFlowService, "configuration", configuration);
+
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setUserId("user123");
+
+        Map<String, Object> toValue = new HashMap<>();
+        toValue.put(Constants.DESIGNATION, 123);
+
+        HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.TO_VALUE, toValue);
+
+        List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
+        updateFieldValues.add(updateField);
+        wfRequest.setUpdateFieldValues(updateFieldValues);
+
+        Method method = WorkFlowServiceImplV2.class.getDeclaredMethod("publishDesignationApprovalEvent", WfRequest.class);
+        method.setAccessible(true);
+        method.invoke(workFlowService, wfRequest);
+
+        verifyNoInteractions(producer);
+    }
+
+    @Test
+    void testPublishDesignationApprovalEvent_producerThrows_exceptionIsCaught() throws Exception {
+        ReflectionTestUtils.setField(workFlowService, "producer", producer);
+        ReflectionTestUtils.setField(workFlowService, "configuration", configuration);
+
+        WfRequest wfRequest = buildDesignationWfRequest("Agriculture Supervisor");
+
+        when(configuration.getWorkflowDesignationApprovalTopic()).thenReturn("designationApprovalTopic");
+        doThrow(new RuntimeException("kafka down")).when(producer).push(anyString(), any());
+
+        Method method = WorkFlowServiceImplV2.class.getDeclaredMethod("publishDesignationApprovalEvent", WfRequest.class);
+        method.setAccessible(true);
+
+        assertDoesNotThrow(() -> method.invoke(workFlowService, wfRequest));
+
+        verify(producer).push(eq("designationApprovalTopic"), any());
+    }
+
+    @Test
+    void testChangeStatus_designationChangeApproved_publishesWorkflowApprovalEvent() throws Exception {
+        ReflectionTestUtils.setField(workFlowService, "wfStatusRepo", wfStatusRepo);
+        ReflectionTestUtils.setField(workFlowService, "mapper", mapper);
+        ReflectionTestUtils.setField(workFlowService, "cassandraOperation", cassandraOperation);
+        ReflectionTestUtils.setField(workFlowService, "configuration", configuration);
+        ReflectionTestUtils.setField(workFlowService, "requestServiceImpl", requestServiceImpl);
+        ReflectionTestUtils.setField(workFlowService, "producer", producer);
+        ReflectionTestUtils.setField(workFlowService, "redisCacheMgr", redisCacheMgr);
+
+        WfRequest wfRequest = buildDesignationWfRequest("Agriculture Supervisor");
+        wfRequest.setApplicationId("app-1");
+        wfRequest.setActorUserId("actor-1");
+        wfRequest.setUserId("user-1");
+        wfRequest.setWfId("wf-1");
+        wfRequest.setState("SEND_FOR_APPROVAL");
+        wfRequest.setAction("APPROVE");
+        wfRequest.setServiceName(Constants.PROFILE_SERVICE_NAME);
+        wfRequest.setDeptName("Health Dept");
+
+        WfStatusEntity existingStatus = new WfStatusEntity();
+        existingStatus.setWfId("wf-1");
+        existingStatus.setUserId("user-1");
+        existingStatus.setServiceName(Constants.PROFILE_SERVICE_NAME);
+        existingStatus.setCurrentStatus("SEND_FOR_APPROVAL");
+        existingStatus.setRequestType(Constants.DESIGNATION_CHANGE);
+        existingStatus.setCreatedOn(new Date());
+
+        when(wfStatusRepo.findByRootOrgAndOrgAndApplicationIdAndWfId("root", "org", "app-1", "wf-1"))
+                .thenReturn(existingStatus);
+
+        WorkFlowModel workFlowModel = buildWorkFlowModelWithApproveTransition("SEND_FOR_APPROVAL", "APPROVED");
+
+        when(configuration.getLmsServiceHost()).thenReturn("http://host");
+        when(configuration.getProfileServiceConfigPath()).thenReturn("/profile/config");
+        when(requestServiceImpl.fetchResultUsingGet(any())).thenReturn(Map.of(
+                Constants.RESULT, Map.of(Constants.RESPONSE, Map.of(Constants.VALUE, "{}"))
+        ));
+        when(mapper.readValue(anyString(), eq(Map.class))).thenReturn(new HashMap<>());
+        when(mapper.convertValue(any(), any(TypeReference.class))).thenReturn(workFlowModel);
+        when(mapper.writeValueAsString(any())).thenReturn("[]");
+        when(configuration.getModificationRecordAllowActions()).thenReturn("");
+        when(wfStatusRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(configuration.getWorkflowDesignationApprovalTopic()).thenReturn("designationApprovalTopic");
+
+        Method method = WorkFlowServiceImplV2.class.getDeclaredMethod("changeStatus",
+                String.class, String.class, WfRequest.class, String.class, String.class, String.class);
+        method.setAccessible(true);
+
+        Map<String, String> result = (Map<String, String>) method.invoke(
+                workFlowService, "root", "org", wfRequest, "modifier", "role", "token");
+
+        assertEquals("APPROVED", result.get(Constants.STATUS));
+
+        ArgumentCaptor<WorkflowApprovalEvent> captor = ArgumentCaptor.forClass(WorkflowApprovalEvent.class);
+        verify(producer).push(eq("designationApprovalTopic"), captor.capture());
+        WorkflowApprovalEvent event = captor.getValue();
+        assertEquals("Agriculture Supervisor", event.getDesignation());
+        assertEquals("Health Dept", event.getOrgName());
+        assertEquals(Constants.APPROVAL_TYPE_DESIGNATION, event.getApprovalType());
+    }
+
+    @Test
+    void testChangeStatus_requestTypeNotDesignationChange_doesNotPublishEvent() throws Exception {
+        ReflectionTestUtils.setField(workFlowService, "wfStatusRepo", wfStatusRepo);
+        ReflectionTestUtils.setField(workFlowService, "mapper", mapper);
+        ReflectionTestUtils.setField(workFlowService, "cassandraOperation", cassandraOperation);
+        ReflectionTestUtils.setField(workFlowService, "configuration", configuration);
+        ReflectionTestUtils.setField(workFlowService, "requestServiceImpl", requestServiceImpl);
+        ReflectionTestUtils.setField(workFlowService, "producer", producer);
+        ReflectionTestUtils.setField(workFlowService, "redisCacheMgr", redisCacheMgr);
+
+        WfRequest wfRequest = buildDesignationWfRequest("Agriculture Supervisor");
+        wfRequest.setApplicationId("app-1");
+        wfRequest.setActorUserId("actor-1");
+        wfRequest.setUserId("user-1");
+        wfRequest.setWfId("wf-1");
+        wfRequest.setState("SEND_FOR_APPROVAL");
+        wfRequest.setAction("APPROVE");
+        wfRequest.setServiceName(Constants.PROFILE_SERVICE_NAME);
+
+        WfStatusEntity existingStatus = new WfStatusEntity();
+        existingStatus.setWfId("wf-1");
+        existingStatus.setUserId("user-1");
+        existingStatus.setServiceName(Constants.PROFILE_SERVICE_NAME);
+        existingStatus.setCurrentStatus("SEND_FOR_APPROVAL");
+        existingStatus.setRequestType(Constants.GROUP_CHANGE);
+        existingStatus.setCreatedOn(new Date());
+
+        when(wfStatusRepo.findByRootOrgAndOrgAndApplicationIdAndWfId("root", "org", "app-1", "wf-1"))
+                .thenReturn(existingStatus);
+
+        WorkFlowModel workFlowModel = buildWorkFlowModelWithApproveTransition("SEND_FOR_APPROVAL", "APPROVED");
+
+        when(configuration.getLmsServiceHost()).thenReturn("http://host");
+        when(configuration.getProfileServiceConfigPath()).thenReturn("/profile/config");
+        when(requestServiceImpl.fetchResultUsingGet(any())).thenReturn(Map.of(
+                Constants.RESULT, Map.of(Constants.RESPONSE, Map.of(Constants.VALUE, "{}"))
+        ));
+        when(mapper.readValue(anyString(), eq(Map.class))).thenReturn(new HashMap<>());
+        when(mapper.convertValue(any(), any(TypeReference.class))).thenReturn(workFlowModel);
+        when(mapper.writeValueAsString(any())).thenReturn("[]");
+        when(configuration.getModificationRecordAllowActions()).thenReturn("");
+        when(wfStatusRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Method method = WorkFlowServiceImplV2.class.getDeclaredMethod("changeStatus",
+                String.class, String.class, WfRequest.class, String.class, String.class, String.class);
+        method.setAccessible(true);
+
+        Map<String, String> result = (Map<String, String>) method.invoke(
+                workFlowService, "root", "org", wfRequest, "modifier", "role", "token");
+
+        assertEquals("APPROVED", result.get(Constants.STATUS));
+        verifyNoInteractions(producer);
+    }
+
+    @Test
+    void testChangeStatus_nextStateNotApproved_doesNotPublishEvent() throws Exception {
+        ReflectionTestUtils.setField(workFlowService, "wfStatusRepo", wfStatusRepo);
+        ReflectionTestUtils.setField(workFlowService, "mapper", mapper);
+        ReflectionTestUtils.setField(workFlowService, "cassandraOperation", cassandraOperation);
+        ReflectionTestUtils.setField(workFlowService, "configuration", configuration);
+        ReflectionTestUtils.setField(workFlowService, "requestServiceImpl", requestServiceImpl);
+        ReflectionTestUtils.setField(workFlowService, "producer", producer);
+        ReflectionTestUtils.setField(workFlowService, "redisCacheMgr", redisCacheMgr);
+
+        WfRequest wfRequest = buildDesignationWfRequest("Agriculture Supervisor");
+        wfRequest.setApplicationId("app-1");
+        wfRequest.setActorUserId("actor-1");
+        wfRequest.setUserId("user-1");
+        wfRequest.setWfId("wf-1");
+        wfRequest.setState("SEND_FOR_APPROVAL");
+        wfRequest.setAction("REJECT");
+        wfRequest.setServiceName(Constants.PROFILE_SERVICE_NAME);
+
+        WfStatusEntity existingStatus = new WfStatusEntity();
+        existingStatus.setWfId("wf-1");
+        existingStatus.setUserId("user-1");
+        existingStatus.setServiceName(Constants.PROFILE_SERVICE_NAME);
+        existingStatus.setCurrentStatus("SEND_FOR_APPROVAL");
+        existingStatus.setRequestType(Constants.DESIGNATION_CHANGE);
+        existingStatus.setCreatedOn(new Date());
+
+        when(wfStatusRepo.findByRootOrgAndOrgAndApplicationIdAndWfId("root", "org", "app-1", "wf-1"))
+                .thenReturn(existingStatus);
+
+        WfAction rejectAction = new WfAction();
+        rejectAction.setAction("REJECT");
+        rejectAction.setNextState("REJECTED");
+
+        WfStatus sendForApprovalState = new WfStatus();
+        sendForApprovalState.setState("SEND_FOR_APPROVAL");
+        sendForApprovalState.setStartState(true);
+        sendForApprovalState.setActions(List.of(rejectAction));
+
+        WfStatus rejectedState = new WfStatus();
+        rejectedState.setState("REJECTED");
+        rejectedState.setIsLastState(true);
+
+        WorkFlowModel workFlowModel = new WorkFlowModel();
+        workFlowModel.setWfstates(List.of(sendForApprovalState, rejectedState));
+
+        when(configuration.getLmsServiceHost()).thenReturn("http://host");
+        when(configuration.getProfileServiceConfigPath()).thenReturn("/profile/config");
+        when(requestServiceImpl.fetchResultUsingGet(any())).thenReturn(Map.of(
+                Constants.RESULT, Map.of(Constants.RESPONSE, Map.of(Constants.VALUE, "{}"))
+        ));
+        when(mapper.readValue(anyString(), eq(Map.class))).thenReturn(new HashMap<>());
+        when(mapper.convertValue(any(), any(TypeReference.class))).thenReturn(workFlowModel);
+        when(mapper.writeValueAsString(any())).thenReturn("[]");
+        when(configuration.getModificationRecordAllowActions()).thenReturn("");
+        when(wfStatusRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Method method = WorkFlowServiceImplV2.class.getDeclaredMethod("changeStatus",
+                String.class, String.class, WfRequest.class, String.class, String.class, String.class);
+        method.setAccessible(true);
+
+        Map<String, String> result = (Map<String, String>) method.invoke(
+                workFlowService, "root", "org", wfRequest, "modifier", "role", "token");
+
+        assertEquals("REJECTED", result.get(Constants.STATUS));
+        verifyNoInteractions(producer);
+    }
+
+    private WorkFlowModel buildWorkFlowModelWithApproveTransition(String fromState, String toState) {
+        WfAction approveAction = new WfAction();
+        approveAction.setAction("APPROVE");
+        approveAction.setNextState(toState);
+
+        WfStatus startStatus = new WfStatus();
+        startStatus.setState(fromState);
+        startStatus.setStartState(true);
+        startStatus.setActions(List.of(approveAction));
+
+        WfStatus endStatus = new WfStatus();
+        endStatus.setState(toState);
+        endStatus.setIsLastState(true);
+
+        WorkFlowModel workFlowModel = new WorkFlowModel();
+        workFlowModel.setWfstates(List.of(startStatus, endStatus));
+        return workFlowModel;
+    }
+
+    private WfRequest buildDesignationWfRequest(String designation) {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setUserId("user123");
+        wfRequest.setWfId("wfId456");
+
+        Map<String, Object> toValue = new HashMap<>();
+        toValue.put(Constants.DESIGNATION, designation);
+
+        HashMap<String, Object> updateField = new HashMap<>();
+        updateField.put(Constants.TO_VALUE, toValue);
+
+        List<HashMap<String, Object>> updateFieldValues = new ArrayList<>();
+        updateFieldValues.add(updateField);
+        wfRequest.setUpdateFieldValues(updateFieldValues);
 
         return wfRequest;
     }

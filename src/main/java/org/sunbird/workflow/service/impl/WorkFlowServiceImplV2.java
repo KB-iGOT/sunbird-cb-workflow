@@ -364,6 +364,11 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
             // Handle specific fields if applicable
             handleSpecialFields(wfRequest);
 
+            if (Constants.APPROVED_STATE.equalsIgnoreCase(nextState)
+                    && Constants.DESIGNATION_CHANGE.equalsIgnoreCase(applicationStatus.getRequestType())) {
+                publishDesignationApprovalEvent(wfRequest);
+            }
+
         } catch (IOException e) {
             throw new ApplicationException(Constants.WORKFLOW_PARSING_ERROR_MESSAGE, e);
         }
@@ -717,5 +722,37 @@ public class WorkFlowServiceImplV2 implements WorkFlowServiceV2 {
         }
     }
 
+    /**
+     * Publishes a {@link WorkflowApprovalEvent} to the service-history-approval Kafka
+     * topic once a DESIGNATION_CHANGE workflow request has been approved, so that
+     * cb-ext-userprofile-service can append the new designation into the user's
+     * service history without this service calling that service's REST API directly.
+     *
+     * @param wfRequest the approved workflow request carrying the new designation in
+     *                  its updateFieldValues and the user's org name in deptName
+     */
+    private void publishDesignationApprovalEvent(WfRequest wfRequest) {
+        if (CollectionUtils.isEmpty(wfRequest.getUpdateFieldValues())) {
+            logger.warn("No updateFieldValues found to publish designation approval event for userId: {}", wfRequest.getUserId());
+            return;
+        }
+        try {
+            wfRequest.getUpdateFieldValues().stream()
+                    .filter(updatedValue -> updatedValue.get(Constants.TO_VALUE) instanceof Map)
+                    .map(updatedValue -> (Map<String, Object>) updatedValue.get(Constants.TO_VALUE))
+                    .filter(toValue -> toValue.get(Constants.DESIGNATION) instanceof String)
+                    .findFirst()
+                    .ifPresent(toValue -> {
+                        String designation = (String) toValue.get(Constants.DESIGNATION);
+                        WorkflowApprovalEvent event = new WorkflowApprovalEvent(wfRequest.getUserId(), wfRequest.getWfId(),
+                                Constants.APPROVAL_TYPE_DESIGNATION, Constants.DESIGNATION_CHANGE, designation, wfRequest.getDeptName());
+                        producer.push(configuration.getWorkflowDesignationApprovalTopic(), event);
+                        logger.info("Published designation approval event for userId: {}, wfId: {}",
+                                wfRequest.getUserId(), wfRequest.getWfId());
+                    });
+        } catch (Exception e) {
+            logger.error("Error publishing designation approval event for userId: {}", wfRequest.getUserId(), e);
+        }
+    }
 
 }

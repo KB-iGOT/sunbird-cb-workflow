@@ -282,4 +282,10 @@ class ConfigurationTest {
         assertEquals(List.of("blendedprogram"), config.getBpWorkflowServiceNames());
     }
 
+    @Test
+    void testWorkflowDesignationApprovalTopic() {
+        config.setWorkflowDesignationApprovalTopic("workflowDesignationApprovalTopic");
+        assertEquals("workflowDesignationApprovalTopic", config.getWorkflowDesignationApprovalTopic());
+    }
+
 }
