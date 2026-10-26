@@ -248,6 +248,9 @@ public class Configuration {
     @Value("${kafka.topics.workflow.request.v2}")
     private String workflowApplicationTopicV2;
 
+    @Value("${kafka.topics.workflow.service.history}")
+    private String workflowServiceHistoryTopic;
+
     @Value("${lms.service.user.search.limit}")
     private Integer lmsUserSearchLimit;
 
@@ -995,6 +998,14 @@ public class Configuration {
 
     public void setWorkflowApplicationTopicV2(String workflowApplicationTopicV2) {
         this.workflowApplicationTopicV2 = workflowApplicationTopicV2;
+    }
+
+    public String getWorkflowServiceHistoryTopic() {
+        return workflowServiceHistoryTopic;
+    }
+
+    public void setWorkflowServiceHistoryTopic(String workflowServiceHistoryTopic) {
+        this.workflowServiceHistoryTopic = workflowServiceHistoryTopic;
     }
 
     public Integer getLmsUserSearchLimit() { return lmsUserSearchLimit; }

@@ -23,6 +23,7 @@ import org.sunbird.workflow.config.Constants;
 import org.sunbird.workflow.config.RedisCacheMgr;
 import org.sunbird.workflow.exception.ApplicationException;
 import org.sunbird.workflow.models.WfRequest;
+import org.sunbird.workflow.models.WorkflowApprovalEvent;
 import org.sunbird.workflow.postgres.entity.WfStatusEntity;
 import org.sunbird.workflow.postgres.repo.WfStatusRepo;
 import org.sunbird.workflow.producer.Producer;
@@ -637,6 +638,8 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 			Map<String, Object> profileDetails = (Map<String, Object>) existingUserResponse.get(Constants.PROFILE_DETAILS);
 			String previousProfileStatus = profileDetails == null ? null
 					: (String) profileDetails.get(Constants.PROFILE_STATUS);
+			String previousRootOrgId = getPreviousRootOrgId(existingUserResponse);
+			String previousDesignation = getPreviousDesignation(profileDetails);
 			boolean isUpdateRequired = false;
 			for (WfRequest wfRequest : wfRequests) {
 				if (isProfileUpdateApplicable(wfRequest)) {
@@ -646,6 +649,7 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 			if (isUpdateRequired) {
 				updateUserProfileData(userId, profileDetails, wfRequests, previousProfileStatus);
 			}
+			publishServiceHistoryApprovalEvent(wfRequests, previousRootOrgId, previousDesignation);
 		} catch (Exception e) {
 			logger.error("Exception occurred : ", e);
 		}
@@ -798,4 +802,138 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
         }
         return Map.of();
     }
+
+
+	/**
+	 * Runs once the whole batch for this user has finished processing (profile merge and
+	 * the downstream profile-update call are both done). Exactly one service-history event
+	 * is published per batch: an org-transfer approval carries both the previous org id and
+	 * the user's designation, while a designation-change approval carries designation details
+	 * only. The two are mutually exclusive - an org-transfer request is checked first since it
+	 * also needs the designation context, and a designation-change event is only published
+	 * when no org-transfer request was found in this batch.
+	 */
+	private void publishServiceHistoryApprovalEvent(List<WfRequest> wfRequests, String previousRootOrgId,
+			String previousDesignation) {
+		WfRequest orgTransferRequest = findOrgTransferRequest(wfRequests);
+		if (orgTransferRequest != null) {
+			publishOrgTransferApprovalEventIfOrgChanged(orgTransferRequest, previousRootOrgId, previousDesignation);
+			return;
+		}
+		WfRequest designationChangeRequest = findDesignationChangeRequest(wfRequests);
+		if (designationChangeRequest != null) {
+			publishDesignationApprovalEvent(designationChangeRequest);
+		}
+	}
+
+	/**
+	 * Publishes a {@link WorkflowApprovalEvent} to the service-history Kafka topic for an
+	 * org-transfer approval, but only when the resolved root org id actually differs from
+	 * the one the user had before this update - a resubmission that doesn't change the
+	 * underlying org must not be recorded as a transfer in service history.
+	 */
+	private void publishOrgTransferApprovalEventIfOrgChanged(WfRequest orgTransferRequest, String previousRootOrgId,
+			String previousDesignation) {
+		try {
+			String newDeptName = getNewDeptName(orgTransferRequest);
+			Map<String, Object> newOrgDetails = fetchOrgDetails(newDeptName);
+			if (MapUtils.isEmpty(newOrgDetails)) {
+				logger.warn("Could not resolve org details for deptName: {}, skipping org-transfer service-history event for userId: {}",
+						newDeptName, orgTransferRequest.getUserId());
+				return;
+			}
+			String newRootOrgId = String.valueOf(newOrgDetails.get(Constants.ROOT_ORG_ID));
+			if (StringUtils.isEmpty(previousRootOrgId) || previousRootOrgId.equals(newRootOrgId)) {
+				logger.info("Root org id unchanged for userId: {}, skipping org-transfer service-history event", orgTransferRequest.getUserId());
+				return;
+			}
+			WorkflowApprovalEvent event = new WorkflowApprovalEvent(orgTransferRequest.getUserId(), orgTransferRequest.getWfId(),
+					Constants.APPROVAL_TYPE_ORGANIZATION, Constants.ORG_TRANSFER_REQUEST, previousDesignation, newDeptName, previousRootOrgId);
+			producer.push(configuration.getWorkflowServiceHistoryTopic(), event);
+			logger.info("Published org-transfer approval event for userId: {}, wfId: {}", orgTransferRequest.getUserId(), orgTransferRequest.getWfId());
+		} catch (Exception e) {
+			logger.error("Error publishing org-transfer approval event for userId: {}", orgTransferRequest.getUserId(), e);
+		}
+	}
+
+	private WfRequest findOrgTransferRequest(List<WfRequest> wfRequests) {
+		for (WfRequest wfRequest : wfRequests) {
+			List<HashMap<String, Object>> updateFieldValues = wfRequest.getUpdateFieldValues();
+			if (CollectionUtils.isEmpty(updateFieldValues)) {
+				continue;
+			}
+			HashMap<String, Object> toValue = (HashMap<String, Object>) updateFieldValues.get(0).get(Constants.TO_VALUE);
+			if (MapUtils.isNotEmpty(toValue) && StringUtils.isNotEmpty((String) toValue.get(Constants.NAME))) {
+				return wfRequest;
+			}
+		}
+		return null;
+	}
+
+	private String getNewDeptName(WfRequest wfRequest) {
+		HashMap<String, Object> toValue = (HashMap<String, Object>) wfRequest.getUpdateFieldValues().get(0).get(Constants.TO_VALUE);
+		return (String) toValue.get(Constants.NAME);
+	}
+
+	/**
+	 * Publishes a {@link WorkflowApprovalEvent} to the service-history Kafka topic for a
+	 * DESIGNATION_CHANGE approval, carrying designation details only (no org/previousOrgId),
+	 * so that cb-ext-userprofile-service can append the designation the user is moving away
+	 * from into their service history. The designation persisted is the {@code fromValue}
+	 * (the role being left), not the {@code toValue} (the newly approved role).
+	 */
+	private void publishDesignationApprovalEvent(WfRequest designationChangeRequest) {
+		try {
+			String previousDesignation = getFromValueDesignation(designationChangeRequest);
+			WorkflowApprovalEvent event = new WorkflowApprovalEvent(designationChangeRequest.getUserId(), designationChangeRequest.getWfId(),
+					Constants.APPROVAL_TYPE_DESIGNATION, Constants.DESIGNATION_CHANGE, previousDesignation, designationChangeRequest.getDeptName());
+			producer.push(configuration.getWorkflowServiceHistoryTopic(), event);
+			logger.info("Published designation approval event for userId: {}, wfId: {}",
+					designationChangeRequest.getUserId(), designationChangeRequest.getWfId());
+		} catch (Exception e) {
+			logger.error("Error publishing designation approval event for userId: {}", designationChangeRequest.getUserId(), e);
+		}
+	}
+
+	private WfRequest findDesignationChangeRequest(List<WfRequest> wfRequests) {
+		for (WfRequest wfRequest : wfRequests) {
+			if (getFromValueDesignation(wfRequest) != null) {
+				return wfRequest;
+			}
+		}
+		return null;
+	}
+
+	private String getFromValueDesignation(WfRequest wfRequest) {
+		if (CollectionUtils.isEmpty(wfRequest.getUpdateFieldValues())) {
+			return null;
+		}
+		for (HashMap<String, Object> updatedValue : wfRequest.getUpdateFieldValues()) {
+			Object toValueObj = updatedValue.get(Constants.TO_VALUE);
+			Object fromValueObj = updatedValue.get(Constants.FROM_VALUE);
+			boolean isDesignationChange = toValueObj instanceof Map
+					&& ((Map<?, ?>) toValueObj).get(Constants.DESIGNATION) instanceof String;
+			if (isDesignationChange && fromValueObj instanceof Map
+					&& ((Map<?, ?>) fromValueObj).get(Constants.DESIGNATION) instanceof String) {
+				return (String) ((Map<?, ?>) fromValueObj).get(Constants.DESIGNATION);
+			}
+		}
+		return null;
+	}
+
+	private String getPreviousRootOrgId(Map<String, Object> existingUserResponse) {
+		Map<String, Object> rootOrg = (Map<String, Object>) existingUserResponse.get(Constants.ROOT_ORG_CONSTANT);
+		return MapUtils.isEmpty(rootOrg) ? null : (String) rootOrg.get(Constants.ROOT_ORG_ID);
+	}
+
+	private String getPreviousDesignation(Map<String, Object> profileDetails) {
+		if (MapUtils.isEmpty(profileDetails)) {
+			return null;
+		}
+		List<Map<String, Object>> professionalDetailsList = (List<Map<String, Object>>) profileDetails.get(Constants.PROFESSIONAL_DETAILS);
+		if (CollectionUtils.isEmpty(professionalDetailsList)) {
+			return null;
+		}
+		return (String) professionalDetailsList.get(0).get(Constants.DESIGNATION);
+	}
 }
