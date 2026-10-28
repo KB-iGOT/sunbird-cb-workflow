@@ -525,4 +525,10 @@ public class Constants {
 	public static final String EDATA = "edata";
 	public static final String VERSION = "version";
 	public static final String EVENT_TYPE_VERIFIED_PROFILE = "VERIFIED_PROFILE";
+	public static final String WORKFLOW_APPROVAL_EVENT_TYPE = "WorkflowApprovalEventV1";
+	public static final String WORKFLOW_SOURCE_SERVICE = "sunbird-cb-workflow";
+	public static final String APPROVAL_TYPE_DESIGNATION = "DESIGNATION";
+	public static final String APPROVAL_TYPE_ORGANIZATION = "ORGANIZATION";
+	public static final String ENTRY_TYPE_PREVIOUS = "PREVIOUS";
+	public static final String ENTRY_TYPE_CURRENT = "CURRENT";
 }
