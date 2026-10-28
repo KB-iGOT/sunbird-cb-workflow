@@ -10,8 +10,8 @@ class WorkflowApprovalEventTest {
     @Test
     void testFullConstructor_setsDerivedAndPassedFields_previousEntry() {
         WorkflowApprovalEvent event = new WorkflowApprovalEvent("user1", "wf1",
-                Constants.APPROVAL_TYPE_DESIGNATION, Constants.DESIGNATION_CHANGE, Constants.ENTRY_TYPE_PREVIOUS,
-                "Engineer", "Health Dept", "rootOrg-1");
+                Constants.APPROVAL_TYPE_DESIGNATION, Constants.DESIGNATION_CHANGE,
+                new WorkflowApprovalEvent.EntryDetails(Constants.ENTRY_TYPE_PREVIOUS, "Engineer", "Health Dept", "rootOrg-1"));
 
         assertNotNull(event.getEventId());
         assertEquals(Constants.WORKFLOW_APPROVAL_EVENT_TYPE, event.getEventType());
@@ -31,8 +31,8 @@ class WorkflowApprovalEventTest {
     @Test
     void testFullConstructor_setsDerivedAndPassedFields_currentEntry() {
         WorkflowApprovalEvent event = new WorkflowApprovalEvent("user2", "wf2",
-                Constants.APPROVAL_TYPE_ORGANIZATION, Constants.ORG_TRANSFER_REQUEST, Constants.ENTRY_TYPE_CURRENT,
-                "Director", "Finance Dept", "rootOrg-2");
+                Constants.APPROVAL_TYPE_ORGANIZATION, Constants.ORG_TRANSFER_REQUEST,
+                new WorkflowApprovalEvent.EntryDetails(Constants.ENTRY_TYPE_CURRENT, "Director", "Finance Dept", "rootOrg-2"));
 
         assertNotNull(event.getEventId());
         assertEquals(Constants.WORKFLOW_APPROVAL_EVENT_TYPE, event.getEventType());

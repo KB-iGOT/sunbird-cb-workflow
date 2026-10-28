@@ -94,11 +94,11 @@ public class ServiceHistoryApprovalEventServiceImpl implements ServiceHistoryApp
 			logger.debug("Org transfer resolved for userId: {}: rootOrgId {} -> {}", orgTransferRequest.getUserId(), previousRootOrgId, newRootOrgId);
 			String previousOrgName = resolvePreviousOrgName(previousRootOrgId);
 			WorkflowApprovalEvent previousEntry = new WorkflowApprovalEvent(orgTransferRequest.getUserId(), orgTransferRequest.getWfId(),
-					Constants.APPROVAL_TYPE_ORGANIZATION, Constants.ORG_TRANSFER_REQUEST, Constants.ENTRY_TYPE_PREVIOUS,
-					previousDesignation, previousOrgName, previousRootOrgId);
+					Constants.APPROVAL_TYPE_ORGANIZATION, Constants.ORG_TRANSFER_REQUEST,
+					new WorkflowApprovalEvent.EntryDetails(Constants.ENTRY_TYPE_PREVIOUS, previousDesignation, previousOrgName, previousRootOrgId));
 			WorkflowApprovalEvent currentEntry = new WorkflowApprovalEvent(orgTransferRequest.getUserId(), orgTransferRequest.getWfId(),
-					Constants.APPROVAL_TYPE_ORGANIZATION, Constants.ORG_TRANSFER_REQUEST, Constants.ENTRY_TYPE_CURRENT,
-					previousDesignation, newDeptName, newRootOrgId);
+					Constants.APPROVAL_TYPE_ORGANIZATION, Constants.ORG_TRANSFER_REQUEST,
+					new WorkflowApprovalEvent.EntryDetails(Constants.ENTRY_TYPE_CURRENT, previousDesignation, newDeptName, newRootOrgId));
 			producer.push(configuration.getWorkflowServiceHistoryTopic(), List.of(previousEntry, currentEntry));
 			logger.info("Published org-transfer approval event for userId: {}, wfId: {}", orgTransferRequest.getUserId(), orgTransferRequest.getWfId());
 		} catch (Exception e) {
@@ -164,11 +164,11 @@ public class ServiceHistoryApprovalEventServiceImpl implements ServiceHistoryApp
 			logger.debug("Designation change resolved for userId: {}: {} -> {}", designationChangeRequest.getUserId(),
 					previousDesignation, newDesignation);
 			WorkflowApprovalEvent previousEntry = new WorkflowApprovalEvent(designationChangeRequest.getUserId(), designationChangeRequest.getWfId(),
-					Constants.APPROVAL_TYPE_DESIGNATION, Constants.DESIGNATION_CHANGE, Constants.ENTRY_TYPE_PREVIOUS,
-					previousDesignation, deptName, previousRootOrgId);
+					Constants.APPROVAL_TYPE_DESIGNATION, Constants.DESIGNATION_CHANGE,
+					new WorkflowApprovalEvent.EntryDetails(Constants.ENTRY_TYPE_PREVIOUS, previousDesignation, deptName, previousRootOrgId));
 			WorkflowApprovalEvent currentEntry = new WorkflowApprovalEvent(designationChangeRequest.getUserId(), designationChangeRequest.getWfId(),
-					Constants.APPROVAL_TYPE_DESIGNATION, Constants.DESIGNATION_CHANGE, Constants.ENTRY_TYPE_CURRENT,
-					newDesignation, deptName, previousRootOrgId);
+					Constants.APPROVAL_TYPE_DESIGNATION, Constants.DESIGNATION_CHANGE,
+					new WorkflowApprovalEvent.EntryDetails(Constants.ENTRY_TYPE_CURRENT, newDesignation, deptName, previousRootOrgId));
 			producer.push(configuration.getWorkflowServiceHistoryTopic(), List.of(previousEntry, currentEntry));
 			logger.info("Published designation approval event for userId: {}, wfId: {}",
 					designationChangeRequest.getUserId(), designationChangeRequest.getWfId());
