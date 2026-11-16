@@ -26,6 +26,7 @@ import org.sunbird.workflow.models.WfRequest;
 import org.sunbird.workflow.postgres.entity.WfStatusEntity;
 import org.sunbird.workflow.postgres.repo.WfStatusRepo;
 import org.sunbird.workflow.producer.Producer;
+import org.sunbird.workflow.service.ServiceHistoryApprovalEventService;
 import org.sunbird.workflow.service.UserProfileWfService;
 import org.sunbird.workflow.service.Workflowservice;
 
@@ -53,6 +54,8 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 
 	private final Producer producer;
 
+	private final ServiceHistoryApprovalEventService serviceHistoryApprovalEventService;
+
     private final List<String> stateOrMinistry = Arrays.asList("16", "2048");
 
 	public UserProfileWfServiceImpl(RequestServiceImpl requestServiceImpl,
@@ -61,7 +64,8 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 			WfStatusRepo wfStatusRepo,
 			@Qualifier("workflowServiceImpl") WorkflowServiceImpl workflowService,
 			RedisCacheMgr redisCacheMgr,
-			Producer producer) {
+			Producer producer,
+			ServiceHistoryApprovalEventService serviceHistoryApprovalEventService) {
 		this.requestServiceImpl = requestServiceImpl;
 		this.configuration = configuration;
 		this.mapper = mapper;
@@ -69,6 +73,7 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 		this.workflowService = workflowService;
 		this.redisCacheMgr = redisCacheMgr;
 		this.producer = producer;
+		this.serviceHistoryApprovalEventService = serviceHistoryApprovalEventService;
 	}
 	/**
 	 * Update user profile based on wf request
@@ -646,6 +651,7 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 			if (isUpdateRequired) {
 				updateUserProfileData(userId, profileDetails, wfRequests, previousProfileStatus);
 			}
+			serviceHistoryApprovalEventService.publishServiceHistoryApprovalEvent(wfRequests, existingUserResponse, profileDetails);
 		} catch (Exception e) {
 			logger.error("Exception occurred : ", e);
 		}
