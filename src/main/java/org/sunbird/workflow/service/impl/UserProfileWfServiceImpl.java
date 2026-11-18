@@ -668,6 +668,7 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 	private boolean isProfileUpdateApplicable(WfRequest wfRequest) {
 		WfStatusEntity wfStatusEntity = wfStatusRepo.findByApplicationIdAndWfId(wfRequest.getApplicationId(),
 				wfRequest.getWfId());
+		retainRequestType(wfRequest, wfStatusEntity);
 		return (Constants.PROFILE_SERVICE_NAME.equals(wfRequest.getServiceName()) && Constants.APPROVED_STATE.equals(wfStatusEntity.getCurrentStatus()))
 				|| (Constants.USER_PROFILE_FLAG_SERVICE.equals(wfRequest.getServiceName()) && Constants.PROCESSED_STATE.equals(wfStatusEntity.getCurrentStatus()));
 	}
@@ -804,4 +805,24 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
         }
         return Map.of();
     }
+
+	/**
+	 * Stamps the persisted {@code request_type} onto the in-flight request, reusing the
+	 * {@code wf_status} row already fetched for the applicability check so that no additional
+	 * query is issued per request.
+	 * <p>
+	 * The persisted value is authoritative: it is derived server-side at submission time by
+	 * {@code addRequestTypeInProfileWF}, whereas the value carried on an incoming transition
+	 * payload is client-supplied and never validated. Downstream, only
+	 * {@link ServiceHistoryApprovalEventService} reads this field off the request.
+	 *
+	 * @param wfRequest the request being processed
+	 * @param wfStatusEntity the workflow row for that request, may be {@code null}
+	 */
+	private void retainRequestType(WfRequest wfRequest, WfStatusEntity wfStatusEntity) {
+		if (Objects.isNull(wfStatusEntity) || StringUtils.isBlank(wfStatusEntity.getRequestType())) {
+			return;
+		}
+		wfRequest.setRequestType(wfStatusEntity.getRequestType());
+	}
 }
