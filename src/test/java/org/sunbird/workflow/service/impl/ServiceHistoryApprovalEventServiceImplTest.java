@@ -72,11 +72,15 @@ class ServiceHistoryApprovalEventServiceImplTest {
     }
 
     private WfRequest designationChangeRequest(String fromDesignation, String toDesignation) {
+        return designationChangeRequest(fromDesignation, toDesignation, "Health Dept");
+    }
+
+    private WfRequest designationChangeRequest(String fromDesignation, String toDesignation, String deptName) {
         WfRequest wfRequest = new WfRequest();
         wfRequest.setUserId(USER_ID);
         wfRequest.setWfId(WF_ID);
         wfRequest.setApplicationId(APP_ID);
-        wfRequest.setDeptName("Health Dept");
+        wfRequest.setDeptName(deptName);
         wfRequest.setRequestType(Constants.DESIGNATION_CHANGE);
         HashMap<String, Object> toValue = new HashMap<>();
         toValue.put(Constants.DESIGNATION, toDesignation);
@@ -409,8 +413,13 @@ class ServiceHistoryApprovalEventServiceImplTest {
     }
 
     @Test
-    void publishDesignationApprovalEvent_publishesPreviousAndCurrentEntries() {
+    void publishDesignationApprovalEvent_publishesPreviousAndCurrentEntries_whenRootOrgIdUnchanged() {
         WfRequest wfRequest = designationChangeRequest("Accountant General", "Junior Field Assistant");
+        when(configuration.getLmsServiceHost()).thenReturn("http://lms-host/");
+        when(configuration.getLmsOrgSearchEndPoint()).thenReturn("/org/search");
+        when(requestServiceImpl.fetchResultUsingPost(any(), any(), eq(Map.class), any()))
+                .thenReturn(orgSearchResponse("oldRootOrg", "Health Dept"))
+                .thenReturn(orgSearchResponse("oldRootOrg", "Health Dept"));
 
         ReflectionTestUtils.invokeMethod(service, "publishDesignationApprovalEvent", wfRequest, "oldRootOrg");
 
@@ -437,11 +446,82 @@ class ServiceHistoryApprovalEventServiceImplTest {
     }
 
     @Test
+    void publishDesignationApprovalEvent_resolvesNewCurrentRootOrgId_whenDeptNameMapsToDifferentRootOrg() {
+        WfRequest wfRequest = designationChangeRequest("Accountant General", "Junior Field Assistant", "New Dept");
+        when(configuration.getLmsServiceHost()).thenReturn("http://lms-host/");
+        when(configuration.getLmsOrgSearchEndPoint()).thenReturn("/org/search");
+        when(requestServiceImpl.fetchResultUsingPost(any(), any(), eq(Map.class), any()))
+                .thenReturn(orgSearchResponse("oldRootOrg", "Old Dept"))
+                .thenReturn(orgSearchResponse("newRootOrg", "New Dept"));
+
+        ReflectionTestUtils.invokeMethod(service, "publishDesignationApprovalEvent", wfRequest, "oldRootOrg");
+
+        ArgumentCaptor<List<WorkflowApprovalEvent>> captor = ArgumentCaptor.forClass(List.class);
+        verify(producer, times(1)).push(eq(TOPIC), captor.capture());
+        List<WorkflowApprovalEvent> events = captor.getValue();
+        assertEquals(2, events.size());
+
+        WorkflowApprovalEvent previousEntry = events.get(0);
+        assertEquals(Constants.ENTRY_TYPE_PREVIOUS, previousEntry.getEntryType());
+        assertEquals("Accountant General", previousEntry.getDesignation());
+        assertEquals("Old Dept", previousEntry.getOrgName());
+        assertEquals("oldRootOrg", previousEntry.getOrgId());
+
+        WorkflowApprovalEvent currentEntry = events.get(1);
+        assertEquals(Constants.ENTRY_TYPE_CURRENT, currentEntry.getEntryType());
+        assertEquals("Junior Field Assistant", currentEntry.getDesignation());
+        assertEquals("New Dept", currentEntry.getOrgName());
+        assertEquals("newRootOrg", currentEntry.getOrgId());
+    }
+
+    @Test
     void publishDesignationApprovalEvent_doesNotThrow_whenProducerFails() {
         WfRequest wfRequest = designationChangeRequest("Accountant General", "Junior Field Assistant");
+        when(configuration.getLmsServiceHost()).thenReturn("http://lms-host/");
+        when(configuration.getLmsOrgSearchEndPoint()).thenReturn("/org/search");
+        when(requestServiceImpl.fetchResultUsingPost(any(), any(), eq(Map.class), any()))
+                .thenReturn(orgSearchResponse("oldRootOrg", "Health Dept"))
+                .thenReturn(orgSearchResponse("oldRootOrg", "Health Dept"));
         doThrow(new RuntimeException("kafka down")).when(producer).push(anyString(), any());
 
         assertDoesNotThrow(() -> ReflectionTestUtils.invokeMethod(service, "publishDesignationApprovalEvent", wfRequest, "oldRootOrg"));
+    }
+
+    @Test
+    void publishDesignationApprovalEvent_doesNotThrow_whenOrgLookupFails() {
+        WfRequest wfRequest = designationChangeRequest("Accountant General", "Junior Field Assistant");
+        when(configuration.getLmsServiceHost()).thenReturn("http://lms-host/");
+        when(configuration.getLmsOrgSearchEndPoint()).thenReturn("/org/search");
+        when(requestServiceImpl.fetchResultUsingPost(any(), any(), eq(Map.class), any()))
+                .thenThrow(new RuntimeException("search down"));
+
+        assertDoesNotThrow(() -> ReflectionTestUtils.invokeMethod(service, "publishDesignationApprovalEvent", wfRequest, "oldRootOrg"));
+
+        verify(producer, times(1)).push(eq(TOPIC), any());
+    }
+
+    @Test
+    void resolveCurrentRootOrgId_returnsRootOrgId_whenOrgResolved() {
+        when(configuration.getLmsServiceHost()).thenReturn("http://lms-host/");
+        when(configuration.getLmsOrgSearchEndPoint()).thenReturn("/org/search");
+        when(requestServiceImpl.fetchResultUsingPost(any(), any(), eq(Map.class), any()))
+                .thenReturn(orgSearchResponse("newRootOrg", "New Dept"));
+
+        String result = ReflectionTestUtils.invokeMethod(service, "resolveCurrentRootOrgId", "New Dept");
+
+        assertEquals("newRootOrg", result);
+    }
+
+    @Test
+    void resolveCurrentRootOrgId_returnsLiteralNullString_whenOrgNotResolved() {
+        when(configuration.getLmsServiceHost()).thenReturn("http://lms-host/");
+        when(configuration.getLmsOrgSearchEndPoint()).thenReturn("/org/search");
+        when(requestServiceImpl.fetchResultUsingPost(any(), any(), eq(Map.class), any()))
+                .thenReturn(Map.of(Constants.RESPONSE_CODE, "FAILED"));
+
+        String result = ReflectionTestUtils.invokeMethod(service, "resolveCurrentRootOrgId", "Unknown Dept");
+
+        assertEquals("null", result);
     }
 
     @Test
@@ -462,6 +542,11 @@ class ServiceHistoryApprovalEventServiceImplTest {
     @Test
     void publishServiceHistoryApprovalEvent_publishesOnlyDesignationEvent_whenNoOrgTransferRequest() {
         WfRequest wfRequest = designationChangeRequest("Engineer", "Senior Engineer");
+        when(configuration.getLmsServiceHost()).thenReturn("http://lms-host/");
+        when(configuration.getLmsOrgSearchEndPoint()).thenReturn("/org/search");
+        when(requestServiceImpl.fetchResultUsingPost(any(), any(), eq(Map.class), any()))
+                .thenReturn(orgSearchResponse("oldRootOrg", "Health Dept"))
+                .thenReturn(orgSearchResponse("oldRootOrg", "Health Dept"));
 
         service.publishServiceHistoryApprovalEvent(List.of(wfRequest), existingUserResponse("oldRootOrg"),
                 profileDetails("Engineer"));
