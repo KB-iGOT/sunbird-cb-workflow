@@ -149,12 +149,14 @@ public class ServiceHistoryApprovalEventServiceImpl implements ServiceHistoryApp
 
 	/**
 	 * Publishes the previous/current pair for a DESIGNATION_CHANGE approval. The previous entry
-	 * carries the {@code fromValue} designation and the current entry the {@code toValue}
-	 * designation; both carry the same org, since this request type does not move the org.
+	 * carries the {@code fromValue} designation, {@code previousRootOrgId}, and the org name
+	 * resolved for it; the current entry carries the {@code toValue} designation, {@code deptName},
+	 * and the root org id resolved for {@code deptName} at publish time - this is not always equal
+	 * to {@code previousRootOrgId}, since an org transfer can be approved in a separate batch and
+	 * this request's {@code deptName} already reflects it.
 	 *
 	 * @param designationChangeRequest the batch's designation-change request
-	 * @param previousRootOrgId the user's root org id before this update, unchanged by this
-	 *            request type and carried on both entries
+	 * @param previousRootOrgId the user's root org id before this update, used on the previous entry
 	 */
 	private void publishDesignationApprovalEvent(WfRequest designationChangeRequest, String previousRootOrgId) {
 		try {
@@ -165,10 +167,10 @@ public class ServiceHistoryApprovalEventServiceImpl implements ServiceHistoryApp
 					previousDesignation, newDesignation);
 			WorkflowApprovalEvent previousEntry = new WorkflowApprovalEvent(designationChangeRequest.getUserId(), designationChangeRequest.getWfId(),
 					Constants.APPROVAL_TYPE_DESIGNATION, Constants.DESIGNATION_CHANGE,
-					new WorkflowApprovalEvent.EntryDetails(Constants.ENTRY_TYPE_PREVIOUS, previousDesignation, deptName, previousRootOrgId));
+					new WorkflowApprovalEvent.EntryDetails(Constants.ENTRY_TYPE_PREVIOUS, previousDesignation, resolvePreviousOrgName(previousRootOrgId), previousRootOrgId));
 			WorkflowApprovalEvent currentEntry = new WorkflowApprovalEvent(designationChangeRequest.getUserId(), designationChangeRequest.getWfId(),
 					Constants.APPROVAL_TYPE_DESIGNATION, Constants.DESIGNATION_CHANGE,
-					new WorkflowApprovalEvent.EntryDetails(Constants.ENTRY_TYPE_CURRENT, newDesignation, deptName, previousRootOrgId));
+					new WorkflowApprovalEvent.EntryDetails(Constants.ENTRY_TYPE_CURRENT, newDesignation, deptName, resolveCurrentRootOrgId(deptName)));
 			producer.push(configuration.getWorkflowServiceHistoryTopic(), List.of(previousEntry, currentEntry));
 			logger.info("Published designation approval event for userId: {}, wfId: {}",
 					designationChangeRequest.getUserId(), designationChangeRequest.getWfId());
@@ -300,5 +302,17 @@ public class ServiceHistoryApprovalEventServiceImpl implements ServiceHistoryApp
 			logger.error("Error searching for org details with {}: {}", filterKey, filterValue, e);
 		}
 		return Map.of();
+	}
+
+	/**
+	 * Resolves the root org id to carry on the current entry of a designation-change event, by
+	 * looking up {@code deptName} the same way an org-transfer's new org is resolved.
+	 *
+	 * @param deptName the designation-change request's department/org name
+	 * @return the resolved current root org id
+	 */
+	private String resolveCurrentRootOrgId(String deptName) {
+		Map<String, Object> currentOrgDetails = fetchOrgDetailsByName(deptName);
+		return String.valueOf(currentOrgDetails.get(Constants.ROOT_ORG_ID));
 	}
 }
