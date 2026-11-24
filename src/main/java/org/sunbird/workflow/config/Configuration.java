@@ -1,5 +1,7 @@
 package org.sunbird.workflow.config;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -7,6 +9,8 @@ import java.util.Arrays;
 import java.util.List;
 
 @Component
+@Getter
+@Setter
 public class Configuration {
 
     @Value("${workflow.pagination.default.limit}")
@@ -349,6 +353,9 @@ public class Configuration {
 
     @Value("${karma.points.unified.event.version:1}")
     private int karmaPointsEventVersion;
+
+    @Value("${kafka.topics.workflow.service.history}")
+    private String workflowServiceHistoryTopic;
 
     public String getAdminBlendedProgramEnrolEndPoint() {
         return adminBlendedProgramEnrolEndPoint;

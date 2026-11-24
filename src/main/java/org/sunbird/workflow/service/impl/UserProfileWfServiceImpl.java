@@ -26,6 +26,7 @@ import org.sunbird.workflow.models.WfRequest;
 import org.sunbird.workflow.postgres.entity.WfStatusEntity;
 import org.sunbird.workflow.postgres.repo.WfStatusRepo;
 import org.sunbird.workflow.producer.Producer;
+import org.sunbird.workflow.service.ServiceHistoryApprovalEventService;
 import org.sunbird.workflow.service.UserProfileWfService;
 import org.sunbird.workflow.service.Workflowservice;
 
@@ -53,6 +54,8 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 
 	private final Producer producer;
 
+	private final ServiceHistoryApprovalEventService serviceHistoryApprovalEventService;
+
     private final List<String> stateOrMinistry = Arrays.asList("16", "2048");
 
 	public UserProfileWfServiceImpl(RequestServiceImpl requestServiceImpl,
@@ -61,7 +64,8 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 			WfStatusRepo wfStatusRepo,
 			@Qualifier("workflowServiceImpl") WorkflowServiceImpl workflowService,
 			RedisCacheMgr redisCacheMgr,
-			Producer producer) {
+			Producer producer,
+			ServiceHistoryApprovalEventService serviceHistoryApprovalEventService) {
 		this.requestServiceImpl = requestServiceImpl;
 		this.configuration = configuration;
 		this.mapper = mapper;
@@ -69,6 +73,7 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 		this.workflowService = workflowService;
 		this.redisCacheMgr = redisCacheMgr;
 		this.producer = producer;
+		this.serviceHistoryApprovalEventService = serviceHistoryApprovalEventService;
 	}
 	/**
 	 * Update user profile based on wf request
@@ -646,6 +651,7 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 			if (isUpdateRequired) {
 				updateUserProfileData(userId, profileDetails, wfRequests, previousProfileStatus);
 			}
+			serviceHistoryApprovalEventService.publishServiceHistoryApprovalEvent(wfRequests, existingUserResponse, profileDetails);
 		} catch (Exception e) {
 			logger.error("Exception occurred : ", e);
 		}
@@ -662,6 +668,7 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
 	private boolean isProfileUpdateApplicable(WfRequest wfRequest) {
 		WfStatusEntity wfStatusEntity = wfStatusRepo.findByApplicationIdAndWfId(wfRequest.getApplicationId(),
 				wfRequest.getWfId());
+		retainRequestType(wfRequest, wfStatusEntity);
 		return (Constants.PROFILE_SERVICE_NAME.equals(wfRequest.getServiceName()) && Constants.APPROVED_STATE.equals(wfStatusEntity.getCurrentStatus()))
 				|| (Constants.USER_PROFILE_FLAG_SERVICE.equals(wfRequest.getServiceName()) && Constants.PROCESSED_STATE.equals(wfStatusEntity.getCurrentStatus()));
 	}
@@ -798,4 +805,24 @@ public class UserProfileWfServiceImpl implements UserProfileWfService {
         }
         return Map.of();
     }
+
+	/**
+	 * Stamps the persisted {@code request_type} onto the in-flight request, reusing the
+	 * {@code wf_status} row already fetched for the applicability check so that no additional
+	 * query is issued per request.
+	 * <p>
+	 * The persisted value is authoritative: it is derived server-side at submission time by
+	 * {@code addRequestTypeInProfileWF}, whereas the value carried on an incoming transition
+	 * payload is client-supplied and never validated. Downstream, only
+	 * {@link ServiceHistoryApprovalEventService} reads this field off the request.
+	 *
+	 * @param wfRequest the request being processed
+	 * @param wfStatusEntity the workflow row for that request, may be {@code null}
+	 */
+	private void retainRequestType(WfRequest wfRequest, WfStatusEntity wfStatusEntity) {
+		if (Objects.isNull(wfStatusEntity) || StringUtils.isBlank(wfStatusEntity.getRequestType())) {
+			return;
+		}
+		wfRequest.setRequestType(wfStatusEntity.getRequestType());
+	}
 }

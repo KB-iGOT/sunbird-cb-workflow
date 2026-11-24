@@ -1432,4 +1432,105 @@ class UserProfileWfServiceImplTest {
         assert "FAILED".equals(wfStatusEntity.getCurrentStatus());
     }
 
+    @Test
+    void retainRequestType_shouldSetRequestType_whenWfStatusEntityHasRequestType() throws Exception {
+        WfRequest wfRequest = new WfRequest();
+
+        WfStatusEntity wfStatusEntity = new WfStatusEntity();
+        wfStatusEntity.setRequestType("DESIGNATION_CHANGE");
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
+                "retainRequestType", WfRequest.class, WfStatusEntity.class);
+        method.setAccessible(true);
+        method.invoke(userProfileWfServiceImpl, wfRequest, wfStatusEntity);
+
+        assertEquals("DESIGNATION_CHANGE", wfRequest.getRequestType());
+    }
+
+    @Test
+    void retainRequestType_shouldOverwriteClientSuppliedRequestType_whenPersistedValueDiffers() throws Exception {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setRequestType("CLIENT_SUPPLIED_VALUE");
+
+        WfStatusEntity wfStatusEntity = new WfStatusEntity();
+        wfStatusEntity.setRequestType("PERSISTED_VALUE");
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
+                "retainRequestType", WfRequest.class, WfStatusEntity.class);
+        method.setAccessible(true);
+        method.invoke(userProfileWfServiceImpl, wfRequest, wfStatusEntity);
+
+        assertEquals("PERSISTED_VALUE", wfRequest.getRequestType());
+    }
+
+    @Test
+    void retainRequestType_shouldLeaveRequestTypeUnchanged_whenWfStatusEntityIsNull() throws Exception {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setRequestType("CLIENT_SUPPLIED_VALUE");
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
+                "retainRequestType", WfRequest.class, WfStatusEntity.class);
+        method.setAccessible(true);
+        method.invoke(userProfileWfServiceImpl, wfRequest, (WfStatusEntity) null);
+
+        assertEquals("CLIENT_SUPPLIED_VALUE", wfRequest.getRequestType());
+    }
+
+    @Test
+    void retainRequestType_shouldLeaveRequestTypeUnchanged_whenPersistedRequestTypeIsBlank() throws Exception {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setRequestType("CLIENT_SUPPLIED_VALUE");
+
+        WfStatusEntity wfStatusEntity = new WfStatusEntity();
+        wfStatusEntity.setRequestType("   ");
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod(
+                "retainRequestType", WfRequest.class, WfStatusEntity.class);
+        method.setAccessible(true);
+        method.invoke(userProfileWfServiceImpl, wfRequest, wfStatusEntity);
+
+        assertEquals("CLIENT_SUPPLIED_VALUE", wfRequest.getRequestType());
+    }
+
+    @Test
+    void isProfileUpdateApplicable_shouldRetainPersistedRequestType_whenWfStatusEntityHasRequestType() throws Exception {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setApplicationId("appId");
+        wfRequest.setWfId("wfId");
+        wfRequest.setServiceName(Constants.PROFILE_SERVICE_NAME);
+        wfRequest.setRequestType("CLIENT_SUPPLIED_VALUE");
+
+        WfStatusEntity wfStatusEntity = new WfStatusEntity();
+        wfStatusEntity.setCurrentStatus(Constants.APPROVED_STATE);
+        wfStatusEntity.setRequestType("DESIGNATION_CHANGE");
+        when(wfStatusRepo.findByApplicationIdAndWfId("appId", "wfId")).thenReturn(wfStatusEntity);
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod("isProfileUpdateApplicable", WfRequest.class);
+        method.setAccessible(true);
+        boolean result = (boolean) method.invoke(userProfileWfServiceImpl, wfRequest);
+
+        assertTrue(result);
+        assertEquals("DESIGNATION_CHANGE", wfRequest.getRequestType());
+    }
+
+    @Test
+    void isProfileUpdateApplicable_shouldLeaveRequestTypeUnchanged_whenWfStatusEntityRequestTypeIsBlank() throws Exception {
+        WfRequest wfRequest = new WfRequest();
+        wfRequest.setApplicationId("appId");
+        wfRequest.setWfId("wfId");
+        wfRequest.setServiceName(Constants.USER_PROFILE_FLAG_SERVICE);
+        wfRequest.setRequestType("CLIENT_SUPPLIED_VALUE");
+
+        WfStatusEntity wfStatusEntity = new WfStatusEntity();
+        wfStatusEntity.setCurrentStatus(Constants.PROCESSED_STATE);
+        when(wfStatusRepo.findByApplicationIdAndWfId("appId", "wfId")).thenReturn(wfStatusEntity);
+
+        Method method = UserProfileWfServiceImpl.class.getDeclaredMethod("isProfileUpdateApplicable", WfRequest.class);
+        method.setAccessible(true);
+        boolean result = (boolean) method.invoke(userProfileWfServiceImpl, wfRequest);
+
+        assertTrue(result);
+        assertEquals("CLIENT_SUPPLIED_VALUE", wfRequest.getRequestType());
+    }
+
 }
